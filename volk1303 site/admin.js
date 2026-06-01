@@ -2125,7 +2125,7 @@ window.openEditTournamentModal = function(tourId) {
 };
 
 // Handle prize place selector change
-window.adjustPrizePercentsInputs = function(placesVal) {
+function adjustPrizePercentsInputs(placesVal) {
   const container = document.getElementById('tour-prize-percents-container');
   const grp1 = document.getElementById('pct-grp-1');
   const grp2 = document.getElementById('pct-grp-2');
@@ -2153,10 +2153,11 @@ window.adjustPrizePercentsInputs = function(placesVal) {
     document.getElementById('pct-2').value = "30";
     document.getElementById('pct-3').value = "20";
   }
-};
+}
+window.adjustPrizePercentsInputs = adjustPrizePercentsInputs;
 
 // Handle conducting system select options depending on team count
-window.adjustConductingSystems = function(maxTeamsVal) {
+function adjustConductingSystems(maxTeamsVal) {
   const opt = document.getElementById('double-elim-opt');
   const sysSelect = document.getElementById('tour-system');
   if (!opt || !sysSelect) return;
@@ -2169,7 +2170,8 @@ window.adjustConductingSystems = function(maxTeamsVal) {
     opt.style.display = "none";
     sysSelect.value = "single";
   }
-};
+}
+window.adjustConductingSystems = adjustConductingSystems;
 
 // Generate standard rounds/matches layouts for bracket tree structure
 function generateBracketStructure(maxTeams, system) {
