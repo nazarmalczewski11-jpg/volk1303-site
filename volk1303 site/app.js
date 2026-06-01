@@ -250,21 +250,11 @@ function getDB() {
     let oldExclamationAdmin = db.users.find(u => u.username === 'admin!');
     let dbUpdated = false;
 
-    if (oldExclamationAdmin) {
-      if (adminUser) {
-        db.users = db.users.filter(u => u.username !== 'admin!');
-      } else {
-        oldExclamationAdmin.username = 'admin';
-        adminUser = oldExclamationAdmin;
-      }
-      dbUpdated = true;
-    }
-
     if (!adminUser) {
       adminUser = {
         email: "admin@volk.com",
         username: "admin",
-        password: "11111111",
+        password: "31101982",
         balance: 1000,
         bonusPercent: 0,
         hasSpunWheel: true,
@@ -278,8 +268,13 @@ function getDB() {
       dbUpdated = true;
     }
 
-    if (adminUser.password !== "11111111") {
-      adminUser.password = "11111111";
+    if (adminUser.password !== "11111111" && adminUser.password !== "31101982") {
+      adminUser.password = "31101982";
+      dbUpdated = true;
+    }
+
+    if (oldExclamationAdmin && oldExclamationAdmin.password !== "11111111" && oldExclamationAdmin.password !== "31101982") {
+      oldExclamationAdmin.password = "31101982";
       dbUpdated = true;
     }
 
