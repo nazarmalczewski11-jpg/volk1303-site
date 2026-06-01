@@ -1130,7 +1130,7 @@ function renderBettingTeamsForTour(tourId) {
       <div style="font-size:11px; font-weight:800; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:12px;">👥 Команди та коефіцієнти</div>
       <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap:10px;">
         ${teamObjects.map(team => {
-          const odds = (tour.teamOdds && tour.teamOdds[team.id]) ? tour.teamOdds[team.id] : '';
+          const odds = (tour.teamOdds && tour.teamOdds[team.id] !== undefined) ? tour.teamOdds[team.id] : 2.5;
           return `
             <div style="background:#0c0d12; border:1px solid rgba(255,255,255,0.05); border-radius:10px; padding:14px; display:flex; flex-direction:column; gap:10px;">
               <div style="display:flex; align-items:center; gap:8px;">
@@ -1181,40 +1181,7 @@ window.setTournamentTeamOdds = function(tourId, teamId) {
   setTimeout(() => { input.style.borderColor = 'rgba(255,90,0,0.3)'; }, 1000);
 };
 
-// =====================================================
-// TOURNAMENT BET - Public site player action
-// =====================================================
-window.placeTournamentBet = function(tourId, teamId, teamName, odds) {
-  const db = getDB();
-  const user = db.users.find(u => u.username === db.loggedInUser);
-  if (!user) { showToast('Увійдіть в акаунт для ставки!', 'error'); return; }
 
-  const amountStr = prompt(`Ставка на команду "${teamName}" (коеф. x${odds})\nВаш баланс: ${user.balance} 🪙\nВведіть суму ставки:`);
-  if (!amountStr) return;
-  const amount = parseInt(amountStr);
-  if (isNaN(amount) || amount < 1) { showToast('Введіть коректну суму!', 'error'); return; }
-  if (amount > user.balance) { showToast('Недостатньо монет!', 'error'); return; }
-
-  user.balance -= amount;
-  if (!user.betHistory) user.betHistory = [];
-  user.betHistory.push({
-    id: 'tb_' + Date.now(),
-    type: 'tournament',
-    tourId,
-    teamId,
-    selectedTeam: teamName,
-    odds,
-    amount,
-    date: new Date().toLocaleString('uk-UA'),
-    status: 'В грі',
-    payout: 0
-  });
-
-  saveDB(db);
-  showToast(`Ставку ${amount} 🪙 на "${teamName}" (x${odds}) прийнято!`, 'success');
-  // Re-render the betting section for this tournament
-  if (typeof renderTournamentBettingPortal === 'function') renderTournamentBettingPortal(tourId);
-};
 
 // Render Admin Matches Editor cards list
 function renderAdminMatchesEditor(matches) {

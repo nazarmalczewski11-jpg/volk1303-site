@@ -2760,6 +2760,24 @@ window.switchTournamentDetailTab = function(tourId, tabKey) {
   }
 };
 
+// Check if a tournament's active match has a 6+ round score lead to freeze bets
+function isTournamentBettingFrozen(tour) {
+  if (!tour || !tour.brackets || !tour.brackets.rounds) return false;
+  for (const round of tour.brackets.rounds) {
+    if (!round.matches) continue;
+    for (const match of round.matches) {
+      if (match.status === 'live' || match.status === 'active') {
+        const s1 = parseInt(match.score1) || 0;
+        const s2 = parseInt(match.score2) || 0;
+        if (Math.abs(s1 - s2) >= 6) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
 // Render betting portal for a tournament on the public site
 function renderTournamentBettingPortal(tourId) {
   const container = document.getElementById(`tour-betting-portal-${tourId}`);
@@ -2774,37 +2792,44 @@ function renderTournamentBettingPortal(tourId) {
   const teamOdds = tour.teamOdds || {};
 
   const user = db.loggedInUser ? db.users.find(u => u.username === db.loggedInUser) : null;
-
-  // Check if any team has odds set
-  const hasOdds = teamObjects.some(t => teamOdds[t.id]);
+  const frozen = isTournamentBettingFrozen(tour);
 
   if (teamObjects.length === 0) {
     container.innerHTML = `<div style="text-align:center; color:var(--text-secondary); padding:30px; font-size:12px;">Команди до цього турніру ще не додані</div>`;
     return;
   }
 
-  if (!hasOdds) {
-    container.innerHTML = `
-      <div style="text-align:center; padding:30px;">
-        <div style="font-size:32px; margin-bottom:12px;">⏳</div>
-        <div style="color:white; font-weight:800; font-size:14px; margin-bottom:6px;">Коефіцієнти ще не встановлені</div>
-        <div style="color:var(--text-secondary); font-size:12px;">Організатор ще не виставив коефіцієнти на команди.<br>Перевірте пізніше!</div>
-      </div>`;
-    return;
-  }
-
   container.innerHTML = `
-    <div style="margin-bottom:16px;">
-      <div style="font-size:12px; font-weight:800; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">💰 Ваш баланс</div>
-      <div style="font-size:20px; font-weight:900; color:var(--cs-orange);">${user ? user.balance + ' 🪙' : '<span style="color:var(--text-secondary); font-size:13px;">Увійдіть для ставок</span>'}</div>
+    ${frozen ? `
+      <div style="background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.25); border-radius:10px; padding:12px 16px; margin-bottom:16px; display:flex; align-items:center; gap:10px; color:#ef4444; font-size:12px; font-weight:800; box-shadow:0 4px 12px rgba(239,68,68,0.05);">
+        <span style="font-size:16px; animation: pulse 1.5s infinite;">❄️</span>
+        <span>СТАВКИ ЗАМОРОЖЕНО (одна з команд перемагає на 6+ раундів)</span>
+      </div>
+    ` : ''}
+    <div style="margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <div style="font-size:12px; font-weight:800; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">💰 Ваш баланс</div>
+        <div style="font-size:20px; font-weight:900; color:var(--cs-orange);">${user ? user.balance + ' 🪙' : '<span style="color:var(--text-secondary); font-size:13px;">Увійдіть для ставок</span>'}</div>
+      </div>
+      ${!frozen ? `<span style="font-size:11px; background:rgba(38,161,123,0.1); border:1px solid rgba(38,161,123,0.2); padding:4px 8px; border-radius:6px; color:#26a17b; font-weight:700;">🟢 Ставки відкриті</span>` : ''}
     </div>
     <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:12px;">
       ${teamObjects.map(team => {
-        const odds = teamOdds[team.id];
-        if (!odds) return '';
+        const odds = teamOdds[team.id] !== undefined ? teamOdds[team.id] : 2.5;
         const players = (team.players || []);
+        
+        let btnText = `🎰 ПОСТАВИТИ НА ${team.name.toUpperCase()}`;
+        let btnDisabledAttr = '';
+        
+        if (frozen) {
+          btnText = `❄️ ЗАМОРОЖЕНО`;
+          btnDisabledAttr = 'disabled title="Ставки заморожені через велику різницю в рахунку" style="background:#1e293b; color:var(--text-secondary); cursor:not-allowed;"';
+        } else if (!user) {
+          btnDisabledAttr = 'disabled title="Увійдіть для ставок"';
+        }
+
         return `
-          <div style="background:linear-gradient(135deg, #0e0f1a 0%, #131525 100%); border:1px solid rgba(255,255,255,0.07); border-radius:12px; padding:16px; display:flex; flex-direction:column; gap:12px; transition:all 0.2s;" onmouseover="this.style.borderColor='rgba(255,90,0,0.4)'; this.style.transform='translateY(-2px)';" onmouseout="this.style.borderColor='rgba(255,255,255,0.07)'; this.style.transform='translateY(0)';">
+          <div style="background:linear-gradient(135deg, #0e0f1a 0%, #131525 100%); border:1px solid rgba(255,255,255,0.07); border-radius:12px; padding:16px; display:flex; flex-direction:column; gap:12px; transition:all 0.2s;" onmouseover="if(!${frozen}) this.style.borderColor='rgba(255,90,0,0.4)'; if(!${frozen}) this.style.transform='translateY(-2px)';" onmouseout="this.style.borderColor='rgba(255,255,255,0.07)'; this.style.transform='translateY(0)';">
             <div style="display:flex; align-items:center; gap:10px;">
               <div style="background:rgba(255,90,0,0.15); border:1px solid rgba(255,90,0,0.3); border-radius:8px; padding:8px 10px; font-size:16px; flex-shrink:0;">🛡️</div>
               <div style="min-width:0;">
@@ -2822,14 +2847,66 @@ function renderTournamentBettingPortal(tourId) {
                 ${players.slice(0,5).map(p => `<span style="background:#1e293b; color:white; padding:3px 8px; border-radius:4px; font-size:10px; font-weight:700;">@${p.toUpperCase()}</span>`).join('')}
                 ${players.length > 5 ? `<span style="background:#1e293b; color:var(--text-secondary); padding:3px 8px; border-radius:4px; font-size:10px;">+${players.length-5}</span>` : ''}
               </div>` : ''}
-            <button onclick="placeTournamentBet('${tourId}', '${team.id}', '${team.name}', ${odds})" style="width:100%; background:linear-gradient(135deg, rgba(255,90,0,0.9), rgba(255,60,0,0.9)); border:none; color:white; border-radius:8px; padding:10px; font-size:12px; font-weight:900; cursor:pointer; letter-spacing:0.5px; transition:all 0.2s; text-transform:uppercase;" onmouseover="this.style.transform='scale(1.02)';" onmouseout="this.style.transform='scale(1)';"
-              ${!user ? 'disabled title="Увійдіть для ставок"' : ''}>🎰 ПОСТАВИТИ НА ${team.name.toUpperCase()}</button>
+            <button onclick="placeTournamentBet('${tourId}', '${team.id}', '${team.name}', ${odds})" style="width:100%; background:linear-gradient(135deg, rgba(255,90,0,0.9), rgba(255,60,0,0.9)); border:none; color:white; border-radius:8px; padding:10px; font-size:12px; font-weight:900; cursor:pointer; letter-spacing:0.5px; transition:all 0.2s; text-transform:uppercase;" onmouseover="if(!${frozen}) this.style.transform='scale(1.02)';" onmouseout="if(!${frozen}) this.style.transform='scale(1)';"
+              ${btnDisabledAttr}>${btnText}</button>
           </div>
         `;
       }).join('')}
     </div>
   `;
 }
+
+// Handle placing tournament team bet on client side
+window.placeTournamentBet = function(tourId, teamId, teamName, odds) {
+  const db = getDB();
+  const tour = db.tournaments.find(t => t.id === tourId);
+  if (!tour) {
+    showToast('Турнір не знайдено!', 'error');
+    return;
+  }
+
+  if (isTournamentBettingFrozen(tour)) {
+    showToast('Ставки на цей турнір заморожено (різниця в рахунку матчу 6+ раундів)!', 'error');
+    return;
+  }
+
+  const user = db.users.find(u => u.username === db.loggedInUser);
+  if (!user) {
+    showToast('Увійдіть в акаунт для ставки!', 'error');
+    return;
+  }
+
+  const amountStr = prompt(`Ставка на команду "${teamName}" (коеф. x${odds})\nВаш баланс: ${user.balance} 🪙\nВведіть суму ставки:`);
+  if (!amountStr) return;
+  const amount = parseInt(amountStr);
+  if (isNaN(amount) || amount < 1) {
+    showToast('Введіть коректну суму!', 'error');
+    return;
+  }
+  if (amount > user.balance) {
+    showToast('Недостатньо монет на балансі!', 'error');
+    return;
+  }
+
+  user.balance -= amount;
+  if (!user.betHistory) user.betHistory = [];
+  user.betHistory.push({
+    id: 'tb_' + Date.now(),
+    type: 'tournament',
+    tourId,
+    teamId,
+    selectedTeam: teamName,
+    odds,
+    amount,
+    date: new Date().toLocaleString('uk-UA'),
+    status: 'В грі',
+    payout: 0
+  });
+
+  saveDB(db);
+  showToast(`Ставку ${amount} 🪙 на "${teamName}" (x${odds}) прийнято!`, 'success');
+  renderTournamentBettingPortal(tourId);
+};
 
 // SVG vibrant color hash team initials logo generator
 function generateTeamLogoSVG(teamName) {
