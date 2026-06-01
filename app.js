@@ -1,5 +1,187 @@
 // Database key for LocalStorage
 const DB_KEY = 'volk_site_v4';
+const CLOUD_BUCKET = 'https://kvdb.io/RewyBV3ePoEzaKv2H17apy/';
+
+let isSyncing = false;
+
+// Pull and sync from cloud
+async function syncWithCloud() {
+  if (isSyncing) return;
+  isSyncing = true;
+  
+  const db = getDB();
+  let dbChanged = false;
+  let shouldPush = false;
+
+  try {
+    // 1. Sync users
+    const uRes = await fetch(CLOUD_BUCKET + 'users');
+    if (uRes.ok) {
+      const cloudUsers = await uRes.json();
+      if (Array.isArray(cloudUsers)) {
+        cloudUsers.forEach(cu => {
+          const luIdx = db.users.findIndex(u => u.username.toLowerCase() === cu.username.toLowerCase());
+          if (luIdx === -1) {
+            db.users.push(cu);
+            dbChanged = true;
+          } else {
+            const lu = db.users[luIdx];
+            if (JSON.stringify(lu) !== JSON.stringify(cu)) {
+              let userUpdated = false;
+              
+              // A. Merge login history (keep the longer one)
+              const cuLogLen = cu.loginHistory ? cu.loginHistory.length : 0;
+              const luLogLen = lu.loginHistory ? lu.loginHistory.length : 0;
+              if (cuLogLen > luLogLen) {
+                lu.loginHistory = cu.loginHistory;
+                userUpdated = true;
+              } else if (luLogLen > cuLogLen) {
+                shouldPush = true;
+              }
+
+              // B. Merge deposit history
+              const cuDepLen = cu.depositHistory ? cu.depositHistory.length : 0;
+              const luDepLen = lu.depositHistory ? lu.depositHistory.length : 0;
+              if (cuDepLen > luDepLen) {
+                lu.depositHistory = cu.depositHistory;
+                userUpdated = true;
+              } else if (luDepLen > cuDepLen) {
+                shouldPush = true;
+              }
+
+              // C. Merge bet history
+              const cuBetLen = cu.betHistory ? cu.betHistory.length : 0;
+              const luBetLen = lu.betHistory ? lu.betHistory.length : 0;
+              if (cuBetLen > luBetLen) {
+                lu.betHistory = cu.betHistory;
+                userUpdated = true;
+              } else if (luBetLen > cuBetLen) {
+                shouldPush = true;
+              }
+
+              // D. Sync basic fields
+              if (lu.balance !== cu.balance) {
+                lu.balance = cu.balance;
+                userUpdated = true;
+              }
+              if (lu.bonusPercent !== cu.bonusPercent) {
+                lu.bonusPercent = cu.bonusPercent;
+                userUpdated = true;
+              }
+              if (lu.password !== cu.password) {
+                lu.password = cu.password;
+                userUpdated = true;
+              }
+              if (lu.email !== cu.email) {
+                lu.email = cu.email;
+                userUpdated = true;
+              }
+
+              if (userUpdated) {
+                dbChanged = true;
+              }
+            }
+          }
+        });
+      }
+    } else if (uRes.status === 404) {
+      await pushToCloud(db);
+    }
+
+    // 2. Sync structures
+    const [bRes, mRes, tRes, lRes, sRes, pRes] = await Promise.all([
+      fetch(CLOUD_BUCKET + 'brackets'),
+      fetch(CLOUD_BUCKET + 'matches'),
+      fetch(CLOUD_BUCKET + 'teams'),
+      fetch(CLOUD_BUCKET + 'aimLobbies'),
+      fetch(CLOUD_BUCKET + 'settings'),
+      fetch(CLOUD_BUCKET + 'promocodes')
+    ]);
+
+    if (bRes.ok) {
+      const cloudBrackets = await bRes.json();
+      if (JSON.stringify(db.brackets) !== JSON.stringify(cloudBrackets)) {
+        db.brackets = cloudBrackets;
+        dbChanged = true;
+      }
+    }
+    if (mRes.ok) {
+      const cloudMatches = await mRes.json();
+      if (JSON.stringify(db.matches) !== JSON.stringify(cloudMatches)) {
+        db.matches = cloudMatches;
+        dbChanged = true;
+      }
+    }
+    if (tRes.ok) {
+      const cloudTeams = await tRes.json();
+      if (JSON.stringify(db.teams) !== JSON.stringify(cloudTeams)) {
+        db.teams = cloudTeams;
+        dbChanged = true;
+      }
+    }
+    if (lRes.ok) {
+      const cloudLobbies = await lRes.json();
+      if (JSON.stringify(db.aimLobbies) !== JSON.stringify(cloudLobbies)) {
+        db.aimLobbies = cloudLobbies;
+        dbChanged = true;
+      }
+    }
+    if (pRes.ok) {
+      const cloudPromocodes = await pRes.json();
+      if (JSON.stringify(db.promocodes) !== JSON.stringify(cloudPromocodes)) {
+        db.promocodes = cloudPromocodes;
+        dbChanged = true;
+      }
+    }
+    if (sRes.ok) {
+      const settings = await sRes.json();
+      if (settings.twitchStatus && settings.twitchStatus !== db.twitchStatus) {
+        db.twitchStatus = settings.twitchStatus;
+        dbChanged = true;
+      }
+      if (settings.activeTwitchChannel && settings.activeTwitchChannel !== db.activeTwitchChannel) {
+        db.activeTwitchChannel = settings.activeTwitchChannel;
+        dbChanged = true;
+      }
+    }
+
+    if (dbChanged) {
+      localStorage.setItem(DB_KEY, JSON.stringify(db));
+      window.dispatchEvent(new Event('storage_updated'));
+      if (typeof renderPageContent === 'function') {
+        renderPageContent();
+      }
+      if (shouldPush) {
+        pushToCloud(db);
+      }
+    }
+
+  } catch (e) {
+    console.error("Cloud sync error:", e);
+  } finally {
+    isSyncing = false;
+  }
+}
+
+// Push local changes to cloud
+async function pushToCloud(db) {
+  try {
+    await Promise.all([
+      fetch(CLOUD_BUCKET + 'users', { method: 'POST', body: JSON.stringify(db.users) }),
+      fetch(CLOUD_BUCKET + 'brackets', { method: 'POST', body: JSON.stringify(db.brackets) }),
+      fetch(CLOUD_BUCKET + 'matches', { method: 'POST', body: JSON.stringify(db.matches) }),
+      fetch(CLOUD_BUCKET + 'teams', { method: 'POST', body: JSON.stringify(db.teams) }),
+      fetch(CLOUD_BUCKET + 'aimLobbies', { method: 'POST', body: JSON.stringify(db.aimLobbies) }),
+      fetch(CLOUD_BUCKET + 'promocodes', { method: 'POST', body: JSON.stringify(db.promocodes) }),
+      fetch(CLOUD_BUCKET + 'settings', { method: 'POST', body: JSON.stringify({
+        twitchStatus: db.twitchStatus,
+        activeTwitchChannel: db.activeTwitchChannel
+      }) })
+    ]);
+  } catch (e) {
+    console.error("Failed to push to cloud:", e);
+  }
+}
 
 // Fresh database getter
 function getDB() {
@@ -75,6 +257,7 @@ function getDB() {
 function saveDB(db) {
   localStorage.setItem(DB_KEY, JSON.stringify(db));
   window.dispatchEvent(new Event('storage_updated'));
+  return pushToCloud(db); // Async cloud update!
 }
 
 // Initial mock database
@@ -184,6 +367,45 @@ window.logoutUser = function() {
   window.location.href = 'index.html';
 };
 
+function getBrowserDeviceInfo() {
+  const ua = navigator.userAgent;
+  let os = "Unknown OS";
+  let browser = "Unknown Browser";
+
+  if (ua.indexOf("Android") !== -1) os = "Android";
+  else if (ua.indexOf("like Mac") !== -1 || ua.indexOf("iPhone") !== -1 || ua.indexOf("iPad") !== -1) os = "iOS";
+  else if (ua.indexOf("Win") !== -1) os = "Windows";
+  else if (ua.indexOf("Mac") !== -1) os = "MacOS";
+  else if (ua.indexOf("Linux") !== -1) os = "Linux";
+
+  if (ua.indexOf("Chrome") !== -1) browser = "Chrome";
+  else if (ua.indexOf("Safari") !== -1) browser = "Safari";
+  else if (ua.indexOf("Firefox") !== -1) browser = "Firefox";
+  else if (ua.indexOf("MSIE") !== -1 || !!document.documentMode === true) browser = "IE";
+  else if (ua.indexOf("Edge") !== -1) browser = "Edge";
+
+  return `${os} (${browser})`;
+}
+
+function logUserSessionVisit() {
+  const db = getDB();
+  if (db && db.currentUser && db.currentUser !== 'admin!') {
+    const sessionKey = 'logged_visit_' + db.currentUser;
+    if (!sessionStorage.getItem(sessionKey)) {
+      const user = db.users.find(u => u.username === db.currentUser);
+      if (user) {
+        if (!user.loginHistory) user.loginHistory = [];
+        user.loginHistory.unshift({
+          date: new Date().toLocaleString(),
+          device: getBrowserDeviceInfo(),
+          type: "visit"
+        });
+        sessionStorage.setItem(sessionKey, 'true');
+        saveDB(db);
+      }
+    }
+  }
+}
 
 // Global active betslip state
 let activeBet = null; // { matchId, selectedTeamIndex, odds, teamName, matchDisplay }
@@ -193,11 +415,37 @@ document.addEventListener('DOMContentLoaded', () => {
   // Check auth wall immediately
   checkAuthGate();
   
+  // Log session visit
+  logUserSessionVisit();
+  
   // Set up listeners based on current active file layout
   setupListenersByPage();
   
   // Render layout details
   renderPageContent();
+
+  // Trigger background cloud sync immediately and poll every 8 seconds
+  syncWithCloud();
+  setInterval(syncWithCloud, 8000);
+
+  // Handle parameters from other pages redirecting to place a bet
+  const urlParams = new URLSearchParams(window.location.search);
+  if (currentPage === 'betting.html' && urlParams.has('selectMatch')) {
+    const matchId = urlParams.get('selectMatch');
+    const teamIndex = parseInt(urlParams.get('teamIndex'));
+    const odds = parseFloat(urlParams.get('odds'));
+    const teamName = urlParams.get('teamName');
+    
+    // Clear URL parameters
+    window.history.replaceState({}, document.title, window.location.pathname);
+    
+    // Auto select odds after page is rendering
+    setTimeout(() => {
+      if (typeof selectBetodds === 'function') {
+        selectBetodds(matchId, teamIndex, odds, teamName);
+      }
+    }, 150);
+  }
 
   // Listen for storage adjustments from other browser windows (real-time operator sync)
   window.addEventListener('storage', (e) => {
@@ -348,6 +596,29 @@ function setupListenersByPage() {
       });
     }
   }
+
+  if (currentPage === 'my-bets.html') {
+    // Deposit verification submits
+    const trcForm = document.getElementById('trc-deposit-form');
+    if (trcForm) {
+      trcForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const amt = parseFloat(document.getElementById('trc-amount').value);
+        const tx = document.getElementById('trc-txid').value.trim();
+        startDepositVerify(amt, "USDT TRC20", tx);
+      });
+    }
+
+    const monoForm = document.getElementById('mono-deposit-form');
+    if (monoForm) {
+      monoForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const amt = parseFloat(document.getElementById('mono-amount').value);
+        const name = document.getElementById('mono-sender-name').value.trim();
+        startDepositVerify(amt, "MONOBANKA", name);
+      });
+    }
+  }
 }
 
 // Render dynamic components based on which page is open
@@ -382,11 +653,14 @@ function renderPageContent() {
   if (currentPage === 'tournament.html') {
     renderChallengermodeTeamPanel();
     renderBracketsTree(db.brackets);
-    render1v1Lobbies();
   }
 
   if (currentPage === 'profile.html') {
     renderProfileDashboard();
+  }
+
+  if (currentPage === 'my-bets.html') {
+    renderMyBetsPage();
   }
 
 
@@ -423,12 +697,20 @@ function handleLoginSubmit() {
   }
 
   db.currentUser = user.username;
-  saveDB(db);
-  showToast(`Вітаємо назад, ${user.username.toUpperCase()}!`, "success");
+  if (!user.loginHistory) user.loginHistory = [];
+  user.loginHistory.unshift({
+    date: new Date().toLocaleString(),
+    device: getBrowserDeviceInfo(),
+    type: "login"
+  });
+  sessionStorage.setItem('logged_visit_' + user.username, 'true');
   
-  setTimeout(() => {
-    window.location.href = 'betting.html';
-  }, 1000);
+  saveDB(db).finally(() => {
+    setTimeout(() => {
+      window.location.href = 'betting.html';
+    }, 800);
+  });
+  showToast(`Вітаємо назад, ${user.username.toUpperCase()}!`, "success");
 }
 
 // Handle Registration Form Submit
@@ -480,11 +762,17 @@ function handleRegisterSubmit() {
     depositHistory: [],
     betHistory: [],
     claimedQuests: [],
-    skinsInventory: []
+    skinsInventory: [],
+    loginHistory: [{
+      date: new Date().toLocaleString(),
+      device: getBrowserDeviceInfo(),
+      type: "register"
+    }]
   };
 
   db.users.push(newUser);
   db.currentUser = username;
+  sessionStorage.setItem('logged_visit_' + username, 'true');
   saveDB(db);
 
   showToast("Акаунт створено! Ви отримали 50 поінтів.", "success");
@@ -778,6 +1066,12 @@ function renderBettingMatches(matches) {
 
 // Select betodds coefficient and play eyes animation
 window.selectBetodds = function(matchId, teamIndex, odds, teamName) {
+  if (currentPage !== 'betting.html') {
+    // Redirect to betting.html with query parameters to select this bet
+    window.location.href = `betting.html?selectMatch=${matchId}&teamIndex=${teamIndex}&odds=${odds}&teamName=${encodeURIComponent(teamName)}`;
+    return;
+  }
+
   const db = getDB();
   
   // Trigger wolf eyes flashing keyframes
@@ -2455,4 +2749,135 @@ function startBracketSimulation() {
       saveDB(db);
     }
   }, 10000); // Check every 10 seconds
+}
+
+// ── MY BETS PAGE HANDLERS ──
+let activeBetsFilter = 'all';
+
+window.filterMyBets = function(filterVal) {
+  activeBetsFilter = filterVal;
+  
+  // Highlight active tab
+  document.querySelectorAll('.filter-tab').forEach(tab => tab.classList.remove('active'));
+  const activeTab = document.getElementById(`tab-${filterVal}`);
+  if (activeTab) activeTab.classList.add('active');
+  
+  renderMyBetsPage();
+};
+
+function renderMyBetsPage() {
+  const db = getDB();
+  if (!db || !db.currentUser) return;
+  const user = db.users.find(u => u.username === db.currentUser);
+  if (!user) return;
+
+  // 1. Calculate Stats
+  const history = user.betHistory || [];
+  const totalBets = history.length;
+  const activeBets = history.filter(b => b.status === 'В грі').length;
+  const totalWon = history.reduce((acc, b) => acc + (b.payout || 0), 0);
+  
+  const settledBets = history.filter(b => b.status === 'Виграш' || b.status === 'Програш');
+  const wonBets = history.filter(b => b.status === 'Виграш');
+  const winRate = settledBets.length > 0 ? Math.round((wonBets.length / settledBets.length) * 100) : 0;
+
+  // Update Stats UI
+  const totalEl = document.getElementById('stats-total-bets');
+  if (totalEl) totalEl.innerText = totalBets;
+  
+  const activeEl = document.getElementById('stats-active-bets');
+  if (activeEl) activeEl.innerText = activeBets;
+  
+  const wonEl = document.getElementById('stats-total-won');
+  if (wonEl) wonEl.innerText = `${totalWon} 🪙`;
+  
+  const rateEl = document.getElementById('stats-win-rate');
+  if (rateEl) rateEl.innerText = `${winRate}%`;
+
+  // 2. Render Cards List
+  const container = document.getElementById('my-bets-container');
+  if (!container) return;
+  container.innerHTML = "";
+
+  // Filter history
+  let filtered = [];
+  if (activeBetsFilter === 'all') {
+    filtered = history;
+  } else if (activeBetsFilter === 'active') {
+    filtered = history.filter(b => b.status === 'В грі');
+  } else {
+    // "Розраховані"
+    filtered = history.filter(b => b.status === 'Виграш' || b.status === 'Програш');
+  }
+
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <div style="text-align:center; color:var(--text-secondary); padding: 40px 10px; font-size: 14px;">
+        🔍 Не знайдено жодної ставки для обраного фільтру.
+        <br><br>
+        <a href="betting.html" class="btn" style="text-decoration:none;">Перейти до ставок</a>
+      </div>
+    `;
+    return;
+  }
+
+  filtered.forEach(bet => {
+    let statusClass = "badge-in-game";
+    if (bet.status === "Виграш") statusClass = "badge-win";
+    if (bet.status === "Програш") statusClass = "badge-loss";
+
+    let payoutDisplay = "";
+    let payoutClass = "";
+    if (bet.status === "В грі") {
+      const estWin = Math.round(bet.amount * bet.odds);
+      payoutDisplay = `~ ${estWin} 🪙 (Можливий)`;
+      payoutClass = "highlight";
+    } else if (bet.status === "Виграш") {
+      payoutDisplay = `+${bet.payout} 🪙`;
+      payoutClass = "win";
+    } else {
+      payoutDisplay = "0 🪙";
+    }
+
+    const card = document.createElement('div');
+    card.className = "bet-history-card";
+    card.innerHTML = `
+      <div class="bet-card-header">
+        <div class="bet-game-info">
+          <span>🎮 Counter-Strike 2 • Ординар</span>
+        </div>
+        <span class="bet-badge ${statusClass}">${bet.status}</span>
+      </div>
+      
+      <div class="bet-match-row">
+        <div class="bet-team-name">${bet.matchDisplay.split(' vs ')[0] || bet.matchDisplay}</div>
+        <div class="bet-vs-box">VS</div>
+        <div class="bet-team-name">${bet.matchDisplay.split(' vs ')[1] || ''}</div>
+      </div>
+      
+      <div class="bet-details-grid">
+        <div class="bet-detail-item">
+          <span class="bet-detail-label">Ваш вибір</span>
+          <span class="bet-detail-value highlight">${bet.selectedTeam}</span>
+        </div>
+        <div class="bet-detail-item">
+          <span class="bet-detail-label">Коефіцієнт</span>
+          <span class="bet-detail-value">${bet.odds.toFixed(2)}</span>
+        </div>
+        <div class="bet-detail-item">
+          <span class="bet-detail-label">Сума ставки</span>
+          <span class="bet-detail-value">${bet.amount} 🪙</span>
+        </div>
+        <div class="bet-detail-item">
+          <span class="bet-detail-label">Виплата</span>
+          <span class="bet-detail-value ${payoutClass}">${payoutDisplay}</span>
+        </div>
+      </div>
+      
+      <div style="font-size:10px; color:var(--text-secondary); text-align:right;">
+        📅 Час ставки: ${bet.date}
+      </div>
+    `;
+    container.appendChild(card);
+  });
 }

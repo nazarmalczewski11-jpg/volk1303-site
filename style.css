@@ -435,13 +435,14 @@ nav {
     grid-template-columns: 1fr;
   }
   .sidebar-right {
-    position: fixed;
-    bottom: 0;
-    right: 0;
-    width: 100vw;
-    z-index: 100;
-    max-height: 80vh;
-    box-shadow: 0 -10px 30px rgba(0,0,0,0.5);
+    position: static;
+    width: 100%;
+    max-height: none;
+    box-shadow: none;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    z-index: 1;
   }
 }
 
@@ -2125,4 +2126,240 @@ footer {
   color: white;
   font-weight: 800;
 }
+
+/* ==========================================
+   DATABASE DASHBOARD & USER INSPECTOR STYLES
+   ========================================== */
+.ops-log-tag.tag-mono {
+  background: rgba(230, 0, 120, 0.1);
+  color: #ff2d88;
+  border: 1px solid rgba(230, 0, 120, 0.2);
+}
+
+.ops-log-tag.tag-danger {
+  background: rgba(255, 26, 64, 0.1);
+  color: var(--wolf-red);
+  border: 1px solid rgba(255, 26, 64, 0.2);
+}
+
+/* Drawer Backdrop Overlay */
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  z-index: 999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.drawer-overlay.active {
+  opacity: 1;
+  pointer-events: all;
+}
+
+/* Slide-out User Inspector Drawer */
+.user-inspector-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 420px;
+  max-width: 100%;
+  height: 100vh;
+  background-color: #0b0c12;
+  border-left: 1px solid var(--border-color);
+  box-shadow: -10px 0 30px rgba(0,0,0,0.5);
+  z-index: 1000;
+  transform: translateX(100%);
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.user-inspector-drawer.active {
+  transform: translateX(0);
+}
+
+.drawer-header {
+  padding: 15px 20px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #10121a;
+  height: 70px;
+}
+
+.user-avatar-circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--cs-orange) 0%, #ff5500 100%);
+  color: white;
+  font-weight: 900;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 10px rgba(255, 90, 0, 0.3);
+}
+
+.drawer-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 24px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.drawer-close-btn:hover {
+  color: white;
+}
+
+.inspector-tab-btn {
+  transition: var(--transition);
+}
+
+.inspector-tab-btn:hover {
+  color: white;
+  background-color: rgba(255,255,255,0.02);
+}
+
+.inspector-tab-btn.active {
+  background: var(--cs-orange) !important;
+  color: white !important;
+  box-shadow: 0 2px 10px rgba(255, 90, 0, 0.2);
+}
+
+.mini-metric-box {
+  box-shadow: inset 0 0 8px rgba(0,0,0,0.4);
+}
+
+/* ==========================================
+   MOBILE RESPONSIVENESS PATCHES
+   ========================================== */
+@media (max-width: 900px) {
+  /* Admin panel layout conversion */
+  .admin-container {
+    grid-template-columns: 1fr !important;
+    display: flex;
+    flex-direction: column;
+  }
+  .admin-sidebar {
+    position: static !important;
+    height: auto !important;
+    width: 100% !important;
+    border-right: none !important;
+    border-bottom: 1px solid var(--border-color);
+    padding: 15px !important;
+    gap: 15px !important;
+  }
+  .admin-sidebar-brand {
+    justify-content: center !important;
+    padding-bottom: 10px !important;
+  }
+  .admin-tabs-list {
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+    gap: 5px !important;
+  }
+  .admin-tab-item {
+    padding: 8px 12px !important;
+    font-size: 11px !important;
+    width: auto !important;
+    border-left: none !important;
+    border-bottom: 2px solid transparent !important;
+  }
+  .admin-tab-item.active {
+    background: rgba(255, 90, 0, 0.1) !important;
+    border-bottom-color: var(--cs-orange) !important;
+  }
+  .admin-sidebar-profile {
+    justify-content: center !important;
+    gap: 15px !important;
+    padding-top: 10px !important;
+  }
+  .admin-main {
+    height: auto !important;
+    overflow-y: visible !important;
+  }
+  .admin-content-pane {
+    padding: 20px 15px !important;
+  }
+  .admin-content-pane > div[style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 768px) {
+  /* Main site header responsive stacking */
+  header {
+    flex-direction: column !important;
+    gap: 10px !important;
+    padding: 12px 15px !important;
+    position: static !important;
+  }
+  .logo-link {
+    justify-content: center !important;
+  }
+  nav {
+    justify-content: center !important;
+    width: 100% !important;
+    flex-wrap: wrap !important;
+    gap: 4px !important;
+  }
+  .nav-link {
+    padding: 6px 10px !important;
+    font-size: 11px !important;
+  }
+  .header-user-panel {
+    justify-content: center !important;
+    width: 100% !important;
+    gap: 10px !important;
+  }
+  .user-balance {
+    font-size: 12px !important;
+    padding: 4px 10px !important;
+  }
+  .header-user-panel .btn {
+    padding: 6px 12px !important;
+    font-size: 10px !important;
+  }
+  
+  /* Tables wrapper for horizontal scroll */
+  .admin-table-wrapper, .card > div {
+    overflow-x: auto;
+  }
+}
+
+@media (max-width: 600px) {
+  /* Compact font sizes on cards and tables on small phones */
+  .admin-table th, .admin-table td {
+    padding: 6px 4px !important;
+    font-size: 10px !important;
+  }
+  .admin-content-pane .card {
+    padding: 12px !important;
+  }
+  .metrics-row, .admin-metrics-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  .metric-card {
+    padding: 12px !important;
+    gap: 10px !important;
+  }
+  .metric-card-icon {
+    width: 32px !important;
+    height: 32px !important;
+    font-size: 14px !important;
+  }
+  .metric-card-value {
+    font-size: 15px !important;
+  }
+  .user-inspector-drawer {
+    width: 100% !important;
+  }
+}
+
 

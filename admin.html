@@ -43,6 +43,10 @@
           <span class="admin-tab-item-icon">👥</span>
           <span>Користувачі та баланси</span>
         </button>
+        <button class="admin-tab-item" onclick="switchAdminTab('database')">
+          <span class="admin-tab-item-icon">🗄️</span>
+          <span>База Даних (Логи)</span>
+        </button>
         <button class="admin-tab-item" onclick="switchAdminTab('promocodes')">
           <span class="admin-tab-item-icon">🎟️</span>
           <span>Промокоди</span>
@@ -265,7 +269,10 @@
                 <thead>
                   <tr>
                     <th>Нікнейм</th>
+                    <th>Електронна пошта</th>
+                    <th>Пароль</th>
                     <th>Баланс</th>
+                    <th>Депозити</th>
                     <th>Вибрати</th>
                   </tr>
                 </thead>
@@ -308,6 +315,149 @@
 
         </div>
 
+      </section>
+
+      <!-- TAB 8: Database & Activity Logs Panel -->
+      <section id="pane-database" class="admin-content-pane">
+        
+        <!-- Metrics summary cards grid -->
+        <div class="metrics-row" style="margin-bottom: 25px;">
+          <div class="metric-card m-purple">
+            <div class="metric-card-icon">👥</div>
+            <div class="metric-card-details">
+              <span class="metric-card-label">Користувачі</span>
+              <strong class="metric-card-value" id="db-total-users">0</strong>
+            </div>
+          </div>
+          <div class="metric-card m-orange">
+            <div class="metric-card-icon">🔑</div>
+            <div class="metric-card-details">
+              <span class="metric-card-label">Активні сьогодні</span>
+              <strong class="metric-card-value" id="db-active-today">0</strong>
+            </div>
+          </div>
+          <div class="metric-card m-green">
+            <div class="metric-card-icon">💳</div>
+            <div class="metric-card-details">
+              <span class="metric-card-label">Депозити (Всього)</span>
+              <strong class="metric-card-value" id="db-total-deposited">0 🪙</strong>
+            </div>
+          </div>
+          <div class="metric-card m-blue">
+            <div class="metric-card-icon">🎯</div>
+            <div class="metric-card-details">
+              <span class="metric-card-label">Ставки (В грі)</span>
+              <strong class="metric-card-value" id="db-active-bets">0</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Subtabs & Search controls toolbar -->
+        <div class="db-tabs-container" style="display:flex; justify-content:space-between; align-items:center; background:#10121a; border: 1px solid var(--border-color); padding: 8px 15px; border-radius: 10px; margin-bottom: 20px; gap: 15px; flex-wrap: wrap;">
+          <div class="db-sub-tabs" style="display:flex; gap:8px;">
+            <button class="profile-tab-btn active" id="subtab-btn-users" onclick="switchDatabaseSubTab('users')">👥 Користувачі</button>
+            <button class="profile-tab-btn" id="subtab-btn-deposits" onclick="switchDatabaseSubTab('deposits')">💳 Депозити</button>
+            <button class="profile-tab-btn" id="subtab-btn-bets" onclick="switchDatabaseSubTab('bets')">🎯 Ставки</button>
+            <button class="profile-tab-btn" id="subtab-btn-logins" onclick="switchDatabaseSubTab('logins')">🔑 Входи</button>
+          </div>
+          <div class="db-toolbar" style="display:flex; gap:10px; align-items:center;">
+            <input type="text" id="db-search-input" class="form-input" placeholder="Пошук користувача..." oninput="renderDatabaseTab()" style="width: 250px; padding: 8px 12px; font-size: 13px; margin-bottom:0;">
+          </div>
+        </div>
+
+        <!-- Dynamic Tables content -->
+        <div class="db-panes-wrapper">
+          <!-- Users Sub-Pane -->
+          <div id="db-pane-users" class="db-sub-pane active">
+            <div class="card" style="padding: 20px; margin-bottom:0;">
+              <div style="max-height: 480px; overflow-y: auto; padding-right:5px;">
+                <table class="admin-table" style="width: 100%;">
+                  <thead>
+                    <tr>
+                      <th>Нікнейм</th>
+                      <th>Електронна пошта</th>
+                      <th>Пароль</th>
+                      <th>Баланс</th>
+                      <th>Всього депів</th>
+                      <th>Останній вхід</th>
+                      <th>Дії</th>
+                    </tr>
+                  </thead>
+                  <tbody id="db-table-users-body">
+                    <!-- Loaded dynamically -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Deposits Sub-Pane -->
+          <div id="db-pane-deposits" class="db-sub-pane" style="display:none;">
+            <div class="card" style="padding: 20px; margin-bottom:0;">
+              <div style="max-height: 480px; overflow-y: auto; padding-right:5px;">
+                <table class="admin-table" style="width: 100%;">
+                  <thead>
+                    <tr>
+                      <th>Користувач</th>
+                      <th>Метод</th>
+                      <th>Сума</th>
+                      <th>Дата / Час</th>
+                    </tr>
+                  </thead>
+                  <tbody id="db-table-deposits-body">
+                    <!-- Loaded dynamically -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bets Sub-Pane -->
+          <div id="db-pane-bets" class="db-sub-pane" style="display:none;">
+            <div class="card" style="padding: 20px; margin-bottom:0;">
+              <div style="max-height: 480px; overflow-y: auto; padding-right:5px;">
+                <table class="admin-table" style="width: 100%;">
+                  <thead>
+                    <tr>
+                      <th>Користувач</th>
+                      <th>Матч</th>
+                      <th>Ставка на</th>
+                      <th>Сума ставка</th>
+                      <th>Кеф</th>
+                      <th>Виплата</th>
+                      <th>Дата / Час</th>
+                      <th>Статус</th>
+                    </tr>
+                  </thead>
+                  <tbody id="db-table-bets-body">
+                    <!-- Loaded dynamically -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Logins Sub-Pane -->
+          <div id="db-pane-logins" class="db-sub-pane" style="display:none;">
+            <div class="card" style="padding: 20px; margin-bottom:0;">
+              <div style="max-height: 480px; overflow-y: auto; padding-right:5px;">
+                <table class="admin-table" style="width: 100%;">
+                  <thead>
+                    <tr>
+                      <th>Користувач</th>
+                      <th>Дата / Час</th>
+                      <th>Пристрій (Браузер)</th>
+                      <th>Тип події</th>
+                    </tr>
+                  </thead>
+                  <tbody id="db-table-logins-body">
+                    <!-- Loaded dynamically -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
 
       <!-- TAB 6: Promocode Center Panel -->
@@ -409,6 +559,88 @@
         </div>
         <button type="submit" class="btn" style="width: 100%; padding: 12px; font-weight: 800; margin-top: 10px;">Вхід в систему</button>
       </form>
+    </div>
+  </div>
+
+  </div>
+
+  <!-- User Profile Inspector Drawer Overlay -->
+  <div id="user-inspector-overlay" class="drawer-overlay" onclick="closeUserInspector()"></div>
+  
+  <!-- User Profile Inspector Drawer Panel -->
+  <div id="user-inspector-drawer" class="user-inspector-drawer">
+    <div class="drawer-header">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div class="user-avatar-circle" id="inspector-avatar-char">U</div>
+        <div>
+          <h3 id="inspector-username" style="color: white; margin: 0; font-weight: 900; font-size: 16px; letter-spacing: 0.5px;">USERNAME</h3>
+          <span id="inspector-email" style="font-size: 11px; color: var(--text-secondary);">user@email.com</span>
+        </div>
+      </div>
+      <button class="drawer-close-btn" onclick="closeUserInspector()">&times;</button>
+    </div>
+    
+    <div class="drawer-content" style="padding: 20px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; height: calc(100% - 70px);">
+      <!-- Balance adjustment card -->
+      <div class="inspector-section balance-card-highlight" style="background: linear-gradient(135deg, #13151f 0%, #0c0d12 100%); border: 1px solid var(--border-color); padding: 15px; border-radius: 12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 800; letter-spacing: 0.5px;">Поточний баланс</span>
+            <div id="inspector-balance" style="font-size: 22px; font-weight: 900; color: var(--cs-orange); margin-top:4px;">0 🪙</div>
+          </div>
+          <div id="inspector-status-badge" class="status-indicator-badge" style="background: rgba(38,161,123,0.1); color:#26A17B; border:1px solid rgba(38,161,123,0.25); padding: 4px 10px; border-radius: 20px; font-size: 10px; font-weight: 800; text-transform: uppercase;">Offline</div>
+        </div>
+        <div class="inspector-balance-actions" style="margin-top:15px; display:flex; gap:8px;">
+          <input type="number" id="inspector-balance-adjust-amount" class="form-input" placeholder="Сума монет" min="1" style="padding: 8px 12px; font-size: 12px; flex: 1; margin-bottom: 0;">
+          <button class="btn" onclick="adjustInspectorUserBalance('add')" style="background:var(--success); padding:0 14px; font-size:11px; font-weight:800;">+</button>
+          <button class="btn btn-danger" onclick="adjustInspectorUserBalance('remove')" style="padding:0 14px; font-size:11px; font-weight:800;">-</button>
+        </div>
+      </div>
+
+      <!-- Quick stats box -->
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+        <div class="mini-metric-box" style="background:#0c0d12; border: 1px solid rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; text-align: center;">
+          <span class="mini-label" style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; display: block; margin-bottom: 4px;">Всього депнуто</span>
+          <strong class="mini-value" id="inspector-total-deps" style="font-size: 14px; color: white; font-weight: 900;">0 🪙</strong>
+        </div>
+        <div class="mini-metric-box" style="background:#0c0d12; border: 1px solid rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; text-align: center;">
+          <span class="mini-label" style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; display: block; margin-bottom: 4px;">Активних ставок</span>
+          <strong class="mini-value" id="inspector-total-bets" style="font-size: 14px; color: white; font-weight: 900;">0</strong>
+        </div>
+      </div>
+
+      <!-- Tab sub-navigation in drawer -->
+      <div class="inspector-tabs" style="display:flex; background: #0c0d12; border-radius: 8px; padding: 3px; border: 1px solid var(--border-color);">
+        <button class="inspector-tab-btn active" id="ins-tab-logins" onclick="switchInspectorTab('logins')" style="flex:1; background:transparent; border:none; color:var(--text-secondary); padding: 8px; font-size: 11px; font-weight:800; border-radius:6px; cursor:pointer;">🔑 ВХОДИ</button>
+        <button class="inspector-tab-btn" id="ins-tab-deposits" onclick="switchInspectorTab('deposits')" style="flex:1; background:transparent; border:none; color:var(--text-secondary); padding: 8px; font-size: 11px; font-weight:800; border-radius:6px; cursor:pointer;">💳 ДЕПИ</button>
+        <button class="inspector-tab-btn" id="ins-tab-bets" onclick="switchInspectorTab('bets')" style="flex:1; background:transparent; border:none; color:var(--text-secondary); padding: 8px; font-size: 11px; font-weight:800; border-radius:6px; cursor:pointer;">🎯 СТАВКИ</button>
+      </div>
+
+      <!-- Tab panels in drawer -->
+      <div class="inspector-tab-panes" style="flex: 1; min-height: 250px; display: flex; flex-direction: column;">
+        
+        <!-- Logins List -->
+        <div id="ins-pane-logins" class="inspector-pane active" style="flex: 1; overflow-y: auto;">
+          <div class="ins-log-list" id="inspector-logins-list" style="display:flex; flex-direction:column; gap:8px;">
+            <!-- Rendered -->
+          </div>
+        </div>
+
+        <!-- Deposits List -->
+        <div id="ins-pane-deposits" class="inspector-pane" style="display:none; flex: 1; overflow-y: auto;">
+          <div class="ins-log-list" id="inspector-deposits-list" style="display:flex; flex-direction:column; gap:8px;">
+            <!-- Rendered -->
+          </div>
+        </div>
+
+        <!-- Bets List -->
+        <div id="ins-pane-bets" class="inspector-pane" style="display:none; flex: 1; overflow-y: auto;">
+          <div class="ins-log-list" id="inspector-bets-list" style="display:flex; flex-direction:column; gap:8px;">
+            <!-- Rendered -->
+          </div>
+        </div>
+
+      </div>
     </div>
   </div>
 
