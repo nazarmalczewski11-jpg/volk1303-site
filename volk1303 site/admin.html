@@ -51,10 +51,7 @@
           <span class="admin-tab-item-icon">🎮</span>
           <span>Керування ставками</span>
         </button>
-        <button class="admin-tab-item" onclick="switchAdminTab('brackets')">
-          <span class="admin-tab-item-icon">🏆</span>
-          <span>Турнірна сітка</span>
-        </button>
+
         <button class="admin-tab-item" onclick="switchAdminTab('teams')">
           <span class="admin-tab-item-icon">🛡️</span>
           <span>Команди та склади</span>
@@ -201,60 +198,7 @@
 
       </section>
 
-      <!-- TAB 3: Tournament Brackets Panel -->
-      <section id="pane-brackets" class="admin-content-pane">
-        
-        <div class="card" style="max-width: 900px; width: 100%;">
-          <div class="section-title">🏆 КЕРУВАННЯ ТУРНІРНОЮ СІТКОЮ CHALLENGERMODE</div>
-          <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.6;">
-            Оберіть тип сітки (Single/Double Elimination) та формат поєдинку, згенеруйте нову сітку, а потім призначте створені команди та внесіть рахунки матчів.
-          </p>
 
-          <!-- Demo Tournament Controls Card -->
-          <div style="background: rgba(255, 90, 0, 0.03); border: 1.5px solid rgba(255, 90, 0, 0.15); padding: 20px; border-radius: 12px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; gap: 20px; box-shadow: inset 0 0 10px rgba(255, 90, 0, 0.02);">
-            <div>
-              <strong style="color: white; font-size: 13px; display: flex; align-items: center; gap: 8px;">🤖 СИМУЛЯЦІЯ ДЕМО-ТУРНІРІВ</strong>
-              <p style="font-size: 11px; color: var(--text-secondary); margin: 5px 0 0 0; line-height: 1.5;">
-                При активації система автоматично заповнить сітку випадковими командами та почне симулювати матчі в реальному часі кожні 10 секунд (перший до 13 раундів).
-              </p>
-            </div>
-            <div style="display: flex; align-items: center; gap: 15px; flex-shrink: 0;">
-              <span id="admin-demo-status-badge" class="rank-badge-inline" style="background: rgba(255, 26, 64, 0.1); color: #ff1a40; border: 1px solid rgba(255, 26, 64, 0.3); font-size: 11px; font-weight: 800; padding: 6px 12px;">ВИМКНЕНО 🔴</span>
-              <button id="admin-demo-toggle-btn" class="btn" style="padding: 10px 20px; font-weight: 800; font-size: 11px; letter-spacing: 0.5px;" onclick="toggleDemoTournaments()">🚀 ЗАПУСТИТИ ДЕМО-ТУРНІР</button>
-            </div>
-          </div>
-
-          <!-- Dynamic Bracket Reset/Generator Tool -->
-          <div style="background: var(--bg-input); border: 1px solid var(--border-color); padding: 20px; border-radius: 12px; margin-bottom: 25px; display: grid; grid-template-columns: 1fr 1fr auto; gap: 15px; align-items: flex-end;">
-            <div class="form-group" style="margin-bottom:0;">
-              <label for="admin-bracket-type-select">Тип турнірної сітки</label>
-              <select id="admin-bracket-type-select" class="form-input" style="padding:10px;">
-                <option value="single-2">2 матчі в 1-му раунді (4 команди, Півфінали)</option>
-                <option value="single-4">4 матчі в 1-му раунді (8 команд, Чвертьфінали)</option>
-                <option value="single-6">6 матчів в 1-му раунді (12 команд, 1 раунд)</option>
-                <option value="double-4">Double Elimination (4 команди)</option>
-              </select>
-            </div>
-            <div class="form-group" style="margin-bottom:0;">
-              <label for="admin-bracket-format-select">Формат турніру</label>
-              <select id="admin-bracket-format-select" class="form-input" style="padding:10px;">
-                <option value="2x2">2х2 Wingman</option>
-                <option value="3x3">3х3 Teamfight</option>
-                <option value="4x4">4х4 Arena</option>
-                <option value="5x5">5х5 Competitive</option>
-              </select>
-            </div>
-            <button class="btn" onclick="generateNewBracket()" style="padding: 12px 24px; font-weight:800; font-size:12px; letter-spacing:0.5px;">ЗГЕНЕРУВАТИ СІТКУ</button>
-          </div>
-
-
-          <div id="admin-brackets-editor-list" style="min-height: 200px;">
-            <!-- Filled dynamically by JS -->
-          </div>
-
-        </div>
-
-      </section>
 
       <!-- TAB 4: Teams & Rosters Panel -->
       <section id="pane-teams" class="admin-content-pane">
