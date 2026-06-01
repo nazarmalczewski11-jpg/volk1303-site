@@ -2586,7 +2586,7 @@ window.openRosterModal = function(tourId) {
       const playersListHtml = players.map(p => `
         <span class="player-tag-badge" style="display:inline-flex; align-items:center; background:#1e293b; color:white; border:1px solid rgba(255,255,255,0.08); padding:5px 12px; border-radius:6px; font-size:12px; gap:6px; font-weight:bold; transition: all 0.2s; max-width: 100%; box-sizing: border-box; overflow: hidden;" onmouseover="this.style.background='rgba(255,90,0,0.1)'; this.style.borderColor='var(--cs-orange)';" onmouseout="this.style.background='#1e293b'; this.style.borderColor='rgba(255,255,255,0.08)';">
           <span style="text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 140px; display: inline-block;">@${p.toUpperCase()}</span>
-          <span style="color:var(--wolf-red); cursor:pointer; font-weight:900; font-size:15px; padding-left:4px; display:inline-block; transition: transform 0.1s; flex-shrink: 0;" onmouseover="this.style.transform='scale(1.2)';" onmouseout="this.style.transform='scale(1)';" onclick="removePlayerFromSlotTeam('${team.id}', '${p}')">&times;</span>
+          <button type="button" style="color:var(--wolf-red); cursor:pointer; font-weight:900; font-size:17px; padding:0 4px; display:inline-flex; align-items:center; justify-content:center; background:transparent; border:none; transition: transform 0.1s; flex-shrink: 0; line-height:1;" onmouseover="this.style.transform='scale(1.3)';" onmouseout="this.style.transform='scale(1)';" onclick="event.stopPropagation(); removePlayerFromSlotTeam('${team.id}', '${p}')" title="Видалити гравця">&times;</button>
         </span>
       `).join(" ");
 
@@ -2896,6 +2896,9 @@ window.addPlayerToSlotTeam = function(teamId, username) {
   if (!team.players) team.players = [];
   const userNickLower = username.toLowerCase();
 
+  // Normalize all stored players to lowercase for reliable comparison
+  team.players = team.players.map(p => p.toLowerCase());
+
   if (team.players.includes(userNickLower)) {
     showToast("Цей гравець вже є у команді!", "error");
     return;
@@ -2908,7 +2911,9 @@ window.addPlayerToSlotTeam = function(teamId, username) {
       if (!regTeamId || regTeamId === teamId) continue;
       const otherTeam = db.teams.find(t => t.id === regTeamId);
       if (otherTeam && otherTeam.players) {
-        if (otherTeam.players.map(p => p.toLowerCase()).includes(userNickLower)) {
+        // Normalize other team players too
+        otherTeam.players = otherTeam.players.map(p => p.toLowerCase());
+        if (otherTeam.players.includes(userNickLower)) {
           showToast(`Помилка: Гравець @${username.toUpperCase()} вже бере участь у цьому турнірі в складі команди "${otherTeam.name}"!`, "error");
           return;
         }
@@ -2928,13 +2933,23 @@ window.removePlayerFromSlotTeam = function(teamId, username) {
 
   const db = getDB();
   const team = db.teams.find(t => t.id === teamId);
-  if (!team) return;
+  if (!team) { showToast('Помилка: команду не знайдено', 'error'); return; }
 
+  const before = (team.players || []).length;
   team.players = (team.players || []).filter(p => p.toLowerCase() !== username.toLowerCase());
-  saveDB(db);
+  const after = team.players.length;
 
+  if (before === after) {
+    showToast(`Гравця @${username.toUpperCase()} не знайдено в команді`, 'error');
+    return;
+  }
+
+  saveDB(db);
   showToast(`Гравця @${username.toUpperCase()} вилучено з команди!`, "success");
-  openRosterModal(activeRosterTournamentId);
+  // Re-open roster modal to refresh the UI
+  if (activeRosterTournamentId) {
+    openRosterModal(activeRosterTournamentId);
+  }
 };
 
 // Global state for bracket editor selection
