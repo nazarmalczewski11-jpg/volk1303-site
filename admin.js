@@ -844,6 +844,7 @@ function renderAdminPanel() {
   renderAdminPromocodesList(db.promocodes || []);
   renderAdminPendingDeposits(db.pendingDeposits || []);
   renderAdminTournamentsList(db.tournaments || []);
+  renderTournamentBettingTab();
   
   if (typeof renderDatabaseTab === 'function') {
     renderDatabaseTab();
@@ -1026,6 +1027,171 @@ window.autoSelectUserForDispenser = function(nick) {
   switchAdminTab('users');
   document.getElementById('admin-user-search-input').value = nick;
   handleUserSearchAdmin();
+};
+
+// =====================================================
+// TOURNAMENT BETTING TAB - Admin
+// =====================================================
+function renderTournamentBettingTab() {
+  const container = document.getElementById('admin-tournament-betting-list');
+  if (!container) return;
+  const db = getDB();
+  const tournaments = db.tournaments || [];
+
+  if (tournaments.length === 0) {
+    container.innerHTML = `<div style="text-align:center; color:var(--text-secondary); padding:40px; font-size:13px;">Немає доступних турнірів</div>`;
+    return;
+  }
+
+  container.innerHTML = "";
+  tournaments.forEach(tour => {
+    const statusMap = { upcoming: { label: "Очікується", color: "var(--text-secondary)" }, active: { label: "Активний", color: "var(--cs-orange)" }, completed: { label: "Завершений", color: "var(--success)" } };
+    const st = statusMap[tour.status] || statusMap.upcoming;
+
+    const card = document.createElement('div');
+    card.className = "card";
+    card.style.marginBottom = "12px";
+    card.style.overflow = "hidden";
+
+    const regTeams = (tour.registeredTeams || []).filter(Boolean);
+    const teamCount = regTeams.length;
+
+    card.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; gap:12px;" onclick="toggleBettingTourCard('${tour.id}')">
+        <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:0;">
+          <div style="background:rgba(255,90,0,0.1); border:1px solid rgba(255,90,0,0.3); border-radius:8px; width:40px; height:40px; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0;">🏆</div>
+          <div style="min-width:0;">
+            <div style="font-size:14px; font-weight:800; color:white; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${tour.name}</div>
+            <div style="font-size:11px; color:var(--text-secondary); margin-top:2px;">${tour.format} · ${tour.map} · <span style="color:${st.color}; font-weight:700;">${st.label}</span></div>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
+          <span style="font-size:11px; background:rgba(255,255,255,0.05); padding:4px 10px; border-radius:20px; color:var(--text-secondary);">${teamCount} команд</span>
+          <span id="betting-chevron-${tour.id}" style="color:var(--cs-orange); font-size:14px; transition:transform 0.2s;">▼</span>
+        </div>
+      </div>
+      <div id="betting-tour-teams-${tour.id}" style="display:none; margin-top:16px; border-top:1px solid rgba(255,255,255,0.05); padding-top:16px;">
+        <div id="betting-teams-inner-${tour.id}"></div>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+window.toggleBettingTourCard = function(tourId) {
+  const panel = document.getElementById(`betting-tour-teams-${tourId}`);
+  const chevron = document.getElementById(`betting-chevron-${tourId}`);
+  if (!panel) return;
+
+  if (panel.style.display === 'none') {
+    panel.style.display = 'block';
+    if (chevron) chevron.style.transform = 'rotate(180deg)';
+    renderBettingTeamsForTour(tourId);
+  } else {
+    panel.style.display = 'none';
+    if (chevron) chevron.style.transform = 'rotate(0deg)';
+  }
+};
+
+function renderBettingTeamsForTour(tourId) {
+  const db = getDB();
+  const tour = db.tournaments.find(t => t.id === tourId);
+  const inner = document.getElementById(`betting-teams-inner-${tourId}`);
+  if (!tour || !inner) return;
+
+  const regTeams = (tour.registeredTeams || []).filter(Boolean);
+
+  if (regTeams.length === 0) {
+    inner.innerHTML = `<div style="color:var(--text-secondary); font-size:12px; text-align:center; padding:16px;">Команди ще не додані до цього турніру</div>`;
+    return;
+  }
+
+  const teamObjects = regTeams.map(tid => db.teams.find(t => t.id === tid)).filter(Boolean);
+
+  inner.innerHTML = `
+    <div style="font-size:11px; font-weight:800; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:12px;">👥 Команди та коефіцієнти</div>
+    <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap:10px;">
+      ${teamObjects.map(team => {
+        const odds = (tour.teamOdds && tour.teamOdds[team.id]) ? tour.teamOdds[team.id] : '';
+        return `
+          <div style="background:#0c0d12; border:1px solid rgba(255,255,255,0.05); border-radius:10px; padding:14px; display:flex; flex-direction:column; gap:10px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <div style="width:8px; height:8px; border-radius:50%; background:var(--cs-orange); flex-shrink:0;"></div>
+              <span style="font-size:13px; font-weight:800; color:white; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;">${team.name}</span>
+              <span style="font-size:10px; color:var(--text-secondary);">[${team.tag || '?'}]</span>
+            </div>
+            <div style="font-size:10px; color:var(--text-secondary);">👥 ${(team.players || []).length} гравців</div>
+            <div>
+              <label style="font-size:10px; font-weight:800; color:var(--cs-orange); text-transform:uppercase; letter-spacing:0.5px; display:block; margin-bottom:5px;">КОЕФІЦІЄНТ</label>
+              <div style="display:flex; gap:6px; align-items:center;">
+                <input type="number" id="odds-input-${tourId}-${team.id}" value="${odds}" min="1.01" max="99.99" step="0.01" placeholder="напр. 2.50" style="flex:1; background:#1a1b26; border:1px solid rgba(255,90,0,0.3); color:white; border-radius:6px; padding:7px 10px; font-size:13px; font-weight:800; outline:none;" onkeyup="if(event.key==='Enter') setTournamentTeamOdds('${tourId}', '${team.id}')">
+                <button onclick="setTournamentTeamOdds('${tourId}', '${team.id}')" style="background:var(--cs-orange); border:none; color:white; border-radius:6px; padding:7px 12px; font-size:12px; font-weight:800; cursor:pointer; transition:opacity 0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">✓</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+window.setTournamentTeamOdds = function(tourId, teamId) {
+  const db = getDB();
+  const tour = db.tournaments.find(t => t.id === tourId);
+  if (!tour) return;
+
+  const input = document.getElementById(`odds-input-${tourId}-${teamId}`);
+  if (!input) return;
+
+  const val = parseFloat(input.value);
+  if (isNaN(val) || val < 1.01) {
+    showToast('Коефіцієнт має бути числом ≥ 1.01', 'error');
+    return;
+  }
+
+  if (!tour.teamOdds) tour.teamOdds = {};
+  tour.teamOdds[teamId] = parseFloat(val.toFixed(2));
+
+  saveDB(db);
+  showToast(`Коефіцієнт встановлено: x${val.toFixed(2)}`, 'success');
+  // Flash the input green briefly
+  input.style.borderColor = 'var(--success)';
+  setTimeout(() => { input.style.borderColor = 'rgba(255,90,0,0.3)'; }, 1000);
+};
+
+// =====================================================
+// TOURNAMENT BET - Public site player action
+// =====================================================
+window.placeTournamentBet = function(tourId, teamId, teamName, odds) {
+  const db = getDB();
+  const user = db.users.find(u => u.username === db.loggedInUser);
+  if (!user) { showToast('Увійдіть в акаунт для ставки!', 'error'); return; }
+
+  const amountStr = prompt(`Ставка на команду "${teamName}" (коеф. x${odds})\nВаш баланс: ${user.balance} 🪙\nВведіть суму ставки:`);
+  if (!amountStr) return;
+  const amount = parseInt(amountStr);
+  if (isNaN(amount) || amount < 1) { showToast('Введіть коректну суму!', 'error'); return; }
+  if (amount > user.balance) { showToast('Недостатньо монет!', 'error'); return; }
+
+  user.balance -= amount;
+  if (!user.betHistory) user.betHistory = [];
+  user.betHistory.push({
+    id: 'tb_' + Date.now(),
+    type: 'tournament',
+    tourId,
+    teamId,
+    selectedTeam: teamName,
+    odds,
+    amount,
+    date: new Date().toLocaleString('uk-UA'),
+    status: 'В грі',
+    payout: 0
+  });
+
+  saveDB(db);
+  showToast(`Ставку ${amount} 🪙 на "${teamName}" (x${odds}) прийнято!`, 'success');
+  // Re-render the betting section for this tournament
+  if (typeof renderTournamentBettingPortal === 'function') renderTournamentBettingPortal(tourId);
 };
 
 // Render Admin Matches Editor cards list
@@ -3002,7 +3168,7 @@ window.openBracketEditorCard = function(tourId) {
           <div>
             <select id="m-status-${rIndex}-${mIndex}" style="background:var(--bg-input); color:white; border:1px solid var(--border-color); font-size:11px; padding:4px 8px; border-radius:4px;">
               <option value="upcoming" ${match.status === 'upcoming' ? 'selected' : ''}>Очікується</option>
-              <option value="live" ${match.status === 'live' ? 'selected' : ''}>В процесі</option>
+              <option value="live" ${match.status === 'live' ? 'selected' : ''}>Активний</option>
               <option value="finished" ${match.status === 'finished' ? 'selected' : ''}>Завершений</option>
             </select>
           </div>

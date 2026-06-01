@@ -148,59 +148,25 @@
 
       </section>
 
-      <!-- TAB 2: Betting Odds & Match Creator Panel -->
+      <!-- TAB 2: Tournament Betting Odds Manager -->
       <section id="pane-betting" class="admin-content-pane">
         
-        <div style="display: grid; grid-template-columns: 1fr 1.3fr; gap: 20px;">
-          
-          <!-- Creator form -->
-          <div class="card" style="height: fit-content;">
-            <div class="section-title">🎮 ДОДАТИ НОВИЙ МАТЧ СТАВОК</div>
-            <form id="admin-create-match-form" style="display:flex; flex-direction:column; gap:12px;">
-              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-                <div class="form-group" style="margin-bottom:0;">
-                  <label for="match-team1-name">Команда 1</label>
-                  <input type="text" id="match-team1-name" class="form-input" placeholder="Напр: NaVi" required>
-                </div>
-                <div class="form-group" style="margin-bottom:0;">
-                  <label for="match-team2-name">Команда 2</label>
-                  <input type="text" id="match-team2-name" class="form-input" placeholder="Напр: G2" required>
-                </div>
-              </div>
-
-              <div class="form-group" style="margin-bottom:0;">
-                <label for="match-team1-players">Гравці Команди 1 (через кому)</label>
-                <input type="text" id="match-team1-players" class="form-input" placeholder="s1mple, b1t, jL">
-              </div>
-
-              <div class="form-group" style="margin-bottom:0;">
-                <label for="match-team2-players">Гравці Команди 2 (через кому)</label>
-                <input type="text" id="match-team2-players" class="form-input" placeholder="m0NESY, NiKo, Snax">
-              </div>
-
-              <div class="form-group" style="margin-bottom:0;">
-                <label for="match-stream-link">Посилання на стрім (Необов'язково)</label>
-                <input type="url" id="match-stream-link" class="form-input" placeholder="Залиште пустим для дефолтного Twitch">
-              </div>
-
-              <button type="submit" class="btn" style="width: 100%; padding: 12px; font-weight: 800; margin-top: 5px;">ДОДАТИ МАТЧ СТАВОК</button>
-            </form>
-          </div>
-
-          <!-- Active Odds Match Editor List -->
-          <div class="card">
-            <div class="section-title">⚙️ РЕДАГУВАННЯ СТАТУСІВ ТА ЛАЙВ-РАХУНКУ МАТЧІВ</div>
-            <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.5;">
-              Зміна рахунку автоматично перераховує LIVE-коефіцієнти. Зарахування рахунку 6-0 або 0-6 автоматично блокує (заморожує) ставки.
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+          <div>
+            <div class="section-title" style="margin-bottom:4px;">🎰 КЕРУВАННЯ СТАВКАМИ НА ТУРНІРИ</div>
+            <p style="font-size:12px; color:var(--text-secondary); margin:0; line-height:1.5;">
+              Виставляйте коефіцієнти для кожної команди. Гравці зможуть робити ставки на команди через сторінку турніру.
             </p>
-            <div id="admin-matches-editor-list" style="display:flex; flex-direction:column; gap:15px; max-height: 520px; overflow-y:auto; padding-right:5px;">
-              <!-- Filled by JS -->
-            </div>
           </div>
+        </div>
 
+        <div id="admin-tournament-betting-list">
+          <!-- Filled by renderTournamentBettingTab() -->
+          <div style="text-align:center; color:var(--text-secondary); padding:40px; font-size:13px;">Завантаження...</div>
         </div>
 
       </section>
+
 
       <!-- TAB 3: Tournament Brackets Manager Panel -->
       <section id="pane-brackets" class="admin-content-pane">

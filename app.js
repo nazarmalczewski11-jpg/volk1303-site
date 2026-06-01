@@ -2661,6 +2661,7 @@ window.renderTournamentsPortal = function() {
             <button class="details-tab-btn active" id="tab-btn-info-${tour.id}" onclick="switchTournamentDetailTab('${tour.id}', 'info')">ℹ️ Інформація</button>
             <button class="details-tab-btn" id="tab-btn-rules-${tour.id}" onclick="switchTournamentDetailTab('${tour.id}', 'rules')">📜 Правила</button>
             <button class="details-tab-btn" id="tab-btn-bracket-${tour.id}" onclick="switchTournamentDetailTab('${tour.id}', 'bracket')">🏆 Сітка матчів</button>
+            <button class="details-tab-btn" id="tab-btn-betting-${tour.id}" onclick="switchTournamentDetailTab('${tour.id}', 'betting')" style="background:rgba(255,90,0,0.08); border-color:rgba(255,90,0,0.2);">🎰 Ставки</button>
           </div>
 
           <!-- TAB CONTENT: Info -->
@@ -2701,6 +2702,13 @@ window.renderTournamentsPortal = function() {
             </div>
           </div>
 
+          <!-- TAB CONTENT: Tournament Betting -->
+          <div class="details-tab-content" id="tab-content-betting-${tour.id}">
+            <div id="tour-betting-portal-${tour.id}">
+              <!-- Rendered by renderTournamentBettingPortal() -->
+            </div>
+          </div>
+
         </div>
       `;
       container.appendChild(card);
@@ -2731,7 +2739,7 @@ window.toggleTournamentDetails = function(tourId) {
 
 // Switch tabs inside expanded tournament details
 window.switchTournamentDetailTab = function(tourId, tabKey) {
-  const tabs = ['info', 'rules', 'bracket'];
+  const tabs = ['info', 'rules', 'bracket', 'betting'];
   tabs.forEach(key => {
     const btn = document.getElementById(`tab-btn-${key}-${tourId}`);
     const content = document.getElementById(`tab-content-${key}-${tourId}`);
@@ -2747,7 +2755,81 @@ window.switchTournamentDetailTab = function(tourId, tabKey) {
   if (tabKey === 'bracket') {
     renderVisualBracketPortal(tourId);
   }
+  if (tabKey === 'betting') {
+    renderTournamentBettingPortal(tourId);
+  }
 };
+
+// Render betting portal for a tournament on the public site
+function renderTournamentBettingPortal(tourId) {
+  const container = document.getElementById(`tour-betting-portal-${tourId}`);
+  if (!container) return;
+
+  const db = getDB();
+  const tour = db.tournaments.find(t => t.id === tourId);
+  if (!tour) return;
+
+  const regTeams = (tour.registeredTeams || []).filter(Boolean);
+  const teamObjects = regTeams.map(tid => db.teams.find(t => t.id === tid)).filter(Boolean);
+  const teamOdds = tour.teamOdds || {};
+
+  const user = db.loggedInUser ? db.users.find(u => u.username === db.loggedInUser) : null;
+
+  // Check if any team has odds set
+  const hasOdds = teamObjects.some(t => teamOdds[t.id]);
+
+  if (teamObjects.length === 0) {
+    container.innerHTML = `<div style="text-align:center; color:var(--text-secondary); padding:30px; font-size:12px;">Команди до цього турніру ще не додані</div>`;
+    return;
+  }
+
+  if (!hasOdds) {
+    container.innerHTML = `
+      <div style="text-align:center; padding:30px;">
+        <div style="font-size:32px; margin-bottom:12px;">⏳</div>
+        <div style="color:white; font-weight:800; font-size:14px; margin-bottom:6px;">Коефіцієнти ще не встановлені</div>
+        <div style="color:var(--text-secondary); font-size:12px;">Організатор ще не виставив коефіцієнти на команди.<br>Перевірте пізніше!</div>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = `
+    <div style="margin-bottom:16px;">
+      <div style="font-size:12px; font-weight:800; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">💰 Ваш баланс</div>
+      <div style="font-size:20px; font-weight:900; color:var(--cs-orange);">${user ? user.balance + ' 🪙' : '<span style="color:var(--text-secondary); font-size:13px;">Увійдіть для ставок</span>'}</div>
+    </div>
+    <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:12px;">
+      ${teamObjects.map(team => {
+        const odds = teamOdds[team.id];
+        if (!odds) return '';
+        const players = (team.players || []);
+        return `
+          <div style="background:linear-gradient(135deg, #0e0f1a 0%, #131525 100%); border:1px solid rgba(255,255,255,0.07); border-radius:12px; padding:16px; display:flex; flex-direction:column; gap:12px; transition:all 0.2s;" onmouseover="this.style.borderColor='rgba(255,90,0,0.4)'; this.style.transform='translateY(-2px)';" onmouseout="this.style.borderColor='rgba(255,255,255,0.07)'; this.style.transform='translateY(0)';">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div style="background:rgba(255,90,0,0.15); border:1px solid rgba(255,90,0,0.3); border-radius:8px; padding:8px 10px; font-size:16px; flex-shrink:0;">🛡️</div>
+              <div style="min-width:0;">
+                <div style="font-size:14px; font-weight:900; color:white; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${team.name}</div>
+                <div style="font-size:10px; color:var(--text-secondary);">[${team.tag || '?'}] · ${players.length} гравців</div>
+              </div>
+            </div>
+            <div style="background:rgba(0,0,0,0.25); border-radius:8px; padding:10px; text-align:center;">
+              <div style="font-size:10px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">КОЕФІЦІЄНТ</div>
+              <div style="font-size:26px; font-weight:900; color:var(--cs-orange); line-height:1;">x${odds.toFixed(2)}</div>
+              <div style="font-size:10px; color:var(--text-secondary); margin-top:4px;">Потенційний виграш на 100 🪙: <strong style="color:white;">${Math.round(100 * odds)} 🪙</strong></div>
+            </div>
+            ${players.length > 0 ? `
+              <div style="display:flex; flex-wrap:wrap; gap:4px;">
+                ${players.slice(0,5).map(p => `<span style="background:#1e293b; color:white; padding:3px 8px; border-radius:4px; font-size:10px; font-weight:700;">@${p.toUpperCase()}</span>`).join('')}
+                ${players.length > 5 ? `<span style="background:#1e293b; color:var(--text-secondary); padding:3px 8px; border-radius:4px; font-size:10px;">+${players.length-5}</span>` : ''}
+              </div>` : ''}
+            <button onclick="placeTournamentBet('${tourId}', '${team.id}', '${team.name}', ${odds})" style="width:100%; background:linear-gradient(135deg, rgba(255,90,0,0.9), rgba(255,60,0,0.9)); border:none; color:white; border-radius:8px; padding:10px; font-size:12px; font-weight:900; cursor:pointer; letter-spacing:0.5px; transition:all 0.2s; text-transform:uppercase;" onmouseover="this.style.transform='scale(1.02)';" onmouseout="this.style.transform='scale(1)';"
+              ${!user ? 'disabled title="Увійдіть для ставок"' : ''}>🎰 ПОСТАВИТИ НА ${team.name.toUpperCase()}</button>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
 
 // SVG vibrant color hash team initials logo generator
 function generateTeamLogoSVG(teamName) {
@@ -2858,7 +2940,7 @@ function renderVisualBracketPortal(tourId) {
 
       let statusBadge = "";
       if (match.status === "live") {
-        statusBadge = `<span class="match-status-badge live"><span class="pulse-dot"></span>LIVE</span>`;
+        statusBadge = `<span class="match-status-badge live"><span class="pulse-dot"></span>Активний</span>`;
       } else if (match.status === "finished") {
         statusBadge = `<span class="match-status-badge completed">Завершено</span>`;
       } else {
