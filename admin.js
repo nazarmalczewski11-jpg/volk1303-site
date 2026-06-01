@@ -169,6 +169,7 @@ async function syncWithCloud() {
     isSyncing = false;
   }
 }
+window.syncWithCloud = syncWithCloud;
 
 // Push local changes to cloud
 async function pushToCloud(db) {
@@ -2002,4 +2003,24 @@ function updateSyncStatus(success, text) {
     txt.innerText = text;
   }
 }
+
+window.manualSyncFromUI = async function(btn) {
+  if (btn.disabled) return;
+  btn.disabled = true;
+  const originalText = btn.innerHTML;
+  btn.innerHTML = `<span style="display:inline-block; animation: spin 1s linear infinite;">🔄</span> Оновлення...`;
+  
+  try {
+    await syncWithCloud();
+    btn.innerHTML = `✅ Оновлено`;
+  } catch (e) {
+    btn.innerHTML = `❌ Помилка`;
+    console.error(e);
+  }
+  
+  setTimeout(() => {
+    btn.innerHTML = originalText;
+    btn.disabled = false;
+  }, 1200);
+};
 

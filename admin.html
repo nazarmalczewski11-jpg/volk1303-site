@@ -92,9 +92,14 @@
       
       <header class="admin-top-bar">
         <div class="admin-top-title" id="admin-current-tab-title">Дашборд</div>
-        <div class="admin-top-actions" id="sync-status-container" style="display:flex; align-items:center; gap:8px; font-size:12px; font-weight:800;">
-          <span class="status-indicator" id="sync-status-dot" style="color: #4a5568; transition: color 0.3s ease;">●</span> 
-          <span id="sync-status-text">Ініціалізація...</span>
+        <div class="admin-top-actions" style="display:flex; align-items:center; gap:15px;">
+          <div id="sync-status-container" style="display:flex; align-items:center; gap:8px; font-size:12px; font-weight:800; margin-bottom:0;">
+            <span class="status-indicator" id="sync-status-dot" style="color: #4a5568; transition: color 0.3s ease;">●</span> 
+            <span id="sync-status-text">Ініціалізація...</span>
+          </div>
+          <button class="btn btn-secondary" onclick="manualSyncFromUI(this)" style="padding: 6px 12px; font-size: 11px; font-weight: 800; display: flex; align-items: center; gap: 6px; margin-bottom: 0; line-height: 1;">
+            🔄 Оновити
+          </button>
         </div>
       </header>
 
