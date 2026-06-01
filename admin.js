@@ -143,9 +143,25 @@ async function syncWithCloud() {
     }
     if (tourRes && tourRes.ok) {
       const cloudTournaments = await tourRes.json();
-      if (JSON.stringify(db.tournaments) !== JSON.stringify(cloudTournaments)) {
-        db.tournaments = cloudTournaments;
-        dbChanged = true;
+      if (Array.isArray(cloudTournaments)) {
+        db.tournaments = db.tournaments || [];
+        db.deletedTournamentIds = db.deletedTournamentIds || [];
+        let toursChanged = false;
+        cloudTournaments.forEach(ct => {
+          // Skip any tournament that was explicitly deleted locally
+          if (db.deletedTournamentIds.includes(ct.id)) return;
+          const localIdx = db.tournaments.findIndex(t => t.id === ct.id);
+          if (localIdx === -1) {
+            db.tournaments.push(ct);
+            toursChanged = true;
+          } else {
+            if (JSON.stringify(db.tournaments[localIdx]) !== JSON.stringify(ct)) {
+              db.tournaments[localIdx] = ct;
+              toursChanged = true;
+            }
+          }
+        });
+        if (toursChanged) dbChanged = true;
       }
     }
     if (pdRes && pdRes.ok) {
@@ -2448,11 +2464,18 @@ window.saveTournamentAdmin = function() {
 };
 
 // Delete tournament
-window.deleteTournamentAdmin = function(tourId) {
+window.deleteTournamentAdmin = async function(tourId) {
   if (!confirm("Ви впевнені, що хочете видалити цей турнір та очистити всі його сітки та склади?")) return;
   const db = getDB();
   db.tournaments = (db.tournaments || []).filter(t => t.id !== tourId);
-  saveDB(db);
+  // Track deleted IDs so syncWithCloud never restores them from the cloud
+  db.deletedTournamentIds = db.deletedTournamentIds || [];
+  if (!db.deletedTournamentIds.includes(tourId)) {
+    db.deletedTournamentIds.push(tourId);
+  }
+  localStorage.setItem(DB_KEY, JSON.stringify(db));
+  // Wait for push to complete before allowing next sync
+  await pushToCloud(db);
   showToast("Турнір видалено!", "success");
   renderAdminPanel();
 };
