@@ -93,7 +93,7 @@ async function syncWithCloud() {
     }
 
     // 2. Sync structures
-    const [bRes, mRes, tRes, lRes, sRes, pRes, pdRes, txRes] = await Promise.all([
+    const [bRes, mRes, tRes, lRes, sRes, pRes, pdRes, txRes, tourRes] = await Promise.all([
       fetch(CLOUD_BUCKET + 'brackets', { cache: 'no-store' }),
       fetch(CLOUD_BUCKET + 'matches', { cache: 'no-store' }),
       fetch(CLOUD_BUCKET + 'teams', { cache: 'no-store' }),
@@ -101,7 +101,8 @@ async function syncWithCloud() {
       fetch(CLOUD_BUCKET + 'settings', { cache: 'no-store' }),
       fetch(CLOUD_BUCKET + 'promocodes', { cache: 'no-store' }),
       fetch(CLOUD_BUCKET + 'pendingDeposits', { cache: 'no-store' }),
-      fetch(CLOUD_BUCKET + 'usedTxids', { cache: 'no-store' })
+      fetch(CLOUD_BUCKET + 'usedTxids', { cache: 'no-store' }),
+      fetch(CLOUD_BUCKET + 'tournaments', { cache: 'no-store' })
     ]);
 
     if (bRes.ok) {
@@ -136,6 +137,13 @@ async function syncWithCloud() {
       const cloudPromocodes = await pRes.json();
       if (JSON.stringify(db.promocodes) !== JSON.stringify(cloudPromocodes)) {
         db.promocodes = cloudPromocodes;
+        dbChanged = true;
+      }
+    }
+    if (tourRes && tourRes.ok) {
+      const cloudTournaments = await tourRes.json();
+      if (JSON.stringify(db.tournaments) !== JSON.stringify(cloudTournaments)) {
+        db.tournaments = cloudTournaments;
         dbChanged = true;
       }
     }
@@ -223,6 +231,7 @@ async function pushToCloud(db) {
       fetch(CLOUD_BUCKET + 'promocodes', { method: 'POST', body: JSON.stringify(db.promocodes) }),
       fetch(CLOUD_BUCKET + 'pendingDeposits', { method: 'POST', body: JSON.stringify(db.pendingDeposits || []) }),
       fetch(CLOUD_BUCKET + 'usedTxids', { method: 'POST', body: JSON.stringify(db.usedTxids || []) }),
+      fetch(CLOUD_BUCKET + 'tournaments', { method: 'POST', body: JSON.stringify(db.tournaments || []) }),
       fetch(CLOUD_BUCKET + 'settings', { method: 'POST', body: JSON.stringify({
         twitchStatus: db.twitchStatus,
         activeTwitchChannel: db.activeTwitchChannel
@@ -247,6 +256,7 @@ function getDB() {
     if (!db.promocodes) db.promocodes = [];
     if (!db.pendingDeposits) db.pendingDeposits = [];
     if (!db.usedTxids) db.usedTxids = [];
+    if (!db.tournaments) db.tournaments = [];
     
     // Defensive check to ensure admin user is present and has the correct password
     let adminUser = db.users.find(u => u.username === 'admin');
@@ -447,6 +457,15 @@ function setupAdminListeners() {
     newTeamForm.addEventListener('submit', (e) => {
       e.preventDefault();
       createNewTeamAdmin();
+    });
+  }
+
+  // Tournament Form Submit Listener
+  const tourForm = document.getElementById('admin-tournament-form');
+  if (tourForm) {
+    tourForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      saveTournamentAdmin();
     });
   }
 }
@@ -796,9 +815,10 @@ function renderAdminPanel() {
   renderDashboardOpsLog(db);
   renderAdminUsersTable(db.users);
   renderAdminMatchesEditor(db.matches);
-    renderAdminUserTeamsList(db.teams || []);
+  renderAdminUserTeamsList(db.teams || []);
   renderAdminPromocodesList(db.promocodes || []);
   renderAdminPendingDeposits(db.pendingDeposits || []);
+  renderAdminTournamentsList(db.tournaments || []);
   
   if (typeof renderDatabaseTab === 'function') {
     renderDatabaseTab();
@@ -1165,7 +1185,8 @@ window.switchAdminTab = function(tabId) {
   const titleMap = {
     'dashboard': 'Дашборд (Зведений огляд)',
     'betting': 'Керування ставками та матчами',
-        'teams': 'Команди та склади гравців',
+    'brackets': 'Керування турнірами та сітками матчів',
+    'teams': 'Команди та склади гравців',
     'users': 'Баланси та реєстри користувачів',
     'deposits-verify': 'Верифікація депозитів Monobank',
     'database': 'База Даних (Логи та Активність)',
@@ -2011,4 +2032,845 @@ function updateAdminNotificationBadges() {
     }
   }
 }
+
+// ==========================================
+// TOURNAMENT BRACKETS & ROSTERS CONTROLLER
+// ==========================================
+
+const DEFAULT_UKRAINIAN_RULES = `1. Регламент проведення:
+- Усі матчі проходять у форматі Single Elimination (або Double Elimination) на вказаній карті.
+- Формат гри відповідає типу турніру (2х2, 3х3, 4х4, 5x5).
+- Сервери гри визначаються суддями VOLK 1303.
+
+2. Правила поведінки та чесної гри (Fair Play):
+- Використання будь-якого стороннього софту (чітів, скриптів, макросів) або багів карти заборонено. Порушення карається миттєвою дискваліфікацією.
+- Обов'язкова повага до суперників. Образи у чаті гри ведуть до попередження або дискваліфікації.
+
+3. Процедура старту та результати:
+- Команди зобов'язані з'явитися в лобі матчу протягом 15 хвилин після початку гри.
+- Результат матчу вноситься та перевіряється адміністратором турніру.
+- Призові монети автоматично нараховуються капітанам команд-переможців згідно з відсотковим розподілом.`;
+
+// Open modal to create a new tournament
+window.openAddTournamentModal = function() {
+  // Clear inputs
+  document.getElementById('tournament-id-field').value = "";
+  document.getElementById('tour-name').value = "";
+  document.getElementById('tour-format').value = "5x5";
+  document.getElementById('tour-map').value = "de_mirage";
+  document.getElementById('tour-status').value = "upcoming";
+  document.getElementById('tour-max-teams').value = "4";
+  document.getElementById('tour-system').value = "single";
+  document.getElementById('tour-prize-pool').value = "1000";
+  document.getElementById('tour-prize-places').value = "3";
+  document.getElementById('tour-rules').value = DEFAULT_UKRAINIAN_RULES;
+  
+  // Set calendar min date on the fly to prevent choosing past dates
+  const dtInput = document.getElementById('tour-datetime');
+  if (dtInput) {
+    const now = new Date();
+    // Offset local timezone
+    const tzOffset = now.getTimezoneOffset() * 60000;
+    const localISOTime = (new Date(now - tzOffset)).toISOString().slice(0, 16);
+    dtInput.min = localISOTime;
+    dtInput.value = localISOTime;
+  }
+
+  // Adjust options
+  adjustConductingSystems("4");
+  adjustPrizePercentsInputs("3");
+
+  document.getElementById('tournament-modal-title').innerText = "🏆 Створити новий турнір";
+  document.getElementById('tournament-form-modal').classList.add('active');
+};
+
+// Open modal prefilled to edit a tournament
+window.openEditTournamentModal = function(tourId) {
+  const db = getDB();
+  const tour = (db.tournaments || []).find(t => t.id === tourId);
+  if (!tour) return;
+
+  document.getElementById('tournament-id-field').value = tour.id;
+  document.getElementById('tour-name').value = tour.name;
+  document.getElementById('tour-format').value = tour.format;
+  document.getElementById('tour-map').value = tour.map;
+  document.getElementById('tour-status').value = tour.status;
+  document.getElementById('tour-max-teams').value = tour.maxTeams;
+  document.getElementById('tour-system').value = tour.system;
+  document.getElementById('tour-prize-pool').value = tour.prizePool;
+  document.getElementById('tour-prize-places').value = tour.prizePlaces || "1";
+  document.getElementById('tour-rules').value = tour.rules || DEFAULT_UKRAINIAN_RULES;
+  
+  const dtInput = document.getElementById('tour-datetime');
+  if (dtInput) {
+    const now = new Date();
+    const tzOffset = now.getTimezoneOffset() * 60000;
+    dtInput.min = (new Date(now - tzOffset)).toISOString().slice(0, 16);
+    dtInput.value = tour.datetime || "";
+  }
+
+  // Adjust displays
+  adjustConductingSystems(tour.maxTeams);
+  adjustPrizePercentsInputs(tour.prizePlaces || "1");
+
+  // Fill in percentages
+  if (tour.percents) {
+    if (document.getElementById('pct-1')) document.getElementById('pct-1').value = tour.percents[1] || "";
+    if (document.getElementById('pct-2')) document.getElementById('pct-2').value = tour.percents[2] || "";
+    if (document.getElementById('pct-3')) document.getElementById('pct-3').value = tour.percents[3] || "";
+  }
+
+  document.getElementById('tournament-modal-title').innerText = "📝 Редагувати турнір";
+  document.getElementById('tournament-form-modal').classList.add('active');
+};
+
+// Handle prize place selector change
+window.adjustPrizePercentsInputs = function(placesVal) {
+  const container = document.getElementById('tour-prize-percents-container');
+  const grp1 = document.getElementById('pct-grp-1');
+  const grp2 = document.getElementById('pct-grp-2');
+  const grp3 = document.getElementById('pct-grp-3');
+  
+  if (!container) return;
+  container.style.display = "flex";
+
+  if (placesVal === "1") {
+    grp1.style.display = "block";
+    grp2.style.display = "none";
+    grp3.style.display = "none";
+    document.getElementById('pct-1').value = "100";
+  } else if (placesVal === "2") {
+    grp1.style.display = "block";
+    grp2.style.display = "block";
+    grp3.style.display = "none";
+    document.getElementById('pct-1').value = "60";
+    document.getElementById('pct-2').value = "40";
+  } else {
+    grp1.style.display = "block";
+    grp2.style.display = "block";
+    grp3.style.display = "block";
+    document.getElementById('pct-1').value = "50";
+    document.getElementById('pct-2').value = "30";
+    document.getElementById('pct-3').value = "20";
+  }
+};
+
+// Handle conducting system select options depending on team count
+window.adjustConductingSystems = function(maxTeamsVal) {
+  const opt = document.getElementById('double-elim-opt');
+  const sysSelect = document.getElementById('tour-system');
+  if (!opt || !sysSelect) return;
+
+  if (maxTeamsVal === "4") {
+    opt.disabled = false;
+    opt.style.display = "block";
+  } else {
+    opt.disabled = true;
+    opt.style.display = "none";
+    sysSelect.value = "single";
+  }
+};
+
+// Generate standard rounds/matches layouts for bracket tree structure
+function generateBracketStructure(maxTeams, system) {
+  const rounds = [];
+  
+  if (system === "double" && maxTeams === 4) {
+    // 6-match Double Elimination Layout
+    rounds.push({
+      name: "Верхня сітка - Півфінали",
+      matches: [
+        { id: "m_1", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, status: "upcoming", time: "", winner: null },
+        { id: "m_2", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, status: "upcoming", time: "", winner: null }
+      ]
+    });
+    rounds.push({
+      name: "Верхня сітка - Фінал / Нижня сітка - Раунд 1",
+      matches: [
+        { id: "m_3", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, status: "upcoming", time: "", winner: null }, // Upper Final
+        { id: "m_4", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, status: "upcoming", time: "", winner: null }  // Lower R1
+      ]
+    });
+    rounds.push({
+      name: "Нижня сітка - Фінал",
+      matches: [
+        { id: "m_5", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, status: "upcoming", time: "", winner: null }
+      ]
+    });
+    rounds.push({
+      name: "Суперфінал",
+      matches: [
+        { id: "m_6", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, status: "upcoming", time: "", winner: null }
+      ]
+    });
+    return { rounds };
+  }
+
+  // Single Elimination Algorithm
+  const numTeams = parseInt(maxTeams, 10);
+  let roundSize = numTeams / 2;
+  let roundIndex = 1;
+  let matchIdCounter = 1;
+
+  while (roundSize >= 1) {
+    let roundName = "";
+    if (roundSize === 1) roundName = "Фінал";
+    else if (roundSize === 2) roundName = "Півфінали";
+    else if (roundSize === 4) roundName = "Чвертьфінали";
+    else roundName = `1/${roundSize * 2} Фіналу`;
+
+    const matches = [];
+    for (let i = 0; i < roundSize; i++) {
+      matches.push({
+        id: `m_${matchIdCounter++}`,
+        team1: "Очікується",
+        team2: "Очікується",
+        score1: 0,
+        score2: 0,
+        status: "upcoming",
+        time: "",
+        winner: null
+      });
+    }
+
+    rounds.push({ name: roundName, matches });
+    roundSize = roundSize / 2;
+  }
+
+  return { rounds };
+}
+
+// Re-fill team slots in brackets based on current registration roster
+function rebuildBracketTeamSlots(tour) {
+  if (!tour || !tour.brackets || !tour.brackets.rounds || tour.brackets.rounds.length === 0) return;
+  const db = getDB();
+  const registeredTeams = tour.registeredTeams || [];
+  
+  // Get first round matches
+  const round1 = tour.brackets.rounds[0];
+  if (!round1 || !round1.matches) return;
+
+  // Clear all matches to "Очікується" first
+  tour.brackets.rounds.forEach(round => {
+    round.matches.forEach(m => {
+      m.team1 = "Очікується";
+      m.team2 = "Очікується";
+    });
+  });
+
+  // Re-fill first round match slots
+  for (let i = 0; i < round1.matches.length; i++) {
+    const match = round1.matches[i];
+    const team1Id = registeredTeams[i * 2];
+    const team2Id = registeredTeams[i * 2 + 1];
+
+    if (team1Id) {
+      const team = db.teams.find(t => t.id === team1Id);
+      match.team1 = team ? team.name : "Очікується";
+    }
+    if (team2Id) {
+      const team = db.teams.find(t => t.id === team2Id);
+      match.team2 = team ? team.name : "Очікується";
+    }
+  }
+
+  // Restore propagated winners if match scores already exist
+  for (let r = 0; r < tour.brackets.rounds.length - 1; r++) {
+    const currentRound = tour.brackets.rounds[r];
+    const nextRound = tour.brackets.rounds[r + 1];
+
+    if (tour.system === "double" && tour.maxTeams === 4) {
+      // Propagation for Double Elimination
+      const m1 = currentRound.matches[0]; // m_1
+      const m2 = currentRound.matches[1]; // m_2
+      
+      if (r === 0) {
+        // Upper Semis propagate to Upper Final (m_3) and Lower R1 (m_4)
+        const nextM3 = nextRound.matches[0];
+        const nextM4 = nextRound.matches[1];
+
+        if (m1 && m1.winner) {
+          nextM3.team1 = m1.winner;
+          nextM4.team1 = (m1.winner === m1.team1) ? m1.team2 : m1.team1;
+        }
+        if (m2 && m2.winner) {
+          nextM3.team2 = m2.winner;
+          nextM4.team2 = (m2.winner === m2.team1) ? m2.team2 : m2.team1;
+        }
+      } else if (r === 1) {
+        // Round 1 matches (m_3 & m_4) propagate to Lower Final (m_5)
+        const m3 = currentRound.matches[0]; // m_3
+        const m4 = currentRound.matches[1]; // m_4
+        const nextM5 = nextRound.matches[0]; // m_5
+
+        if (m3 && m3.winner) {
+          nextM5.team1 = (m3.winner === m3.team1) ? m3.team2 : m3.team1; // loser of m3
+        }
+        if (m4 && m4.winner) {
+          nextM5.team2 = m4.winner; // winner of m4
+        }
+      } else if (r === 2) {
+        // Lower Final (m_5) propagates to Superfinal (m_6)
+        const m5 = currentRound.matches[0]; // m_5
+        const nextM6 = nextRound.matches[0]; // m_6
+        
+        // Find winner of m3 (which went straight to Superfinal team1)
+        const round1Matches = tour.brackets.rounds[1];
+        const m3 = round1Matches.matches[0];
+        if (m3 && m3.winner) {
+          nextM6.team1 = m3.winner;
+        }
+        if (m5 && m5.winner) {
+          nextM6.team2 = m5.winner;
+        }
+      }
+    } else {
+      // Propagation for Single Elimination
+      for (let m = 0; m < currentRound.matches.length; m++) {
+        const match = currentRound.matches[m];
+        if (match.winner && match.winner !== "Очікується") {
+          const nextMatchIdx = Math.floor(m / 2);
+          const nextMatchSlot = (m % 2 === 0) ? 'team1' : 'team2';
+          const nextMatch = nextRound.matches[nextMatchIdx];
+          if (nextMatch) {
+            nextMatch[nextMatchSlot] = match.winner;
+          }
+        }
+      }
+    }
+  }
+}
+
+// Save or Update tournament in database
+window.saveTournamentAdmin = function() {
+  const db = getDB();
+  const id = document.getElementById('tournament-id-field').value;
+  const name = document.getElementById('tour-name').value.trim();
+  const format = document.getElementById('tour-format').value;
+  const map = document.getElementById('tour-map').value;
+  const status = document.getElementById('tour-status').value;
+  const maxTeams = parseInt(document.getElementById('tour-max-teams').value, 10);
+  const system = document.getElementById('tour-system').value;
+  const datetime = document.getElementById('tour-datetime').value;
+  const prizePool = parseFloat(document.getElementById('tour-prize-pool').value);
+  const prizePlaces = parseInt(document.getElementById('tour-prize-places').value, 10);
+  const rules = document.getElementById('tour-rules').value.trim();
+
+  // Validate percentages
+  const p1 = parseFloat(document.getElementById('pct-1').value) || 0;
+  const p2 = parseFloat(document.getElementById('pct-2').value) || 0;
+  const p3 = parseFloat(document.getElementById('pct-3').value) || 0;
+
+  let totalPercent = 0;
+  const percents = {};
+  if (prizePlaces === 1) {
+    totalPercent = p1;
+    percents[1] = p1;
+  } else if (prizePlaces === 2) {
+    totalPercent = p1 + p2;
+    percents[1] = p1;
+    percents[2] = p2;
+  } else {
+    totalPercent = p1 + p2 + p3;
+    percents[1] = p1;
+    percents[2] = p2;
+    percents[3] = p3;
+  }
+
+  if (totalPercent !== 100) {
+    showToast(`Помилка: Сума відсотків має дорівнювати 100% (зараз: ${totalPercent}%)`, "error");
+    return;
+  }
+
+  if (id) {
+    // EDIT MODE
+    const tour = db.tournaments.find(t => t.id === id);
+    if (!tour) return;
+
+    tour.name = name;
+    tour.format = format;
+    tour.map = map;
+    tour.status = status;
+    
+    // If maximum teams changed, initialize new brackets
+    if (tour.maxTeams !== maxTeams || tour.system !== system) {
+      tour.maxTeams = maxTeams;
+      tour.system = system;
+      tour.brackets = generateBracketStructure(maxTeams, system);
+      tour.registeredTeams = [];
+    }
+    
+    tour.datetime = datetime;
+    tour.prizePool = prizePool;
+    tour.prizePlaces = prizePlaces;
+    tour.percents = percents;
+    tour.rules = rules;
+
+    rebuildBracketTeamSlots(tour);
+    showToast("Турнір успішно оновлено!", "success");
+  } else {
+    // CREATE MODE
+    const newTour = {
+      id: "tour_" + Date.now(),
+      name: name,
+      format: format,
+      map: map,
+      status: status,
+      maxTeams: maxTeams,
+      system: system,
+      datetime: datetime,
+      prizePool: prizePool,
+      prizePlaces: prizePlaces,
+      percents: percents,
+      rules: rules,
+      registeredTeams: [],
+      brackets: generateBracketStructure(maxTeams, system)
+    };
+    
+    db.tournaments.push(newTour);
+    showToast("Новий турнір успішно створено!", "success");
+  }
+
+  saveDB(db);
+  closeModal('tournament-form-modal');
+  renderAdminPanel();
+};
+
+// Delete tournament
+window.deleteTournamentAdmin = function(tourId) {
+  if (!confirm("Ви впевнені, що хочете видалити цей турнір та очистити всі його сітки та склади?")) return;
+  const db = getDB();
+  db.tournaments = (db.tournaments || []).filter(t => t.id !== tourId);
+  saveDB(db);
+  showToast("Турнір видалено!", "success");
+  renderAdminPanel();
+};
+
+// Render administrative tournaments table list
+function renderAdminTournamentsList(tournaments) {
+  const tbody = document.getElementById('admin-tournaments-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  if (tournaments.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-secondary); padding: 25px;">Створіть свій перший турнір за допомогою кнопки вище!</td></tr>`;
+    return;
+  }
+
+  tournaments.forEach(tour => {
+    const tr = document.createElement('tr');
+    
+    let statusClass = "status-upcoming";
+    let statusText = "Майбутній";
+    if (tour.status === "active") {
+      statusClass = "status-active";
+      statusText = "Активний";
+    } else if (tour.status === "completed") {
+      statusClass = "status-completed";
+      statusText = "Завершений";
+    }
+
+    const regCount = tour.registeredTeams ? tour.registeredTeams.length : 0;
+
+    tr.innerHTML = `
+      <td><strong>${tour.name}</strong></td>
+      <td><span class="rank-badge-inline" style="background:rgba(255,255,255,0.03); color:white; border-color:var(--border-color);">${tour.format}</span></td>
+      <td><span style="font-family:monospace; opacity:0.9;">${tour.map}</span></td>
+      <td>
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          <strong>${regCount} / ${tour.maxTeams}</strong>
+          <a href="#" onclick="openRosterModal('${tour.id}'); return false;" style="color:var(--cs-orange); font-size:10px; text-decoration:none; font-weight:800;">🛡️ Реєструвати склади</a>
+        </div>
+      </td>
+      <td><strong style="color:white;">🪙 ${tour.prizePool}</strong></td>
+      <td><span class="tournament-status-pill ${statusClass}" style="display:inline-block;">${statusText}</span></td>
+      <td>
+        <div style="display:flex; gap:6px;">
+          <button class="btn" style="padding:4px 8px; font-size:10px;" onclick="openBracketEditorCard('${tour.id}')">🏆 Керувати сіткою</button>
+          <button class="btn btn-secondary" style="padding:4px 8px; font-size:10px;" onclick="openEditTournamentModal('${tour.id}')">📝</button>
+          <button class="btn btn-danger" style="padding:4px 8px; font-size:10px;" onclick="deleteTournamentAdmin('${tour.id}')">❌</button>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// Global state for roster modal selection
+let activeRosterTournamentId = null;
+
+// Open roster manager modal
+window.openRosterModal = function(tourId) {
+  const db = getDB();
+  const tour = db.tournaments.find(t => t.id === tourId);
+  if (!tour) return;
+
+  activeRosterTournamentId = tourId;
+  
+  const regCount = tour.registeredTeams ? tour.registeredTeams.length : 0;
+  document.getElementById('roster-count-val').innerText = `${regCount} / ${tour.maxTeams}`;
+  document.getElementById('roster-format-val').innerText = tour.format;
+
+  // Render Registered Teams
+  const regContainer = document.getElementById('roster-registered-list');
+  regContainer.innerHTML = "";
+  if (regCount === 0) {
+    regContainer.innerHTML = `<span style="font-size:11px; color:var(--text-secondary); text-align:center; padding:10px; display:block;">Немає зареєстрованих команд</span>`;
+  } else {
+    tour.registeredTeams.forEach(teamId => {
+      const team = db.teams.find(t => t.id === teamId);
+      if (team) {
+        const item = document.createElement('div');
+        item.style.background = "#181a26";
+        item.style.padding = "8px 12px";
+        item.style.borderRadius = "6px";
+        item.style.display = "flex";
+        item.style.justifyContent = "space-between";
+        item.style.alignItems = "center";
+        item.style.fontSize = "12px";
+
+        item.innerHTML = `
+          <strong>${team.name} [${team.tag}]</strong>
+          <button class="btn btn-danger" style="padding:2px 6px; font-size:9px;" onclick="unregisterTeamFromTournament('${tourId}', '${team.id}')">Видалити</button>
+        `;
+        regContainer.appendChild(item);
+      }
+    });
+  }
+
+  // Render Available Teams matching format
+  const availContainer = document.getElementById('roster-available-list');
+  availContainer.innerHTML = "";
+  
+  const availableTeams = db.teams.filter(t => t.format === tour.format && !(tour.registeredTeams || []).includes(t.id));
+  if (availableTeams.length === 0) {
+    availContainer.innerHTML = `<span style="font-size:11px; color:var(--text-secondary); text-align:center; padding:10px; display:block;">Відповідних вільних команд немає</span>`;
+  } else {
+    availableTeams.forEach(team => {
+      const item = document.createElement('div');
+      item.style.background = "#181a26";
+      item.style.padding = "8px 12px";
+      item.style.borderRadius = "6px";
+      item.style.display = "flex";
+      item.style.justifyContent = "space-between";
+      item.style.alignItems = "center";
+      item.style.fontSize = "12px";
+
+      item.innerHTML = `
+        <strong>${team.name} [${team.tag}]</strong>
+        <button class="btn" style="padding:2px 6px; font-size:9px;" onclick="registerTeamToTournament('${tourId}', '${team.id}')">➕ Зареєструвати</button>
+      `;
+      availContainer.appendChild(item);
+    });
+  }
+
+  document.getElementById('tournament-roster-modal').classList.add('active');
+};
+
+// Register team to tournament
+window.registerTeamToTournament = function(tourId, teamId) {
+  const db = getDB();
+  const tour = db.tournaments.find(t => t.id === tourId);
+  if (!tour) return;
+
+  if (!tour.registeredTeams) tour.registeredTeams = [];
+  if (tour.registeredTeams.length >= tour.maxTeams) {
+    showToast(`Помилка: Досягнуто максимальний ліміт учасників (${tour.maxTeams})!`, "error");
+    return;
+  }
+
+  tour.registeredTeams.push(teamId);
+  rebuildBracketTeamSlots(tour);
+  saveDB(db);
+
+  showToast("Команду успішно зареєстровано на турнір!", "success");
+  openRosterModal(tourId); // Refresh modal view
+  renderAdminPanel();
+};
+
+// Unregister team from tournament
+window.unregisterTeamFromTournament = function(tourId, teamId) {
+  const db = getDB();
+  const tour = db.tournaments.find(t => t.id === tourId);
+  if (!tour) return;
+
+  tour.registeredTeams = (tour.registeredTeams || []).filter(id => id !== teamId);
+  rebuildBracketTeamSlots(tour);
+  saveDB(db);
+
+  showToast("Команду вилучено з турніру!", "success");
+  openRosterModal(tourId); // Refresh modal
+  renderAdminPanel();
+};
+
+// Global state for bracket editor selection
+let activeEditorTournamentId = null;
+
+// Open Visual Match Bracket Editor Card for selected tournament
+window.openBracketEditorCard = function(tourId) {
+  const db = getDB();
+  const tour = db.tournaments.find(t => t.id === tourId);
+  if (!tour) return;
+
+  activeEditorTournamentId = tourId;
+  document.getElementById('admin-editor-tournament-name').innerText = tour.name;
+  
+  const container = document.getElementById('admin-bracket-matches-container');
+  container.innerHTML = "";
+
+  if (!tour.brackets || !tour.brackets.rounds) {
+    container.innerHTML = `<span style="color:var(--text-secondary); text-align:center; display:block; padding:10px;">Сітку не згенеровано.</span>`;
+    return;
+  }
+
+  // Populate round match listings
+  tour.brackets.rounds.forEach((round, rIndex) => {
+    const roundDiv = document.createElement('div');
+    roundDiv.className = "card";
+    roundDiv.style.background = "#0c0d12";
+    roundDiv.style.borderColor = "rgba(255,255,255,0.03)";
+    
+    roundDiv.innerHTML = `
+      <div style="font-size:12px; font-weight:800; text-transform:uppercase; color:var(--cs-orange); margin-bottom:15px; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:6px;">
+        ${round.name}
+      </div>
+      <div style="display:flex; flex-direction:column; gap:12px;" id="round-matches-list-${rIndex}"></div>
+    `;
+    
+    container.appendChild(roundDiv);
+    
+    const mContainer = roundDiv.querySelector(`#round-matches-list-${rIndex}`);
+    round.matches.forEach((match, mIndex) => {
+      const matchCard = document.createElement('div');
+      matchCard.style.background = "#14151e";
+      matchCard.style.border = "1px solid var(--border-color)";
+      matchCard.style.padding = "15px";
+      matchCard.style.borderRadius = "8px";
+
+      matchCard.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid rgba(255,255,255,0.03); padding-bottom:6px;">
+          <strong style="color:white; font-size:12px;">Матч ID: ${match.id}</strong>
+          <div>
+            <select id="m-status-${rIndex}-${mIndex}" style="background:var(--bg-input); color:white; border:1px solid var(--border-color); font-size:11px; padding:4px 8px; border-radius:4px;">
+              <option value="upcoming" ${match.status === 'upcoming' ? 'selected' : ''}>Очікується</option>
+              <option value="live" ${match.status === 'live' ? 'selected' : ''}>В процесі</option>
+              <option value="finished" ${match.status === 'finished' ? 'selected' : ''}>Завершений</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:12px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label style="font-size:10px; margin-bottom:4px;">Команда 1</label>
+            <select id="m-team1-${rIndex}-${mIndex}" class="form-input" style="padding:6px; font-size:12px;">
+              <option value="Очікується" ${match.team1 === 'Очікується' ? 'selected' : ''}>Очікується</option>
+              ${db.teams.map(t => `<option value="${t.name}" ${match.team1 === t.name ? 'selected' : ''}>${t.name}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label style="font-size:10px; margin-bottom:4px;">Команда 2</label>
+            <select id="m-team2-${rIndex}-${mIndex}" class="form-input" style="padding:6px; font-size:12px;">
+              <option value="Очікується" ${match.team2 === 'Очікується' ? 'selected' : ''}>Очікується</option>
+              ${db.teams.map(t => `<option value="${t.name}" ${match.team2 === t.name ? 'selected' : ''}>${t.name}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:12px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label style="font-size:10px; margin-bottom:4px;">Рахунок ${match.team1}</label>
+            <input type="number" id="m-score1-${rIndex}-${mIndex}" class="form-input" min="0" value="${match.score1}" style="padding:6px 10px;">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label style="font-size:10px; margin-bottom:4px;">Рахунок ${match.team2}</label>
+            <input type="number" id="m-score2-${rIndex}-${mIndex}" class="form-input" min="0" value="${match.score2}" style="padding:6px 10px;">
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; align-items:flex-end;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label style="font-size:10px; margin-bottom:4px;">Час початку</label>
+            <input type="datetime-local" id="m-time-${rIndex}-${mIndex}" class="form-input" value="${match.time || ''}" style="padding:5px 8px; font-size:11px;">
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button class="btn" style="flex:1; padding:7px 12px; font-size:11px; margin-bottom:0;" onclick="saveBracketMatchAdmin(${rIndex}, ${mIndex})">Зберегти матч</button>
+          </div>
+        </div>
+      `;
+      mContainer.appendChild(matchCard);
+    });
+  });
+
+  document.getElementById('admin-bracket-editor-card').style.display = "block";
+  document.getElementById('admin-bracket-editor-card').scrollIntoView({ behavior: 'smooth' });
+};
+
+// Close Bracket Editor Card panel
+window.closeBracketEditorCard = function() {
+  document.getElementById('admin-bracket-editor-card').style.display = "none";
+  activeEditorTournamentId = null;
+};
+
+// Save edited match bracket properties and run auto propagation algorithm
+window.saveBracketMatchAdmin = function(rIndex, mIndex) {
+  if (!activeEditorTournamentId) return;
+  const db = getDB();
+  const tour = db.tournaments.find(t => t.id === activeEditorTournamentId);
+  if (!tour) return;
+
+  const round = tour.brackets.rounds[rIndex];
+  const match = round.matches[mIndex];
+
+  // Get inputs
+  const team1 = document.getElementById(`m-team1-${rIndex}-${mIndex}`).value;
+  const team2 = document.getElementById(`m-team2-${rIndex}-${mIndex}`).value;
+  const score1 = parseInt(document.getElementById(`m-score1-${rIndex}-${mIndex}`).value, 10) || 0;
+  const score2 = parseInt(document.getElementById(`m-score2-${rIndex}-${mIndex}`).value, 10) || 0;
+  const status = document.getElementById(`m-status-${rIndex}-${mIndex}`).value;
+  const time = document.getElementById(`m-time-${rIndex}-${mIndex}`).value;
+
+  match.team1 = team1;
+  match.team2 = team2;
+  match.score1 = score1;
+  match.score2 = score2;
+  match.status = status;
+  match.time = time;
+
+  // Settle Winner if finished
+  if (status === "finished") {
+    if (score1 === score2) {
+      showToast("Помилка: У матчі на виліт не може бути нічиєї!", "error");
+      return;
+    }
+    match.winner = (score1 > score2) ? team1 : team2;
+  } else {
+    match.winner = null;
+  }
+
+  // Perform brackets rebuild and propagation
+  rebuildBracketTeamSlots(tour);
+
+  // Auto check if entire tournament is finished (Final match completed)
+  const lastRound = tour.brackets.rounds[tour.brackets.rounds.length - 1];
+  const finalMatch = lastRound.matches[0];
+
+  if (finalMatch && finalMatch.status === "finished" && finalMatch.winner) {
+    tour.status = "completed";
+    
+    // Distribute prizes to team owners automatically
+    distributeTournamentPrizes(tour, db);
+    showToast(`🏆 Турнір завершено! Переможець: ${finalMatch.winner.toUpperCase()}! Кошти зараховано капітанам!`, "success");
+  }
+
+  saveDB(db);
+  showToast(`Матч ${match.id} успішно оновлено!`, "success");
+  openBracketEditorCard(activeEditorTournamentId); // Refresh editor list
+  renderAdminPanel();
+};
+
+// Automatical prizes payout distribution to team owners
+function distributeTournamentPrizes(tour, db) {
+  if (!tour || !tour.percents) return;
+
+  const prizePool = tour.prizePool || 0;
+  const prizePlaces = tour.prizePlaces || 1;
+
+  let firstPlaceTeam = null;
+  let secondPlaceTeam = null;
+  let thirdPlaceTeams = [];
+
+  // Determine winners
+  if (tour.system === "double" && tour.maxTeams === 4) {
+    // Double Elimination standings
+    // Final Match (m_6)
+    const finalM6 = tour.brackets.rounds[3].matches[0];
+    if (finalM6) {
+      firstPlaceTeam = finalM6.winner;
+      secondPlaceTeam = (finalM6.winner === finalM6.team1) ? finalM6.team2 : finalM6.team1;
+    }
+    // 3rd place is the loser of Lower Final (m_5)
+    const m5 = tour.brackets.rounds[2].matches[0];
+    if (m5) {
+      const loserOfM5 = (m5.winner === m5.team1) ? m5.team2 : m5.team1;
+      thirdPlaceTeams.push(loserOfM5);
+    }
+  } else {
+    // Single Elimination standings
+    const lastRound = tour.brackets.rounds[tour.brackets.rounds.length - 1];
+    const finalMatch = lastRound.matches[0];
+
+    if (finalMatch) {
+      firstPlaceTeam = finalMatch.winner;
+      secondPlaceTeam = (finalMatch.winner === finalMatch.team1) ? finalMatch.team2 : finalMatch.team1;
+    }
+
+    // 3rd place: split between both losers of the semi-finals
+    if (tour.brackets.rounds.length >= 2) {
+      const semis = tour.brackets.rounds[tour.brackets.rounds.length - 2];
+      semis.matches.forEach(m => {
+        if (m.winner) {
+          const loser = (m.winner === m.team1) ? m.team2 : m.team1;
+          thirdPlaceTeams.push(loser);
+        }
+      });
+    }
+  }
+
+  // Pay 1st place
+  if (firstPlaceTeam && percentsInPool(tour.percents[1])) {
+    awardPrizeToTeamOwner(firstPlaceTeam, (prizePool * tour.percents[1]) / 100, "1 місце в турнірі " + tour.name, db);
+  }
+
+  // Pay 2nd place
+  if (secondPlaceTeam && percentsInPool(tour.percents[2])) {
+    awardPrizeToTeamOwner(secondPlaceTeam, (prizePool * tour.percents[2]) / 100, "2 місце в турнірі " + tour.name, db);
+  }
+
+  // Pay 3rd place (split if multiple)
+  if (thirdPlaceTeams.length > 0 && percentsInPool(tour.percents[3])) {
+    const total3rdAmt = (prizePool * tour.percents[3]) / 100;
+    const splitAmt = total3rdAmt / thirdPlaceTeams.length;
+    thirdPlaceTeams.forEach(teamName => {
+      awardPrizeToTeamOwner(teamName, splitAmt, "3 місце в турнірі " + tour.name, db);
+    });
+  }
+}
+
+function percentsInPool(pctVal) {
+  return pctVal !== undefined && pctVal > 0;
+}
+
+function awardPrizeToTeamOwner(teamName, amountCoins, reason, db) {
+  if (!teamName || teamName === "Очікується" || amountCoins <= 0) return;
+  
+  const team = db.teams.find(t => t.name.toLowerCase() === teamName.toLowerCase());
+  if (!team) return;
+
+  const ownerNick = team.owner.toLowerCase();
+  const ownerUser = db.users.find(u => u.username.toLowerCase() === ownerNick);
+  
+  if (ownerUser) {
+    const amtRounded = Math.round(amountCoins);
+    ownerUser.balance = (ownerUser.balance || 0) + amtRounded;
+    
+    // Log deposit event
+    if (!ownerUser.depositHistory) ownerUser.depositHistory = [];
+    ownerUser.depositHistory.unshift({
+      amount: amtRounded,
+      method: "🏆 " + reason,
+      date: new Date().toLocaleString()
+    });
+
+    console.log(`[PRIZE] Awarded ${amtRounded} coins to user ${ownerUser.username} as captain of team ${team.name}`);
+  }
+}
+
+// Global Modal helper closes
+window.closeModal = function(modalId) {
+  const overlay = document.getElementById(modalId);
+  if (overlay) {
+    overlay.classList.remove('active');
+  }
+};
+
 

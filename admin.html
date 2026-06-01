@@ -51,6 +51,10 @@
           <span class="admin-tab-item-icon">🎮</span>
           <span>Керування ставками</span>
         </button>
+        <button class="admin-tab-item" onclick="switchAdminTab('brackets')">
+          <span class="admin-tab-item-icon">🏆</span>
+          <span>Турнірна сітка</span>
+        </button>
 
         <button class="admin-tab-item" onclick="switchAdminTab('teams')">
           <span class="admin-tab-item-icon">🛡️</span>
@@ -198,7 +202,204 @@
 
       </section>
 
+      <!-- TAB 3: Tournament Brackets Manager Panel -->
+      <section id="pane-brackets" class="admin-content-pane">
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <div>
+            <div class="section-title" style="margin-bottom:0;">🏆 КЕРУВАННЯ ТУРНІРАМИ ТА СІТКАМИ</div>
+            <p style="font-size:11px; color:var(--text-secondary); margin-top:5px; margin-bottom:0;">
+              Створюйте професійні турніри, реєструйте команди та керуйте просуванням переможців по сітці в реальному часі.
+            </p>
+          </div>
+          <button class="btn" onclick="openAddTournamentModal()" style="margin-bottom:0; font-weight:800; padding:10px 20px;">➕ ДОДАТИ ТУРНІР</button>
+        </div>
 
+        <!-- Brackets Tournament List Card -->
+        <div class="card">
+          <div style="overflow-x:auto;">
+            <table class="admin-table" style="width: 100%;">
+              <thead>
+                <tr>
+                  <th>Назва турніру</th>
+                  <th>Формат</th>
+                  <th>Карта</th>
+                  <th>Учасники</th>
+                  <th>Призовий фонд</th>
+                  <th>Статус</th>
+                  <th>Дії</th>
+                </tr>
+              </thead>
+              <tbody id="admin-tournaments-tbody">
+                <!-- Filled dynamically by JS -->
+                <tr><td colspan="7" style="text-align:center; color:var(--text-secondary); padding:20px;">Завантаження турнірів...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Active Bracket Tree Match Manager (Appears when clicking "Керувати сіткою") -->
+        <div class="card" id="admin-bracket-editor-card" style="display:none; margin-top:25px; border-color:var(--cs-orange);">
+          <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:12px; margin-bottom:20px;">
+            <div>
+              <strong style="color:var(--cs-orange); font-size:16px; text-transform:uppercase;">🏆 Керування сіткою: <span id="admin-editor-tournament-name" style="color:white;">-</span></strong>
+              <div style="font-size:11px; color:var(--text-secondary); margin-top:3px;">
+                Введіть рахунок та виберіть переможця. Результат автоматично просуне команду у наступний раунд сітки.
+              </div>
+            </div>
+            <button class="btn btn-secondary" onclick="closeBracketEditorCard()" style="margin-bottom:0;">❌ Закрити</button>
+          </div>
+
+          <!-- Dynamic Visual Bracket Match Cards for selected tournament -->
+          <div id="admin-bracket-matches-container" style="display:flex; flex-direction:column; gap:20px;">
+            <!-- Filled dynamically by JS -->
+          </div>
+        </div>
+
+      </section>
+
+      <!-- Add/Edit Tournament Modal -->
+      <div id="tournament-form-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 620px;">
+          <button class="modal-close" onclick="closeModal('tournament-form-modal')">&times;</button>
+          <div class="modal-title" id="tournament-modal-title">🏆 Створити новий турнір</div>
+          
+          <form id="admin-tournament-form" style="display:flex; flex-direction:column; gap:12px;">
+            <input type="hidden" id="tournament-id-field">
+
+            <div class="form-group">
+              <label for="tour-name">Назва турніру</label>
+              <input type="text" id="tour-name" class="form-input" placeholder="Наприклад: VOLK SPRING SEASON CUP 2026" required>
+            </div>
+
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+              <div class="form-group">
+                <label for="tour-format">Формат гри</label>
+                <select id="tour-format" class="form-input" style="padding:10px;">
+                  <option value="2x2">2x2 match</option>
+                  <option value="3x3">3x3 match</option>
+                  <option value="4x4">4x4 match</option>
+                  <option value="5x5" selected>5x5 match</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="tour-map">Активна карта</label>
+                <select id="tour-map" class="form-input" style="padding:10px;">
+                  <option value="de_dust2">de_dust2</option>
+                  <option value="de_mirage" selected>de_mirage</option>
+                  <option value="de_inferno">de_inferno</option>
+                  <option value="de_nuke">de_nuke</option>
+                  <option value="de_ancient">de_ancient</option>
+                  <option value="de_anubis">de_anubis</option>
+                  <option value="de_train">de_train</option>
+                  <option value="de_cache">de_cache</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+              <div class="form-group">
+                <label for="tour-status">Статус турніру</label>
+                <select id="tour-status" class="form-input" style="padding:10px;">
+                  <option value="upcoming" selected>Майбутній</option>
+                  <option value="active">Активний</option>
+                  <option value="completed">Завершений</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="tour-max-teams">Макс учасників (команд)</label>
+                <select id="tour-max-teams" class="form-input" style="padding:10px;" onchange="adjustConductingSystems(this.value)">
+                  <option value="2">2 команди</option>
+                  <option value="4" selected>4 команди</option>
+                  <option value="8">8 команд</option>
+                  <option value="16">16 команд</option>
+                  <option value="32">32 команди</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+              <div class="form-group">
+                <label for="tour-system">Система проведення</label>
+                <select id="tour-system" class="form-input" style="padding:10px;">
+                  <option value="single" selected>Single Elimination</option>
+                  <option value="double" id="double-elim-opt">Double Elimination (4 команди)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="tour-datetime">Дата та час початку</label>
+                <input type="datetime-local" id="tour-datetime" class="form-input" required>
+              </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns: 1.2fr 1fr; gap:12px;">
+              <div class="form-group">
+                <label for="tour-prize-pool">Загальний призовий фонд (монеток 🪙)</label>
+                <input type="number" id="tour-prize-pool" class="form-input" placeholder="Напр: 5000" min="0" required>
+              </div>
+              <div class="form-group">
+                <label for="tour-prize-places">Призових місць</label>
+                <select id="tour-prize-places" class="form-input" style="padding:10px;" onchange="adjustPrizePercentsInputs(this.value)">
+                  <option value="1">1 місце</option>
+                  <option value="2">2 місця</option>
+                  <option value="3" selected>3 місця</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Dynamic Percentages Area -->
+            <div id="tour-prize-percents-container" style="background:rgba(0,0,0,0.15); padding:12px; border-radius:8px; border:1px solid rgba(255,255,255,0.03); display:flex; flex-direction:column; gap:10px;">
+              <span style="font-size:10px; color:var(--text-secondary); text-transform:uppercase; font-weight:800; letter-spacing:0.5px;">🏆 Розподіл монет за місця (%)</span>
+              <div style="display:flex; gap:10px;">
+                <div class="form-group" style="margin-bottom:0; flex:1;" id="pct-grp-1">
+                  <label style="font-size:9px; margin-bottom:4px;">1 місце (%)</label>
+                  <input type="number" id="pct-1" class="form-input" min="0" max="100" value="50" style="padding:8px 10px;">
+                </div>
+                <div class="form-group" style="margin-bottom:0; flex:1;" id="pct-grp-2">
+                  <label style="font-size:9px; margin-bottom:4px;">2 місце (%)</label>
+                  <input type="number" id="pct-2" class="form-input" min="0" max="100" value="30" style="padding:8px 10px;">
+                </div>
+                <div class="form-group" style="margin-bottom:0; flex:1;" id="pct-grp-3">
+                  <label style="font-size:9px; margin-bottom:4px;">3 місце (%)</label>
+                  <input type="number" id="pct-3" class="form-input" min="0" max="100" value="20" style="padding:8px 10px;">
+                </div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="tour-rules">Правила турніру (Українською мовою)</label>
+              <textarea id="tour-rules" class="form-input" style="min-height: 100px; resize: vertical; font-size:11px; line-height:1.5;" required></textarea>
+            </div>
+
+            <button type="submit" class="btn" style="width: 100%; padding: 12px; font-weight: 800; margin-top: 5px;" id="tour-submit-btn">ЗБЕРЕГТИ ТУРНІР</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Tournament Roster Management Modal -->
+      <div id="tournament-roster-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 500px; border-color: var(--cs-orange);">
+          <button class="modal-close" onclick="closeModal('tournament-roster-modal')">&times;</button>
+          <div class="modal-title">🛡️ Керування учасниками турніру</div>
+          <div style="font-size:12px; color:var(--text-secondary); margin-bottom:15px;" id="roster-modal-desc">
+            Зареєструйте команди на цей турнір. Кількість учасників не повинна перевищувати ліміт.
+          </div>
+
+          <div class="card" style="background:var(--bg-input); padding:15px; margin-bottom:15px;">
+            <div style="font-size:11px; font-weight:800; text-transform:uppercase; color:white; margin-bottom:10px;">Зареєстровані команди (<span id="roster-count-val">0/4</span>)</div>
+            <div id="roster-registered-list" style="display:flex; flex-direction:column; gap:8px; max-height:160px; overflow-y:auto; padding-right:5px;">
+              <!-- Filled by JS -->
+            </div>
+          </div>
+
+          <div class="card" style="background:var(--bg-input); padding:15px; margin-bottom:0;">
+            <div style="font-size:11px; font-weight:800; text-transform:uppercase; color:white; margin-bottom:10px;">Доступні команди (Формат <span id="roster-format-val">5x5</span>)</div>
+            <div id="roster-available-list" style="display:flex; flex-direction:column; gap:8px; max-height:180px; overflow-y:auto; padding-right:5px;">
+              <!-- Filled by JS -->
+            </div>
+          </div>
+        </div>
+      </div>
 
       <!-- TAB 4: Teams & Rosters Panel -->
       <section id="pane-teams" class="admin-content-pane">

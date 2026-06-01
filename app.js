@@ -89,7 +89,7 @@ async function syncWithCloud() {
     }
 
     // 2. Sync structures
-    const [bRes, mRes, tRes, lRes, sRes, pRes, pdRes, txRes] = await Promise.all([
+    const [bRes, mRes, tRes, lRes, sRes, pRes, pdRes, txRes, tourRes] = await Promise.all([
       fetch(CLOUD_BUCKET + 'brackets', { cache: 'no-store' }),
       fetch(CLOUD_BUCKET + 'matches', { cache: 'no-store' }),
       fetch(CLOUD_BUCKET + 'teams', { cache: 'no-store' }),
@@ -97,7 +97,8 @@ async function syncWithCloud() {
       fetch(CLOUD_BUCKET + 'settings', { cache: 'no-store' }),
       fetch(CLOUD_BUCKET + 'promocodes', { cache: 'no-store' }),
       fetch(CLOUD_BUCKET + 'pendingDeposits', { cache: 'no-store' }),
-      fetch(CLOUD_BUCKET + 'usedTxids', { cache: 'no-store' })
+      fetch(CLOUD_BUCKET + 'usedTxids', { cache: 'no-store' }),
+      fetch(CLOUD_BUCKET + 'tournaments', { cache: 'no-store' })
     ]);
 
     if (bRes.ok) {
@@ -132,6 +133,13 @@ async function syncWithCloud() {
       const cloudPromocodes = await pRes.json();
       if (JSON.stringify(db.promocodes) !== JSON.stringify(cloudPromocodes)) {
         db.promocodes = cloudPromocodes;
+        dbChanged = true;
+      }
+    }
+    if (tourRes && tourRes.ok) {
+      const cloudTournaments = await tourRes.json();
+      if (JSON.stringify(db.tournaments) !== JSON.stringify(cloudTournaments)) {
+        db.tournaments = cloudTournaments;
         dbChanged = true;
       }
     }
@@ -215,6 +223,7 @@ async function pushToCloud(db) {
       fetch(CLOUD_BUCKET + 'promocodes', { method: 'POST', body: JSON.stringify(db.promocodes) }),
       fetch(CLOUD_BUCKET + 'pendingDeposits', { method: 'POST', body: JSON.stringify(db.pendingDeposits || []) }),
       fetch(CLOUD_BUCKET + 'usedTxids', { method: 'POST', body: JSON.stringify(db.usedTxids || []) }),
+      fetch(CLOUD_BUCKET + 'tournaments', { method: 'POST', body: JSON.stringify(db.tournaments || []) }),
       fetch(CLOUD_BUCKET + 'settings', { method: 'POST', body: JSON.stringify({
         twitchStatus: db.twitchStatus,
         activeTwitchChannel: db.activeTwitchChannel
@@ -239,6 +248,7 @@ function getDB() {
     if (!db.matches) db.matches = [];
     if (!db.aimLobbies) db.aimLobbies = [];
     if (!db.promocodes) db.promocodes = [];
+    if (!db.tournaments) db.tournaments = [];
     if (!db.twitchStatus) db.twitchStatus = "live";
     if (!db.activeTwitchChannel) db.activeTwitchChannel = "volk13o3";
     
@@ -632,7 +642,7 @@ function setupListenersByPage() {
     }
   }
 
-  if (currentPage === 'shop.html') {
+  if (currentPage === 'shop.html' || currentPage === 'tournament.html') {
     // Deposit verification submits
     const trcForm = document.getElementById('trc-deposit-form');
     if (trcForm) {
@@ -692,6 +702,10 @@ function renderPageContent() {
 
   if (currentPage === 'my-bets.html') {
     renderMyBetsPage();
+  }
+
+  if (currentPage === 'tournament.html') {
+    renderTournamentsPortal();
   }
 
 
@@ -2538,3 +2552,419 @@ function renderMyBetsPage() {
     container.appendChild(card);
   });
 }
+
+// ==========================================
+// TOURNAMENT PORTAL PORTAL RENDERING
+// ==========================================
+
+// Render tournaments grouped by active, upcoming, and completed categories
+window.renderTournamentsPortal = function() {
+  const container = document.getElementById('tournaments-portal-list');
+  if (!container) return;
+
+  const db = getDB();
+  const tournaments = db.tournaments || [];
+
+  if (tournaments.length === 0) {
+    container.innerHTML = `
+      <div class="card" style="background:rgba(255,255,255,0.01); border-style:dashed; padding:40px; text-align:center;">
+        <span style="font-size:24px;">🏆</span>
+        <div style="font-weight:900; font-size:14px; margin-top:10px; color:white;">ТУРНІРИ ТИМЧАСОВО ВІДСУТНІ</div>
+        <p style="font-size:11px; color:var(--text-secondary); max-width:400px; margin:8px auto 0 auto; line-height:1.5;">
+          На даний момент адміністрацією сайту не створено активних чи запланованих змагань. Поверніться сюди пізніше!
+        </p>
+      </div>
+    `;
+    return;
+  }
+
+  // Sort tournaments: Active first, then Upcoming, then Completed
+  const activeT = tournaments.filter(t => t.status === "active");
+  const upcomingT = tournaments.filter(t => t.status === "upcoming");
+  const completedT = tournaments.filter(t => t.status === "completed");
+
+  container.innerHTML = "";
+
+  // Helper render loop
+  const renderList = (title, list) => {
+    if (list.length === 0) return;
+
+    const groupHeader = document.createElement('div');
+    groupHeader.style.fontSize = "11px";
+    groupHeader.style.fontWeight = "900";
+    groupHeader.style.textTransform = "uppercase";
+    groupHeader.style.letterSpacing = "1px";
+    groupHeader.style.color = "var(--cs-orange)";
+    groupHeader.style.marginBottom = "10px";
+    groupHeader.style.marginTop = "15px";
+    groupHeader.innerText = title;
+    container.appendChild(groupHeader);
+
+    list.forEach(tour => {
+      const card = document.createElement('div');
+      card.className = "tournament-card";
+      card.id = `tour-card-${tour.id}`;
+
+      let statusClass = "status-upcoming";
+      let statusText = "Майбутній";
+      if (tour.status === "active") {
+        statusClass = "status-active";
+        statusText = "Активний";
+      } else if (tour.status === "completed") {
+        statusClass = "status-completed";
+        statusText = "Завершений";
+      }
+
+      const regCount = tour.registeredTeams ? tour.registeredTeams.length : 0;
+      const formattedDate = tour.datetime ? tour.datetime.replace('T', ' ') : "-";
+
+      card.innerHTML = `
+        <div class="tournament-card-header">
+          <div class="tournament-title-area">
+            <span class="tournament-card-title">${tour.name}</span>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span class="tournament-status-pill ${statusClass}">${statusText}</span>
+              <span style="font-size:11px; color:var(--text-secondary); font-family:monospace;">Початок: ${formattedDate}</span>
+            </div>
+          </div>
+          <div class="prize-pool-badge">
+            🪙 <span>${tour.prizePool}</span> монет
+          </div>
+        </div>
+
+        <div class="tournament-info-grid">
+          <div class="info-grid-item">
+            <span class="info-item-label">Учасники</span>
+            <span class="info-item-value">${regCount} / ${tour.maxTeams} команд</span>
+          </div>
+          <div class="info-grid-item">
+            <span class="info-item-label">Формат</span>
+            <span class="info-item-value">${tour.format} Competitive</span>
+          </div>
+          <div class="info-grid-item">
+            <span class="info-item-label">Карта</span>
+            <span class="info-item-value">${tour.map}</span>
+          </div>
+          <div class="info-grid-item">
+            <span class="info-item-label">Проведення</span>
+            <span class="info-item-value" style="text-transform: capitalize;">${tour.system} elimination</span>
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end;">
+          <button class="btn" style="margin-bottom:0; font-size:11px; padding:8px 16px; font-weight:800;" onclick="toggleTournamentDetails('${tour.id}')" id="toggle-btn-${tour.id}">🏆 ДЕТАЛІ ТА СІТКА</button>
+        </div>
+
+        <!-- Hidden details and Brackets Canvas tabs pane -->
+        <div class="tournament-details-panel" id="details-panel-${tour.id}" style="display:none; border-top:1px solid rgba(255,255,255,0.05); padding-top:15px; margin-top:10px;">
+          <div class="details-tabs-bar">
+            <button class="details-tab-btn active" id="tab-btn-info-${tour.id}" onclick="switchTournamentDetailTab('${tour.id}', 'info')">ℹ️ Інформація</button>
+            <button class="details-tab-btn" id="tab-btn-rules-${tour.id}" onclick="switchTournamentDetailTab('${tour.id}', 'rules')">📜 Правила</button>
+            <button class="details-tab-btn" id="tab-btn-bracket-${tour.id}" onclick="switchTournamentDetailTab('${tour.id}', 'bracket')">🏆 Сітка матчів</button>
+          </div>
+
+          <!-- TAB CONTENT: Info -->
+          <div class="details-tab-content active" id="tab-content-info-${tour.id}">
+            <div style="display:grid; grid-template-columns: 1.2fr 1fr; gap:20px; font-size:12px; line-height:1.6;">
+              <div>
+                <strong style="color:white; display:block; margin-bottom:8px; font-size:13px; text-transform:uppercase;">🏆 Розподіл призового фонду:</strong>
+                <ul style="padding-left:15px; display:flex; flex-direction:column; gap:4px; color:var(--text-secondary);">
+                  ${Object.entries(tour.percents || {}).map(([place, pct]) => `
+                    <li><strong>${place} місце:</strong> <span style="color:white;">${pct}%</span> (отримає <strong style="color:var(--cs-orange);">${Math.round(tour.prizePool * pct / 100)} 🪙</strong>)</li>
+                  `).join('')}
+                </ul>
+                <p style="color:var(--text-secondary); margin-top:15px; font-size:11px;">
+                  Призи розподіляються в автоматичному режимі одразу після внесення фінального результату в адмін-панелі. Кошти зараховуються безпосередньо капітану команди!
+                </p>
+              </div>
+              <div style="background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; border:1px solid rgba(255,255,255,0.02); display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;">
+                <span style="font-size:32px; filter:drop-shadow(0 0 8px rgba(255,90,0,0.3));">🗺️</span>
+                <strong style="color:white; margin-top:8px; text-transform:uppercase; font-size:13px;">Активна карта: de_${tour.map.replace('de_', '')}</strong>
+                <span style="font-size:10px; color:var(--text-secondary); margin-top:3px;">Усі поєдинки турніру будуть зіграні виключно на цій локації</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB CONTENT: Rules -->
+          <div class="details-tab-content" id="tab-content-rules-${tour.id}">
+            <div style="background:rgba(0,0,0,0.15); padding:15px; border-radius:8px; border:1px solid rgba(255,255,255,0.02); font-size:12px; line-height:1.6; color:#e1e7f0; white-space:pre-line;">
+              ${tour.rules || "Офіційні правила тимчасово відсутні."}
+            </div>
+          </div>
+
+          <!-- TAB CONTENT: Brackets Canvas -->
+          <div class="details-tab-content" id="tab-content-bracket-${tour.id}">
+            <div class="bracket-canvas-wrapper" id="bracket-wrapper-${tour.id}">
+              <div class="bracket-canvas-inner" id="bracket-inner-${tour.id}">
+                <!-- Rendered dynamically -->
+              </div>
+            </div>
+          </div>
+
+        </div>
+      `;
+      container.appendChild(card);
+    });
+  };
+
+  renderList("🟢 Активні турніри", activeT);
+  renderList("⏳ Заплановані події", upcomingT);
+  renderList("🏁 Завершені змагання", completedT);
+};
+
+// Toggle expanded tournament details view
+window.toggleTournamentDetails = function(tourId) {
+  const panel = document.getElementById(`details-panel-${tourId}`);
+  const btn = document.getElementById(`toggle-btn-${tourId}`);
+  if (!panel || !btn) return;
+
+  if (panel.style.display === "none") {
+    panel.style.display = "block";
+    btn.innerText = "❌ ЗАКРИТИ ДЕТАЛІ";
+    // Initialize to info tab
+    switchTournamentDetailTab(tourId, 'info');
+  } else {
+    panel.style.display = "none";
+    btn.innerText = "🏆 ДЕТАЛІ ТА СІТКА";
+  }
+};
+
+// Switch tabs inside expanded tournament details
+window.switchTournamentDetailTab = function(tourId, tabKey) {
+  const tabs = ['info', 'rules', 'bracket'];
+  tabs.forEach(key => {
+    const btn = document.getElementById(`tab-btn-${key}-${tourId}`);
+    const content = document.getElementById(`tab-content-${key}-${tourId}`);
+    if (btn) btn.classList.remove('active');
+    if (content) content.classList.remove('active');
+  });
+
+  const activeBtn = document.getElementById(`tab-btn-${tabKey}-${tourId}`);
+  const activeContent = document.getElementById(`tab-content-${tabKey}-${tourId}`);
+  if (activeBtn) activeBtn.classList.add('active');
+  if (activeContent) activeContent.classList.add('active');
+
+  if (tabKey === 'bracket') {
+    renderVisualBracketPortal(tourId);
+  }
+};
+
+// SVG vibrant color hash team initials logo generator
+function generateTeamLogoSVG(teamName) {
+  if (!teamName || teamName === "Очікується") {
+    return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 30 30"><rect width="30" height="30" fill="%232c3040" rx="6"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="900" fill="%234f566f">?</text></svg>`;
+  }
+  
+  let hash = 0;
+  for (let i = 0; i < teamName.length; i++) {
+    hash = teamName.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const h = Math.abs(hash) % 360;
+  const color1 = `hsl(${h}, 85%, 45%)`;
+  const color2 = `hsl(${(h + 40) % 360}, 90%, 35%)`;
+  
+  // Extract initials
+  const initials = teamName.split(/\s+/).map(w => w.charAt(0)).join('').toUpperCase().slice(0, 2);
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 30 30">
+    <defs>
+      <linearGradient id="grad-${h}" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="${color1}" />
+        <stop offset="100%" stop-color="${color2}" />
+      </linearGradient>
+    </defs>
+    <rect width="30" height="30" fill="url(%23grad-${h})" rx="6"/>
+    <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="900" fill="white" letter-spacing="0.5">${initials}</text>
+  </svg>`;
+  
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+// Interactive scrolling drag & scroll panning engine
+function makeBracketPanningInteractive(wrapper) {
+  if (!wrapper) return;
+  let isDown = false;
+  let startX;
+  let startY;
+  let scrollLeft;
+  let scrollTop;
+
+  wrapper.addEventListener('mousedown', (e) => {
+    isDown = true;
+    wrapper.classList.add('grabbing');
+    startX = e.pageX - wrapper.offsetLeft;
+    startY = e.pageY - wrapper.offsetTop;
+    scrollLeft = wrapper.scrollLeft;
+    scrollTop = wrapper.scrollTop;
+  });
+
+  wrapper.addEventListener('mouseleave', () => {
+    isDown = false;
+    wrapper.classList.remove('grabbing');
+  });
+
+  wrapper.addEventListener('mouseup', () => {
+    isDown = false;
+    wrapper.classList.remove('grabbing');
+  });
+
+  wrapper.addEventListener('mousemove', (e) => {
+    if (!isDown) return;
+    e.preventDefault();
+    const x = e.pageX - wrapper.offsetLeft;
+    const y = e.pageY - wrapper.offsetTop;
+    const walkX = (x - startX) * 1.5;
+    const walkY = (y - startY) * 1.5;
+    wrapper.scrollLeft = scrollLeft - walkX;
+    wrapper.scrollTop = scrollTop - walkY;
+  });
+}
+
+// Renders visual bracket rounds structure with connectors inside expanded tab
+function renderVisualBracketPortal(tourId) {
+  const wrapper = document.getElementById(`bracket-wrapper-${tourId}`);
+  const inner = document.getElementById(`bracket-inner-${tourId}`);
+  if (!wrapper || !inner) return;
+
+  const db = getDB();
+  const tour = db.tournaments.find(t => t.id === tourId);
+  if (!tour || !tour.brackets || !tour.brackets.rounds) return;
+
+  inner.innerHTML = "";
+
+  // Setup interactive mouse panning
+  makeBracketPanningInteractive(wrapper);
+
+  tour.brackets.rounds.forEach((round, rIndex) => {
+    const col = document.createElement('div');
+    col.className = "bracket-round-column";
+    
+    // Set heights depending on round distance to space out visual match node slots nicely
+    if (rIndex > 0) {
+      col.style.gap = `${30 + rIndex * 110}px`;
+    }
+
+    round.matches.forEach(match => {
+      const node = document.createElement('div');
+      node.className = "bracket-match-node-v2";
+      if (match.status === 'live') node.classList.add('active-live');
+
+      // Click event comparison modal
+      node.onclick = () => {
+        if (match.team1 !== "Очікується" && match.team2 !== "Очікується") {
+          openRosterModalComparison(match.team1, match.team2);
+        }
+      };
+
+      let statusBadge = "";
+      if (match.status === "live") {
+        statusBadge = `<span class="match-status-badge live"><span class="pulse-dot"></span>LIVE</span>`;
+      } else if (match.status === "finished") {
+        statusBadge = `<span class="match-status-badge completed">Завершено</span>`;
+      } else {
+        statusBadge = `<span class="match-status-badge upcoming">Очікується</span>`;
+      }
+
+      const logo1 = generateTeamLogoSVG(match.team1);
+      const logo2 = generateTeamLogoSVG(match.team2);
+
+      const team1WinnerClass = (match.status === "finished" && match.winner === match.team1) ? "winner" : (match.status === "finished" ? "loser" : "");
+      const team2WinnerClass = (match.status === "finished" && match.winner === match.team2) ? "winner" : (match.status === "finished" ? "loser" : "");
+
+      node.innerHTML = `
+        <div class="match-node-header">
+          <span class="match-node-time">${match.time ? match.time.replace('T', ' ') : 'Час не вказано'}</span>
+          ${statusBadge}
+        </div>
+        
+        <div class="bracket-team-row ${team1WinnerClass}">
+          <div class="bracket-team-info">
+            <img class="bracket-team-logo" src="${logo1}" alt="logo">
+            <span class="bracket-team-name">${match.team1}</span>
+          </div>
+          <span class="bracket-team-score">${match.status !== 'upcoming' ? match.score1 : '-'}</span>
+        </div>
+
+        <div class="bracket-team-row ${team2WinnerClass}">
+          <div class="bracket-team-info">
+            <img class="bracket-team-logo" src="${logo2}" alt="logo">
+            <span class="bracket-team-name">${match.team2}</span>
+          </div>
+          <span class="bracket-team-score">${match.status !== 'upcoming' ? match.score2 : '-'}</span>
+        </div>
+      `;
+      col.appendChild(node);
+    });
+
+    inner.appendChild(col);
+  });
+};
+
+// Side-by-side Dual Roster Modal Comparisonclicked on match cards
+window.openRosterModalComparison = function(team1Name, team2Name) {
+  const db = getDB();
+  const team1 = db.teams.find(t => t.name.toLowerCase() === team1Name.toLowerCase());
+  const team2 = db.teams.find(t => t.name.toLowerCase() === team2Name.toLowerCase());
+
+  const container = document.getElementById('roster-modal-players');
+  if (!container) return;
+  container.innerHTML = "";
+
+  document.getElementById('roster-modal-title').innerText = `${team1Name} vs ${team2Name}`;
+  
+  const tagBadge = document.getElementById('roster-modal-tag');
+  if (tagBadge) tagBadge.style.display = "none";
+
+  const flexDiv = document.createElement('div');
+  flexDiv.style.display = "grid";
+  flexDiv.style.gridTemplateColumns = "1fr 1fr";
+  flexDiv.style.gap = "15px";
+
+  // Team 1 players column
+  const col1 = document.createElement('div');
+  col1.innerHTML = `<div style="font-size:11px; font-weight:800; color:var(--cs-orange); margin-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:4px; text-transform:uppercase; text-align:center;">${team1Name}</div>`;
+  const list1 = document.createElement('div');
+  list1.style.display = "flex";
+  list1.style.flexDirection = "column";
+  list1.style.gap = "6px";
+  
+  if (team1 && team1.players && team1.players.length > 0) {
+    team1.players.forEach(p => {
+      list1.innerHTML += `
+        <div class="roster-player-line" style="display:flex; justify-content:center;">
+          <span class="roster-player-name">${p}</span>
+        </div>
+      `;
+    });
+  } else {
+    list1.innerHTML = `<span style="font-size:11px; color:var(--text-secondary); display:block; text-align:center; padding:10px;">Склад не вказано</span>`;
+  }
+  col1.appendChild(list1);
+
+  // Team 2 players column
+  const col2 = document.createElement('div');
+  col2.innerHTML = `<div style="font-size:11px; font-weight:800; color:var(--cs-orange); margin-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:4px; text-transform:uppercase; text-align:center;">${team2Name}</div>`;
+  const list2 = document.createElement('div');
+  list2.style.display = "flex";
+  list2.style.flexDirection = "column";
+  list2.style.gap = "6px";
+
+  if (team2 && team2.players && team2.players.length > 0) {
+    team2.players.forEach(p => {
+      list2.innerHTML += `
+        <div class="roster-player-line" style="display:flex; justify-content:center;">
+          <span class="roster-player-name">${p}</span>
+        </div>
+      `;
+    });
+  } else {
+    list2.innerHTML = `<span style="font-size:11px; color:var(--text-secondary); display:block; text-align:center; padding:10px;">Склад не вказано</span>`;
+  }
+  col2.appendChild(list2);
+
+  flexDiv.appendChild(col1);
+  flexDiv.appendChild(col2);
+  container.appendChild(flexDiv);
+
+  openModal('roster-modal');
+};
