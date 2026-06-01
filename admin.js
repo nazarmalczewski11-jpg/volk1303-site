@@ -899,6 +899,8 @@ function renderAdminUsersTable(users) {
     const depSum = deps.reduce((acc, d) => acc + d.amount, 0);
     const depCount = deps.length;
 
+    const isSystemAdmin = user.username.toLowerCase() === 'admin' || user.username.toLowerCase() === 'admin!';
+
     tr.innerHTML = `
       <td><strong>${user.username.toUpperCase()}</strong></td>
       <td>${user.email || ''}</td>
@@ -907,11 +909,27 @@ function renderAdminUsersTable(users) {
       <td>${depSum} 🪙 (${depCount})</td>
       <td>
         <button class="btn btn-secondary" style="padding:4px 8px; font-size:10px;" onclick="autoSelectUserForDispenser('${user.username}')">Вибрати</button>
+        ${!isSystemAdmin ? `<button class="btn btn-danger" style="padding:4px 8px; font-size:10px; margin-left:5px;" onclick="deleteUserAdmin('${user.username}')">Видалити</button>` : ''}
       </td>
     `;
     tbody.appendChild(tr);
   });
 }
+
+window.deleteUserAdmin = function(username) {
+  if (username.toLowerCase() === 'admin' || username.toLowerCase() === 'admin!') {
+    showToast("Неможливо видалити акаунт адміністратора!", "error");
+    return;
+  }
+  if (!confirm(`Ви впевнені, що хочете видалити користувача ${username.toUpperCase()} та очистити його дані?`)) return;
+
+  const db = getDB();
+  db.users = db.users.filter(u => u.username.toLowerCase() !== username.toLowerCase());
+
+  saveDB(db);
+  showToast(`Користувача ${username.toUpperCase()} успішно видалено!`, "success");
+  renderAdminPanel();
+};
 
 window.autoSelectUserForDispenser = function(nick) {
   switchAdminTab('users');
