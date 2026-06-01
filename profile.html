@@ -146,94 +146,67 @@
 
   <!-- Deposit Modal -->
   <div id="deposit-modal" class="modal-overlay">
-    <div class="modal-content">
+    <div class="modal-content" style="max-width: 440px;">
       <button class="modal-close" onclick="closeModal('deposit-modal')">&times;</button>
       <div class="modal-title">Поповнити баланс</div>
       
+      <!-- Exchange Rate Badge -->
+      <div style="background: rgba(255, 90, 0, 0.06); padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(255, 90, 0, 0.2); font-size: 12px; color: var(--text-secondary); text-align: center; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: inset 0 0 8px rgba(255, 90, 0, 0.05);">
+        🪙 <span style="color: var(--text-primary); font-weight: 800;">КУРС ВАЛЮТИ:</span> 1 монета = 1 гривня (UAH)
+      </div>
+
       <div class="payment-tabs">
-        <button class="payment-tab-btn active" id="dep-tab-trc" onclick="switchPaymentTab('trc')">USDT TRC20</button>
-        <button class="payment-tab-btn" id="dep-tab-mono" onclick="switchPaymentTab('mono')">MONOBANKA</button>
+        <button class="payment-tab-btn active" id="dep-tab-trc" onclick="switchPaymentTab('trc')">
+          <span style="font-size: 14px;">🟢</span> USDT TRC20
+        </button>
+        <button class="payment-tab-btn" id="dep-tab-mono" onclick="switchPaymentTab('mono')">
+          <span style="font-size: 14px;">🟣</span> MONOBANKA
+        </button>
       </div>
 
       <!-- TRC20 Form -->
       <div id="payment-trc" class="payment-method-details active">
-        <div class="qr-code-placeholder">
-          <svg viewBox="0 0 100 100" style="width:100%; height:100%;">
-            <rect width="100" height="100" fill="white"/>
-            <rect x="5" y="5" width="25" height="25" fill="#0c0d12"/>
-            <rect x="9" y="9" width="17" height="17" fill="white"/>
-            <rect x="12" y="12" width="11" height="11" fill="#0c0d12"/>
-            
-            <rect x="70" y="5" width="25" height="25" fill="#0c0d12"/>
-            <rect x="74" y="9" width="17" height="17" fill="white"/>
-            <rect x="77" y="12" width="11" height="11" fill="#0c0d12"/>
-            
-            <rect x="5" y="70" width="25" height="25" fill="#0c0d12"/>
-            <rect x="9" y="74" width="17" height="17" fill="white"/>
-            <rect x="12" y="77" width="11" height="11" fill="#0c0d12"/>
-
-            <rect x="35" y="10" width="10" height="20" fill="#0c0d12"/>
-            <rect x="50" y="15" width="15" height="15" fill="#0c0d12"/>
-            <rect x="35" y="45" width="30" height="10" fill="#0c0d12"/>
-            <rect x="10" y="35" width="15" height="25" fill="#0c0d12"/>
-            <rect x="80" y="35" width="10" height="35" fill="#0c0d12"/>
-            <rect x="55" y="65" width="20" height="20" fill="#0c0d12"/>
-          </svg>
+        <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-secondary); font-weight: 700; text-align: center; margin-bottom: -5px;">Скануйте адресу або скопіюйте гаманець</div>
+        <div class="qr-code-placeholder" style="background: white; padding: 6px;">
+          <img src="assets/qr_crypto.png" alt="USDT TRC20 Wallet QR" style="width: 100%; height: 100%; object-fit: contain; border-radius: 8px;">
         </div>
         <div class="copy-field">
           <input type="text" value="TWe13o3VolkCS2BettingPlatformXyzTRC20" readonly style="flex:1;">
-          <button class="btn btn-secondary" style="padding: 4px 8px; font-size:11px;" onclick="navigator.clipboard.writeText('TWe13o3VolkCS2BettingPlatformXyzTRC20'); showToast('Адресу скопійовано!')">Скопіювати</button>
+          <button class="btn" style="padding: 8px 12px; font-size:10px;" onclick="navigator.clipboard.writeText('TWe13o3VolkCS2BettingPlatformXyzTRC20'); showToast('Адресу скопійовано!', 'success')">Скопіювати</button>
         </div>
         <form id="trc-deposit-form">
           <div class="form-group">
             <label for="trc-amount">Сума (монет)</label>
             <input type="number" id="trc-amount" class="form-input" placeholder="Мін. 500 монет" min="500" required>
           </div>
-          <div class="form-group">
+          <div class="form-group" style="margin-top: 12px;">
             <label for="trc-txid">TxID транзакції</label>
-            <input type="text" id="trc-txid" class="form-input" placeholder="TxID транзакції" required>
+            <input type="text" id="trc-txid" class="form-input" placeholder="Вставте TxID транзакції" required>
           </div>
-          <button type="submit" class="btn" style="width: 100%; margin-top: 10px;">ВЕРЕФІКУВАТИ ДЕПОЗИТ</button>
+          <button type="submit" class="btn" style="width: 100%; margin-top: 15px; padding: 12px;">ВЕРЕФІКУВАТИ ДЕПОЗИТ</button>
         </form>
       </div>
 
       <!-- Monobanka Form -->
       <div id="payment-mono" class="payment-method-details">
-        <div class="qr-code-placeholder">
-          <svg viewBox="0 0 100 100" style="width:100%; height:100%;">
-            <rect width="100" height="100" fill="white"/>
-            <rect x="5" y="5" width="25" height="25" fill="#ff5a00"/>
-            <rect x="9" y="9" width="17" height="17" fill="white"/>
-            <rect x="12" y="12" width="11" height="11" fill="#ff5a00"/>
-            
-            <rect x="70" y="5" width="25" height="25" fill="#ff5a00"/>
-            <rect x="74" y="9" width="17" height="17" fill="white"/>
-            <rect x="77" y="12" width="11" height="11" fill="#ff5a00"/>
-            
-            <rect x="5" y="70" width="25" height="25" fill="#ff5a00"/>
-            <rect x="9" y="74" width="17" height="17" fill="white"/>
-            <rect x="12" y="77" width="11" height="11" fill="#ff5a00"/>
-
-            <rect x="35" y="15" width="20" height="20" fill="#ff5a00"/>
-            <rect x="40" y="45" width="25" height="20" fill="#ff5a00"/>
-            <rect x="75" y="40" width="15" height="25" fill="#ff5a00"/>
-            <rect x="45" y="70" width="20" height="15" fill="#ff5a00"/>
-          </svg>
+        <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-secondary); font-weight: 700; text-align: center; margin-bottom: -5px;">Перейдіть за посиланням на Банку Mono</div>
+        <div class="qr-code-placeholder" style="background: white; padding: 6px;">
+          <img src="assets/qr_mono.png" alt="Monobank Jar QR" style="width: 100%; height: 100%; object-fit: contain; border-radius: 8px;">
         </div>
         <div class="copy-field">
           <input type="text" value="https://send.monobank.ua/jar/volk13o3" readonly style="flex:1;">
-          <a href="https://send.monobank.ua/jar/volk13o3" target="_blank" class="btn btn-secondary" style="padding: 4px 8px; font-size:11px; text-decoration:none; display:flex; align-items:center;">ПЕРЕЙТИ</a>
+          <a href="https://send.monobank.ua/jar/volk13o3" target="_blank" class="btn" style="padding: 8px 12px; font-size:10px; text-decoration:none; display:flex; align-items:center; justify-content:center;">ПЕРЕЙТИ</a>
         </div>
         <form id="mono-deposit-form">
           <div class="form-group">
             <label for="mono-amount">Сума (монет)</label>
             <input type="number" id="mono-amount" class="form-input" placeholder="Мін. 500 монет" min="500" required>
           </div>
-          <div class="form-group">
+          <div class="form-group" style="margin-top: 12px;">
             <label for="mono-sender-name">ПІБ відправника</label>
-            <input type="text" id="mono-sender-name" class="form-input" placeholder="Прізвище, Ім'я" required>
+            <input type="text" id="mono-sender-name" class="form-input" placeholder="Прізвище, Ім'я відправника" required>
           </div>
-          <button type="submit" class="btn" style="width: 100%; margin-top: 10px;">ВЕРЕФІКУВАТИ ДЕПОЗИТ</button>
+          <button type="submit" class="btn" style="width: 100%; margin-top: 15px; padding: 12px;">ВЕРЕФІКУВАТИ ДЕПОЗИТ</button>
         </form>
       </div>
 

@@ -765,7 +765,7 @@ function checkNewRegistrations(db) {
 // Render Admin Panels
 function renderAdminPanel() {
   const db = getDB();
-  if (!db) return;
+  if (!db || db.currentUser !== 'admin') return;
 
   // Track and notify about new registrations in real-time
   checkNewRegistrations(db);
