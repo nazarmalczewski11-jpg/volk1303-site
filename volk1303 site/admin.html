@@ -229,18 +229,19 @@
             <div class="form-group" style="margin-bottom:0;">
               <label for="admin-bracket-type-select">Тип турнірної сітки</label>
               <select id="admin-bracket-type-select" class="form-input" style="padding:10px;">
-                <option value="single-4">Single Elimination (4 команди)</option>
-                <option value="single-8">Single Elimination (8 команд)</option>
+                <option value="single-2">2 матчі в 1-му раунді (4 команди, Півфінали)</option>
+                <option value="single-4">4 матчі в 1-му раунді (8 команд, Чвертьфінали)</option>
+                <option value="single-6">6 матчів в 1-му раунді (12 команд, 1 раунд)</option>
                 <option value="double-4">Double Elimination (4 команди)</option>
               </select>
             </div>
             <div class="form-group" style="margin-bottom:0;">
               <label for="admin-bracket-format-select">Формат турніру</label>
               <select id="admin-bracket-format-select" class="form-input" style="padding:10px;">
-                <option value="1x1">1 vs 1 AIM Duel</option>
-                <option value="2v2">2 vs 2 Wingman</option>
-                <option value="3v3">3 vs 3 Teamfight</option>
-                <option value="5x5">5 vs 5 Competitive</option>
+                <option value="2x2">2х2 Wingman</option>
+                <option value="3x3">3х3 Teamfight</option>
+                <option value="4x4">4х4 Arena</option>
+                <option value="5x5">5х5 Competitive</option>
               </select>
             </div>
             <button class="btn" onclick="generateNewBracket()" style="padding: 12px 24px; font-weight:800; font-size:12px; letter-spacing:0.5px;">ЗГЕНЕРУВАТИ СІТКУ</button>
@@ -277,10 +278,10 @@
               <div class="form-group" style="margin-bottom:0;">
                 <label for="team-format-input-admin">Формат команди</label>
                 <select id="team-format-input-admin" class="form-input" style="padding:10px;">
-                  <option value="1x1">1 vs 1</option>
-                  <option value="2v2">2 vs 2</option>
-                  <option value="3v3">3 vs 3</option>
-                  <option value="5x5">5 vs 5</option>
+                  <option value="2x2">2х2</option>
+                  <option value="3x3">3х3</option>
+                  <option value="4x4">4х4</option>
+                  <option value="5x5">5х5</option>
                 </select>
               </div>
               <div class="form-group" style="margin-bottom:0;">

@@ -1263,44 +1263,79 @@ window.generateNewBracket = function() {
 
   let rounds = [];
 
-  if (selectedType === 'single-4') {
+  if (selectedType === 'single-2') {
     rounds = [
       {
         name: "Півфінали",
         matches: [
-          { id: "s4_1", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null },
-          { id: "s4_2", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null }
+          { id: "s2_1", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null, status: "Очікується", time: "Сьогодні, 18:00" },
+          { id: "s2_2", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null, status: "Очікується", time: "Сьогодні, 19:00" }
         ]
       },
       {
         name: "Фінал",
         matches: [
-          { id: "s4_3", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null }
+          { id: "s2_3", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null, status: "Очікується", time: "Сьогодні, 20:30" }
         ]
       }
     ];
-  } else if (selectedType === 'single-8') {
+  } else if (selectedType === 'single-4') {
     rounds = [
       {
         name: "Чвертьфінали",
         matches: [
-          { id: "s8_1", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null },
-          { id: "s8_2", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null },
-          { id: "s8_3", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null },
-          { id: "s8_4", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null }
+          { id: "s4_1", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null, status: "Очікується", time: "Сьогодні, 14:00" },
+          { id: "s4_2", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null, status: "Очікується", time: "Сьогодні, 15:00" },
+          { id: "s4_3", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null, status: "Очікується", time: "Сьогодні, 16:00" },
+          { id: "s4_4", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null, status: "Очікується", time: "Сьогодні, 17:00" }
         ]
       },
       {
         name: "Півфінали",
         matches: [
-          { id: "s8_5", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null },
-          { id: "s8_6", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null }
+          { id: "s4_5", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null, status: "Очікується", time: "Сьогодні, 18:30" },
+          { id: "s4_6", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null, status: "Очікується", time: "Сьогодні, 19:30" }
         ]
       },
       {
         name: "Фінал",
         matches: [
-          { id: "s8_7", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null }
+          { id: "s4_7", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null, status: "Очікується", time: "Сьогодні, 21:00" }
+        ]
+      }
+    ];
+  } else if (selectedType === 'single-6') {
+    rounds = [
+      {
+        name: "1 раунд",
+        matches: [
+          { id: "s6_1", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null, status: "Очікується", time: "Сьогодні, 12:00" },
+          { id: "s6_2", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null, status: "Очікується", time: "Сьогодні, 13:00" },
+          { id: "s6_3", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null, status: "Очікується", time: "Сьогодні, 14:00" },
+          { id: "s6_4", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null, status: "Очікується", time: "Сьогодні, 15:00" },
+          { id: "s6_5", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null, status: "Очікується", time: "Сьогодні, 16:00" },
+          { id: "s6_6", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null, status: "Очікується", time: "Сьогодні, 17:00" }
+        ]
+      },
+      {
+        name: "Чвертьфінали",
+        matches: [
+          { id: "s6_7", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null, status: "Очікується", time: "Сьогодні, 18:00" },
+          { id: "s6_8", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null, status: "Очікується", time: "Сьогодні, 18:45" },
+          { id: "s6_9", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null, status: "Очікується", time: "Сьогодні, 19:30" }
+        ]
+      },
+      {
+        name: "Півфінали",
+        matches: [
+          { id: "s6_10", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null, status: "Очікується", time: "Сьогодні, 20:15" },
+          { id: "s6_11", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null, status: "Очікується", time: "Сьогодні, 21:00" }
+        ]
+      },
+      {
+        name: "Фінал",
+        matches: [
+          { id: "s6_12", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null, status: "Очікується", time: "Сьогодні, 22:00" }
         ]
       }
     ];
@@ -1309,32 +1344,32 @@ window.generateNewBracket = function() {
       {
         name: "Верхня сітка: Півфінали",
         matches: [
-          { id: "ub_1", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null },
-          { id: "ub_2", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null }
+          { id: "ub_1", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null, status: "Очікується", time: "Сьогодні, 18:00" },
+          { id: "ub_2", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null, status: "Очікується", time: "Сьогодні, 18:00" }
         ]
       },
       {
         name: "Верхня сітка: Фінал",
         matches: [
-          { id: "ub_3", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null }
+          { id: "ub_3", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null, status: "Очікується", time: "Сьогодні, 19:30" }
         ]
       },
       {
         name: "Нижня сітка: Раунд 1",
         matches: [
-          { id: "lb_1", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null }
+          { id: "lb_1", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null, status: "Очікується", time: "Сьогодні, 19:30" }
         ]
       },
       {
         name: "Нижня сітка: Фінал лузерів",
         matches: [
-          { id: "lb_2", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null }
+          { id: "lb_2", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null, status: "Очікується", time: "Сьогодні, 20:30" }
         ]
       },
       {
         name: "Гранд-фінал",
         matches: [
-          { id: "gf_1", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null }
+          { id: "gf_1", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null, status: "Очікується", time: "Сьогодні, 21:30" }
         ]
       }
     ];
@@ -1393,12 +1428,13 @@ function _createAdminMatchNode(match, roundIdx, matchIdx, teams) {
   const node = document.createElement('div');
   node.className = 'bracket-match-node-v2';
   node.style.cursor = 'default';
+  node.style.height = '235px';
 
   if (!match) {
     node.style.opacity = '0.4';
     node.innerHTML = `
-      <div class="bracket-team"><span>Очікується</span></div>
-      <div class="bracket-team"><span>Очікується</span></div>`;
+      <div class="bracket-team" style="padding:10px 13px;"><span>Очікується</span></div>
+      <div class="bracket-team" style="padding:10px 13px;"><span>Очікується</span></div>`;
     return node;
   }
 
@@ -1416,19 +1452,42 @@ function _createAdminMatchNode(match, roundIdx, matchIdx, teams) {
     return opts;
   };
 
+  const status = match.status || 'Очікується';
+  const time = match.time || 'Сьогодні, 20:00';
+
+  const makeStatusOpts = (selected) => {
+    const statuses = ['Очікується', 'В процесі', 'Завершено'];
+    return statuses.map(s => {
+      const sel = selected === s ? 'selected' : '';
+      return `<option value="${s}" ${sel}>${s}</option>`;
+    }).join('');
+  };
+
   node.innerHTML = `
-    <div style="padding:7px 9px;display:flex;gap:6px;align-items:center;border-bottom:1px solid rgba(255,255,255,0.06);">
+    <!-- Top row: Status & Time editing -->
+    <div style="padding:6px 9px;display:flex;gap:6px;align-items:center;border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.01);">
+      <select id="br-status-${match.id}" class="form-input" style="flex:1.2;padding:4px 6px;font-size:9px;min-width:0;height:24px;">${makeStatusOpts(status)}</select>
+      <input type="text" id="br-time-${match.id}" class="form-input" value="${time}" placeholder="Час матчу" style="flex:1;padding:4px 6px;font-size:9px;height:24px;min-width:0;">
+    </div>
+    
+    <!-- Team 1 Row -->
+    <div style="padding:6px 9px;display:flex;gap:6px;align-items:center;border-bottom:1px solid rgba(255,255,255,0.06);">
       <select id="br-t1-${match.id}" class="form-input" style="flex:1;padding:5px 7px;font-size:10px;min-width:0;">${makeOpts(match.team1)}</select>
       <input type="number" id="br-s1-${match.id}" class="form-input" value="${match.score1}" style="width:40px;padding:5px 5px;font-size:11px;font-weight:800;text-align:center;flex-shrink:0;">
     </div>
-    <div style="text-align:center;padding:2px 0;font-size:9px;font-weight:900;color:var(--cs-orange);letter-spacing:1.5px;">VS</div>
-    <div style="padding:7px 9px;display:flex;gap:6px;align-items:center;border-bottom:1px solid rgba(255,255,255,0.06);">
+    <div style="text-align:center;padding:1px 0;font-size:9px;font-weight:900;color:var(--cs-orange);letter-spacing:1.5px;">VS</div>
+    
+    <!-- Team 2 Row -->
+    <div style="padding:6px 9px;display:flex;gap:6px;align-items:center;border-bottom:1px solid rgba(255,255,255,0.06);">
       <select id="br-t2-${match.id}" class="form-input" style="flex:1;padding:5px 7px;font-size:10px;min-width:0;">${makeOpts(match.team2)}</select>
       <input type="number" id="br-s2-${match.id}" class="form-input" value="${match.score2}" style="width:40px;padding:5px 5px;font-size:11px;font-weight:800;text-align:center;flex-shrink:0;">
     </div>
-    <div style="padding:7px 9px;">
+    
+    <!-- Save Button -->
+    <div style="padding:6px 9px;">
       <button class="btn" style="width:100%;padding:6px 10px;font-size:10px;font-weight:800;letter-spacing:0.5px;" onclick="saveAdminBracketMatch('${match.id}',${roundIdx},${matchIdx})">✓ ЗБЕРЕГТИ</button>
     </div>`;
+
   return node;
 }
 
@@ -1557,9 +1616,9 @@ function renderAdminBracketsEditor(brackets) {
   }
 
   // ── SINGLE ELIMINATION ─────────────────────────────────────────────────────
-  const NODE_H = 148; // height of editable admin node
+  const NODE_H = 235; // height of editable admin node
   const maxM = rounds[0].matches.length;
-  const SLOT_H = Math.max(NODE_H + 50, 200);
+  const SLOT_H = Math.max(NODE_H + 50, 290);
   const totalH = maxM * SLOT_H;
   const totalW = rounds.length * NODE_W + (rounds.length - 1) * GAP + PAD * 2;
   const canvasH = totalH + PAD * 2 + 24;
@@ -1633,11 +1692,15 @@ window.saveAdminBracketMatch = function(matchId, roundIdx, matchIdx) {
   const round = db.brackets.rounds[roundIdx];
   const match = round.matches[matchIdx];
 
+  const status = document.getElementById(`br-status-${matchId}`).value;
+  const time = document.getElementById(`br-time-${matchId}`).value.trim() || 'Сьогодні, 20:00';
   const t1 = document.getElementById(`br-t1-${matchId}`).value.trim() || null;
   const s1 = parseInt(document.getElementById(`br-s1-${matchId}`).value) || 0;
   const t2 = document.getElementById(`br-t2-${matchId}`).value.trim() || null;
   const s2 = parseInt(document.getElementById(`br-s2-${matchId}`).value) || 0;
 
+  match.status = status;
+  match.time = time;
   match.team1 = t1;
   match.score1 = s1;
   match.team2 = t2;
@@ -1688,7 +1751,7 @@ window.saveAdminBracketMatch = function(matchId, roundIdx, matchIdx) {
     } else if (matchId === 'lb_2') {
       if (gf_1) gf_1.team2 = winner;
     }
-  } else if (type === 'single-4') {
+  } else if (type === 'single-2') {
     if (roundIdx === 0) {
       const nextRound = db.brackets.rounds[1];
       const nextMatch = nextRound.matches[0];
@@ -1698,7 +1761,7 @@ window.saveAdminBracketMatch = function(matchId, roundIdx, matchIdx) {
         nextMatch.team2 = winner;
       }
     }
-  } else if (type === 'single-8') {
+  } else if (type === 'single-4') {
     if (roundIdx === 0) {
       const nextRound = db.brackets.rounds[1];
       const nextMatch = nextRound.matches[Math.floor(matchIdx / 2)];
@@ -1709,6 +1772,33 @@ window.saveAdminBracketMatch = function(matchId, roundIdx, matchIdx) {
       }
     } else if (roundIdx === 1) {
       const nextRound = db.brackets.rounds[2];
+      const nextMatch = nextRound.matches[0];
+      if (matchIdx === 0) {
+        nextMatch.team1 = winner;
+      } else {
+        nextMatch.team2 = winner;
+      }
+    }
+  } else if (type === 'single-6') {
+    if (roundIdx === 0) {
+      const nextRound = db.brackets.rounds[1];
+      const nextMatch = nextRound.matches[Math.floor(matchIdx / 2)];
+      if (matchIdx % 2 === 0) {
+        nextMatch.team1 = winner;
+      } else {
+        nextMatch.team2 = winner;
+      }
+    } else if (roundIdx === 1) {
+      const nextRound = db.brackets.rounds[2];
+      if (matchIdx === 0) {
+        nextRound.matches[0].team1 = winner;
+      } else if (matchIdx === 1) {
+        nextRound.matches[0].team2 = winner;
+      } else if (matchIdx === 2) {
+        nextRound.matches[1].team1 = winner;
+      }
+    } else if (roundIdx === 2) {
+      const nextRound = db.brackets.rounds[3];
       const nextMatch = nextRound.matches[0];
       if (matchIdx === 0) {
         nextMatch.team1 = winner;

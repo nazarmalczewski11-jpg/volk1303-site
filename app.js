@@ -1557,10 +1557,11 @@ function applyDepositAmount(amount, method) {
 // Render Challengermode panel listing details or team creator form
 function renderChallengermodeTeamPanel() {
   const db = getDB();
-  const team = db.teams.find(t => t.owner === db.currentUser);
-  
   const infoDisplay = document.getElementById('team-info-display');
   const creationForm = document.getElementById('team-creation-form');
+  if (!infoDisplay || !creationForm) return;
+  const team = db.teams.find(t => t.owner === db.currentUser);
+  
   const inputCaptain = document.getElementById('player-1-input');
 
   if (inputCaptain) {
@@ -1789,7 +1790,71 @@ function _addBracketPan(wrapper, inner) {
   }, { passive: false });
 }
 
-/** Build a read-only bracket match node (user-facing) */
+/** Helper to get team avatar path or dynamic SVG avatar */
+function getTeamAvatar(teamName, db) {
+  if (!teamName || teamName === 'Очікується' || teamName.trim() === '') {
+    return 'assets/wolf_logo.png';
+  }
+  const team = db && db.teams ? db.teams.find(t => t.name.toLowerCase() === teamName.toLowerCase()) : null;
+  if (team && team.avatar) return team.avatar;
+  if (team && team.logo) return team.logo;
+
+  // Generate ultra-sleek initials SVG avatar!
+  const initials = teamName.substring(0, 2).toUpperCase();
+  return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="14" fill="%23181a22" stroke="%23ff5a00" stroke-width="1.5"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-size="10" font-family="'Outfit', sans-serif" font-weight="900">${initials}</text></svg>`;
+}
+
+/** Open modern dual roster modal */
+window.inspectMatchRosters = function(t1Name, t2Name) {
+  const db = getDB();
+  const modal = document.getElementById('roster-modal');
+  if (!modal) return;
+
+  const titleEl = document.getElementById('roster-modal-title');
+  const tagEl = document.getElementById('roster-modal-tag');
+  const playersEl = document.getElementById('roster-modal-players');
+
+  if (!titleEl || !playersEl) return;
+
+  titleEl.innerText = "Склад Команд";
+  if (tagEl) tagEl.style.display = 'none';
+
+  const team1 = db.teams ? db.teams.find(t => t.name.toLowerCase() === t1Name.toLowerCase()) : null;
+  const team2 = db.teams ? db.teams.find(t => t.name.toLowerCase() === t2Name.toLowerCase()) : null;
+
+  const renderCol = (name, teamObj) => {
+    let listHtml = '';
+    if (!teamObj || !teamObj.players || teamObj.players.length === 0) {
+      listHtml = '<div style="color:var(--text-secondary); font-size:11px; text-align:center; padding:10px;">Гравців не знайдено</div>';
+    } else {
+      teamObj.players.forEach(p => {
+        listHtml += `<div style="background:var(--bg-card); padding:8px 12px; border-radius:6px; font-size:12px; border:1px solid var(--border-color); text-align:left; color:white; font-weight:700;">${p}</div>`;
+      });
+    }
+    return `
+      <div style="flex:1; min-width:140px; display:flex; flex-direction:column; gap:8px;">
+        <h4 style="color:var(--cs-orange); font-size:14px; font-weight:800; text-align:center; margin-bottom:5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${name}</h4>
+        ${listHtml}
+      </div>
+    `;
+  };
+
+  playersEl.innerHTML = `
+    <div style="display:flex; gap:16px; width:100%; margin-top:10px; flex-wrap:wrap;">
+      ${renderCol(t1Name, team1)}
+      ${renderCol(t2Name, team2)}
+    </div>
+  `;
+
+  const content = modal.querySelector('.modal-content');
+  if (content) {
+    content.style.maxWidth = '480px';
+  }
+
+  modal.classList.add('active');
+};
+
+/** Build a read-only bracket match node (user-facing) with high-fidelity styles */
 function _createBracketMatchNode(match) {
   const node = document.createElement('div');
   node.className = 'bracket-match-node-v2';
@@ -1797,11 +1862,33 @@ function _createBracketMatchNode(match) {
   if (!match) {
     node.style.opacity = '0.4';
     node.innerHTML = `
-      <div class="bracket-team"><span>Очікується</span><span class="bracket-team-score">—</span></div>
-      <div class="bracket-team"><span>Очікується</span><span class="bracket-team-score">—</span></div>`;
+      <div class="bracket-match-header">
+        <span class="match-status-badge pending">Очікується</span>
+        <span class="match-time-text">⏱️ —</span>
+      </div>
+      <div class="bracket-match-body">
+        <div class="bracket-team-row">
+          <div class="team-info-wrapper">
+            <img src="assets/wolf_logo.png" class="team-avatar-img">
+            <span class="team-name-txt">Очікується</span>
+          </div>
+          <span class="bracket-team-score">—</span>
+        </div>
+        <div class="bracket-team-row">
+          <div class="team-info-wrapper">
+            <img src="assets/wolf_logo.png" class="team-avatar-img">
+            <span class="team-name-txt">Очікується</span>
+          </div>
+          <span class="bracket-team-score">—</span>
+        </div>
+      </div>
+      <div class="bracket-match-footer">
+        <button class="bracket-details-btn" disabled style="opacity:0.5; cursor:not-allowed;">Детальніше</button>
+      </div>`;
     return node;
   }
 
+  const db = getDB();
   const t1 = match.team1 || 'Очікується';
   const t2 = match.team2 || 'Очікується';
   const t1A = t1 !== 'Очікується' && t1.trim() !== '';
@@ -1814,17 +1901,57 @@ function _createBracketMatchNode(match) {
 
   const c1 = hw ? (t1W ? 'winner' : 'loser') : '';
   const c2 = hw ? (t2W ? 'winner' : 'loser') : '';
+
+  const avatar1 = getTeamAvatar(t1, db);
+  const avatar2 = getTeamAvatar(t2, db);
+  const status = match.status || (hw ? 'Завершено' : (t1A && t2A ? 'В процесі' : 'Очікується'));
+  const time = match.time || 'Сьогодні, 20:00';
+
+  let statusBadge = '';
+  if (status === 'В процесі') {
+    statusBadge = `<span class="match-status-badge in-progress"><span class="pulse-dot"></span>В процесі</span>`;
+  } else if (status === 'Завершено') {
+    statusBadge = `<span class="match-status-badge completed">Завершено</span>`;
+  } else {
+    statusBadge = `<span class="match-status-badge pending">Очікується</span>`;
+  }
+
   const safe = s => String(s || '').replace(/'/g, "\\'");
 
+  const onClickAction = (t1A && t2A) 
+    ? `if(typeof inspectMatchRosters==='function') inspectMatchRosters('${safe(t1)}', '${safe(t2)}');`
+    : (t1A ? `if(typeof inspectTeamRoster==='function') inspectTeamRoster('${safe(t1)}');` : (t2A ? `if(typeof inspectTeamRoster==='function') inspectTeamRoster('${safe(t2)}');` : ''));
+
+  if (onClickAction) {
+    node.setAttribute('onclick', onClickAction);
+    node.style.cursor = 'pointer';
+  }
+
   node.innerHTML = `
-    <div class="bracket-team ${c1}" onclick="event.stopPropagation(); if(typeof inspectTeamRoster==='function') inspectTeamRoster('${safe(t1)}')">
-      <span style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:155px;">${t1}</span>
-      <span class="bracket-team-score ${t1W ? 'winner-score' : ''}">${match.score1 !== undefined ? match.score1 : '—'}</span>
+    <div class="bracket-match-header">
+      ${statusBadge}
+      <span class="match-time-text">⏱️ ${time}</span>
     </div>
-    <div class="bracket-team ${c2}" onclick="event.stopPropagation(); if(typeof inspectTeamRoster==='function') inspectTeamRoster('${safe(t2)}')">
-      <span style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:155px;">${t2}</span>
-      <span class="bracket-team-score ${t2W ? 'winner-score' : ''}">${match.score2 !== undefined ? match.score2 : '—'}</span>
+    <div class="bracket-match-body">
+      <div class="bracket-team-row ${c1}">
+        <div class="team-info-wrapper">
+          <img src="${avatar1}" class="team-avatar-img">
+          <span class="team-name-txt">${t1}</span>
+        </div>
+        <span class="bracket-team-score ${t1W ? 'winner-score' : ''}">${match.score1 !== undefined ? match.score1 : '—'}</span>
+      </div>
+      <div class="bracket-team-row ${c2}">
+        <div class="team-info-wrapper">
+          <img src="${avatar2}" class="team-avatar-img">
+          <span class="team-name-txt">${t2}</span>
+        </div>
+        <span class="bracket-team-score ${t2W ? 'winner-score' : ''}">${match.score2 !== undefined ? match.score2 : '—'}</span>
+      </div>
+    </div>
+    <div class="bracket-match-footer">
+      <button class="bracket-details-btn">Детальніше</button>
     </div>`;
+
   return node;
 }
 
@@ -1850,10 +1977,10 @@ function renderBracketsTree(brackets) {
   }
 
   // ── SINGLE ELIMINATION ────────────────────────────────────────────────────
-  const NODE_W = 220, NODE_H = 90, GAP = 70, PAD = 36;
+  const NODE_W = 240, NODE_H = 175, GAP = 70, PAD = 36;
   const rounds = brackets.rounds;
   const maxM = rounds[0].matches.length;
-  const SLOT_H = Math.max(NODE_H + 50, 140);
+  const SLOT_H = Math.max(NODE_H + 50, 230);
   const totalH = maxM * SLOT_H;
   const totalW = rounds.length * NODE_W + (rounds.length - 1) * GAP + PAD * 2;
   const canvasH = totalH + PAD * 2 + 24; // 24 for title
