@@ -355,6 +355,28 @@
 
         </div>
 
+        <!-- Pending deposit requests card -->
+        <div class="card" style="margin-top: 20px;">
+          <div class="section-title">⏳ ЗАПИТИ НА ВЕРИФІКАЦІЮ ДЕПОЗИТІВ (MONOBANK)</div>
+          <div style="overflow-x:auto;">
+            <table class="admin-table" style="width: 100%;">
+              <thead>
+                <tr>
+                  <th>Користувач</th>
+                  <th>Сума (UAH)</th>
+                  <th>Метод</th>
+                  <th>Відправник / Реквізит</th>
+                  <th>Дата</th>
+                  <th>Дія</th>
+                </tr>
+              </thead>
+              <tbody id="admin-pending-deposits-tbody">
+                <!-- Filled dynamically by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
       </section>
 
       <!-- TAB 8: Database & Activity Logs Panel -->

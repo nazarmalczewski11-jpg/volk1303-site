@@ -93,13 +93,15 @@ async function syncWithCloud() {
     }
 
     // 2. Sync structures
-    const [bRes, mRes, tRes, lRes, sRes, pRes] = await Promise.all([
+    const [bRes, mRes, tRes, lRes, sRes, pRes, pdRes, txRes] = await Promise.all([
       fetch(CLOUD_BUCKET + 'brackets', { cache: 'no-store' }),
       fetch(CLOUD_BUCKET + 'matches', { cache: 'no-store' }),
       fetch(CLOUD_BUCKET + 'teams', { cache: 'no-store' }),
       fetch(CLOUD_BUCKET + 'aimLobbies', { cache: 'no-store' }),
       fetch(CLOUD_BUCKET + 'settings', { cache: 'no-store' }),
-      fetch(CLOUD_BUCKET + 'promocodes', { cache: 'no-store' })
+      fetch(CLOUD_BUCKET + 'promocodes', { cache: 'no-store' }),
+      fetch(CLOUD_BUCKET + 'pendingDeposits', { cache: 'no-store' }),
+      fetch(CLOUD_BUCKET + 'usedTxids', { cache: 'no-store' })
     ]);
 
     if (bRes.ok) {
@@ -136,6 +138,44 @@ async function syncWithCloud() {
         db.promocodes = cloudPromocodes;
         dbChanged = true;
       }
+    }
+    if (pdRes && pdRes.ok) {
+      const cloudPending = await pdRes.json();
+      if (Array.isArray(cloudPending)) {
+        db.pendingDeposits = db.pendingDeposits || [];
+        cloudPending.forEach(cd => {
+          const idx = db.pendingDeposits.findIndex(d => d.id === cd.id);
+          if (idx === -1) {
+            db.pendingDeposits.push(cd);
+            dbChanged = true;
+          } else {
+            const localDep = db.pendingDeposits[idx];
+            if (localDep.status !== cd.status) {
+              if (cd.status !== "pending") {
+                localDep.status = cd.status;
+                dbChanged = true;
+              } else if (localDep.status !== "pending") {
+                shouldPush = true;
+              }
+            }
+          }
+        });
+      }
+    } else if (pdRes && pdRes.status === 404) {
+      shouldPush = true;
+    }
+    if (txRes && txRes.ok) {
+      const cloudTxids = await txRes.json();
+      if (Array.isArray(cloudTxids)) {
+        db.usedTxids = db.usedTxids || [];
+        const oldLen = db.usedTxids.length;
+        db.usedTxids = Array.from(new Set([...db.usedTxids, ...cloudTxids]));
+        if (db.usedTxids.length !== oldLen) {
+          dbChanged = true;
+        }
+      }
+    } else if (txRes && txRes.status === 404) {
+      shouldPush = true;
     }
     if (sRes.ok) {
       const settings = await sRes.json();
@@ -181,6 +221,8 @@ async function pushToCloud(db) {
       fetch(CLOUD_BUCKET + 'teams', { method: 'POST', body: JSON.stringify(db.teams) }),
       fetch(CLOUD_BUCKET + 'aimLobbies', { method: 'POST', body: JSON.stringify(db.aimLobbies) }),
       fetch(CLOUD_BUCKET + 'promocodes', { method: 'POST', body: JSON.stringify(db.promocodes) }),
+      fetch(CLOUD_BUCKET + 'pendingDeposits', { method: 'POST', body: JSON.stringify(db.pendingDeposits || []) }),
+      fetch(CLOUD_BUCKET + 'usedTxids', { method: 'POST', body: JSON.stringify(db.usedTxids || []) }),
       fetch(CLOUD_BUCKET + 'settings', { method: 'POST', body: JSON.stringify({
         twitchStatus: db.twitchStatus,
         activeTwitchChannel: db.activeTwitchChannel
@@ -203,6 +245,8 @@ function getDB() {
     if (!db.matches) db.matches = [];
     if (!db.aimLobbies) db.aimLobbies = [];
     if (!db.promocodes) db.promocodes = [];
+    if (!db.pendingDeposits) db.pendingDeposits = [];
+    if (!db.usedTxids) db.usedTxids = [];
     
     // Defensive check to ensure admin user is present and has the correct password
     let adminUser = db.users.find(u => u.username === 'admin');
@@ -756,6 +800,7 @@ function renderAdminPanel() {
   renderAdminBracketsEditor(db.brackets);
   renderAdminUserTeamsList(db.teams || []);
   renderAdminPromocodesList(db.promocodes || []);
+  renderAdminPendingDeposits(db.pendingDeposits || []);
   
   if (typeof renderDatabaseTab === 'function') {
     renderDatabaseTab();
@@ -2264,4 +2309,96 @@ function startBracketSimulation() {
     }
   }, 10000); // Check every 10 seconds
 }
+
+// Render pending deposits list
+function renderAdminPendingDeposits(pendingDeposits) {
+  const tbody = document.getElementById('admin-pending-deposits-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  const activePending = pendingDeposits.filter(d => d.status === "pending");
+
+  if (activePending.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 15px;">Немає активних запитів на верифікацію</td></tr>`;
+    return;
+  }
+
+  activePending.forEach(dep => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><strong>${dep.username ? dep.username.toUpperCase() : ''}</strong></td>
+      <td>${dep.amount} UAH (🪙)</td>
+      <td><span class="rank-badge-inline" style="background: rgba(38,161,123,0.1); color:#26A17B; border-color:rgba(38,161,123,0.2);">${dep.method}</span></td>
+      <td>${dep.reference || ''}</td>
+      <td>${dep.date || ''}</td>
+      <td>
+        <button class="btn btn-success" style="padding:4px 8px; font-size:10px; background: var(--cs-orange); border-color: var(--cs-orange);" onclick="approveDepositAdmin('${dep.id}')">Підтвердити</button>
+        <button class="btn btn-danger" style="padding:4px 8px; font-size:10px; margin-left:5px;" onclick="rejectDepositAdmin('${dep.id}')">Відхилити</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// Approve pending monobank deposit
+window.approveDepositAdmin = async function(depositId) {
+  const db = getDB();
+  const deposit = (db.pendingDeposits || []).find(d => d.id === depositId);
+  if (!deposit) {
+    showToast("Запит на депозит не знайдено!", "error");
+    return;
+  }
+  
+  if (deposit.status !== "pending") {
+    showToast("Цей запит вже було оброблено!", "error");
+    return;
+  }
+
+  const user = db.users.find(u => u.username === deposit.username);
+  if (!user) {
+    showToast(`Користувача ${deposit.username} не знайдено!`, "error");
+    return;
+  }
+
+  const multiplier = 1 + (user.bonusPercent || 0) / 100;
+  const creditedCoins = Math.round(deposit.amount * multiplier);
+
+  user.balance = (user.balance || 0) + creditedCoins;
+  user.depositHistory = user.depositHistory || [];
+  user.depositHistory.unshift({
+    amount: creditedCoins,
+    method: deposit.method,
+    date: new Date().toLocaleString(),
+    status: "approved"
+  });
+
+  deposit.status = "approved";
+
+  showToast("Зарахування поповнення...", "success");
+  await saveDB(db);
+  showToast(`Запит схвалено! Гравцю ${deposit.username.toUpperCase()} нараховано ${creditedCoins} 🪙`, "success");
+  renderAdminPanel();
+};
+
+// Reject pending monobank deposit
+window.rejectDepositAdmin = async function(depositId) {
+  const db = getDB();
+  const deposit = (db.pendingDeposits || []).find(d => d.id === depositId);
+  if (!deposit) {
+    showToast("Запит на депозит не знайдено!", "error");
+    return;
+  }
+
+  if (deposit.status !== "pending") {
+    showToast("Цей запит вже було оброблено!", "error");
+    return;
+  }
+
+  deposit.status = "rejected";
+
+  showToast("Відхилення запиту...", "success");
+  await saveDB(db);
+  showToast("Запит відхилено!", "success");
+  renderAdminPanel();
+};
 

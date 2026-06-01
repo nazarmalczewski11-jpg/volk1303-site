@@ -89,13 +89,15 @@ async function syncWithCloud() {
     }
 
     // 2. Sync structures
-    const [bRes, mRes, tRes, lRes, sRes, pRes] = await Promise.all([
+    const [bRes, mRes, tRes, lRes, sRes, pRes, pdRes, txRes] = await Promise.all([
       fetch(CLOUD_BUCKET + 'brackets', { cache: 'no-store' }),
       fetch(CLOUD_BUCKET + 'matches', { cache: 'no-store' }),
       fetch(CLOUD_BUCKET + 'teams', { cache: 'no-store' }),
       fetch(CLOUD_BUCKET + 'aimLobbies', { cache: 'no-store' }),
       fetch(CLOUD_BUCKET + 'settings', { cache: 'no-store' }),
-      fetch(CLOUD_BUCKET + 'promocodes', { cache: 'no-store' })
+      fetch(CLOUD_BUCKET + 'promocodes', { cache: 'no-store' }),
+      fetch(CLOUD_BUCKET + 'pendingDeposits', { cache: 'no-store' }),
+      fetch(CLOUD_BUCKET + 'usedTxids', { cache: 'no-store' })
     ]);
 
     if (bRes.ok) {
@@ -132,6 +134,44 @@ async function syncWithCloud() {
         db.promocodes = cloudPromocodes;
         dbChanged = true;
       }
+    }
+    if (pdRes && pdRes.ok) {
+      const cloudPending = await pdRes.json();
+      if (Array.isArray(cloudPending)) {
+        db.pendingDeposits = db.pendingDeposits || [];
+        cloudPending.forEach(cd => {
+          const idx = db.pendingDeposits.findIndex(d => d.id === cd.id);
+          if (idx === -1) {
+            db.pendingDeposits.push(cd);
+            dbChanged = true;
+          } else {
+            const localDep = db.pendingDeposits[idx];
+            if (localDep.status !== cd.status) {
+              if (cd.status !== "pending") {
+                localDep.status = cd.status;
+                dbChanged = true;
+              } else if (localDep.status !== "pending") {
+                shouldPush = true;
+              }
+            }
+          }
+        });
+      }
+    } else if (pdRes && pdRes.status === 404) {
+      shouldPush = true;
+    }
+    if (txRes && txRes.ok) {
+      const cloudTxids = await txRes.json();
+      if (Array.isArray(cloudTxids)) {
+        db.usedTxids = db.usedTxids || [];
+        const oldLen = db.usedTxids.length;
+        db.usedTxids = Array.from(new Set([...db.usedTxids, ...cloudTxids]));
+        if (db.usedTxids.length !== oldLen) {
+          dbChanged = true;
+        }
+      }
+    } else if (txRes && txRes.status === 404) {
+      shouldPush = true;
     }
     if (sRes.ok) {
       const settings = await sRes.json();
@@ -173,6 +213,8 @@ async function pushToCloud(db) {
       fetch(CLOUD_BUCKET + 'teams', { method: 'POST', body: JSON.stringify(db.teams) }),
       fetch(CLOUD_BUCKET + 'aimLobbies', { method: 'POST', body: JSON.stringify(db.aimLobbies) }),
       fetch(CLOUD_BUCKET + 'promocodes', { method: 'POST', body: JSON.stringify(db.promocodes) }),
+      fetch(CLOUD_BUCKET + 'pendingDeposits', { method: 'POST', body: JSON.stringify(db.pendingDeposits || []) }),
+      fetch(CLOUD_BUCKET + 'usedTxids', { method: 'POST', body: JSON.stringify(db.usedTxids || []) }),
       fetch(CLOUD_BUCKET + 'settings', { method: 'POST', body: JSON.stringify({
         twitchStatus: db.twitchStatus,
         activeTwitchChannel: db.activeTwitchChannel
@@ -1286,7 +1328,8 @@ window.switchPaymentTab = function(method) {
 };
 
 // Start deposit loader verify sequence (7 seconds)
-function startDepositVerify(amount, method, references) {
+// Start deposit loader verify sequence
+async function startDepositVerify(amount, method, references) {
   if (isNaN(amount) || amount < 500) {
     showToast("Мінімальне поповнення становить 500 монет!", "error");
     return;
@@ -1297,42 +1340,159 @@ function startDepositVerify(amount, method, references) {
     return;
   }
 
-  closeModal('deposit-modal');
-  openModal('verify-loader');
+  const db = getDB();
 
-  const fill = document.getElementById('loader-fill');
-  const status = document.getElementById('loader-status');
-  const step = document.getElementById('loader-step');
+  if (method === "MONOBANKA") {
+    // Semi-automatic verification via pending request
+    closeModal('deposit-modal');
+    
+    // Create pending request
+    const pendingRequest = {
+      id: "dep_" + Date.now(),
+      username: db.currentUser,
+      amount: amount,
+      method: "MONOBANKA",
+      reference: references, // sender name
+      date: new Date().toLocaleString(),
+      status: "pending"
+    };
 
-  const updates = [
-    { pct: 15, state: "Авторизація платежу...", detail: "Пошук референсу в мережі... (Крок 1/4)" },
-    { pct: 45, state: "Очікування мережі...", detail: "Верифікація блоку транзакції 1/3... (Крок 2/4)" },
-    { pct: 75, state: "Підтвердження блоку...", detail: "Отримано підтвердження 2/3... (Крок 3/4)" },
-    { pct: 95, state: "Зарахування поінтів...", detail: "Фіналізація транзакції банком... (Крок 4/4)" }
-  ];
+    db.pendingDeposits = db.pendingDeposits || [];
+    db.pendingDeposits.push(pendingRequest);
+    
+    // Send to cloud database
+    showToast("Надсилання запиту...", "success");
+    await saveDB(db);
+    
+    // Clear inputs
+    document.getElementById('mono-amount').value = "";
+    document.getElementById('mono-sender-name').value = "";
+    
+    // Show toast about operator review
+    showToast("Запит надіслано! Зарахування відбудеться після перевірки оператором.", "success");
+    return;
+  }
 
-  let currentIdx = 0;
-  let counter = 0;
-
-  const timer = setInterval(() => {
-    counter += 1.5;
-    if (counter > 100) counter = 100;
-
-    fill.style.width = `${counter}%`;
-
-    if (counter >= 15 && counter < 45) currentIdx = 0;
-    else if (counter >= 45 && counter < 75) currentIdx = 1;
-    else if (counter >= 75 && counter < 95) currentIdx = 2;
-    else if (counter >= 95) currentIdx = 3;
-
-    status.innerText = updates[currentIdx].state;
-    step.innerText = updates[currentIdx].detail;
-
-    if (counter >= 100) {
-      clearInterval(timer);
-      applyDepositAmount(amount, method);
+  if (method === "USDT TRC20") {
+    const txid = references.trim();
+    
+    // Check double spend locally first
+    db.usedTxids = db.usedTxids || [];
+    if (db.usedTxids.includes(txid)) {
+      showToast("Цей хеш транзакції вже був використаний!", "error");
+      return;
     }
-  }, 100); // 100 intervals of 100ms approx 7s
+
+    closeModal('deposit-modal');
+    openModal('verify-loader');
+
+    const fill = document.getElementById('loader-fill');
+    const status = document.getElementById('loader-status');
+    const step = document.getElementById('loader-step');
+
+    const updates = [
+      { pct: 15, state: "Авторизація платежу...", detail: "Пошук хешу в блокчейні Tron... (Крок 1/4)" },
+      { pct: 45, state: "Аналіз блоків...", detail: "Верифікація одержувача та суми... (Крок 2/4)" },
+      { pct: 75, state: "Перевірка підтверджень...", detail: "Отримання консенсусу мережі... (Крок 3/4)" },
+      { pct: 95, state: "Зарахування поінтів...", detail: "Фіналізація транзакції... (Крок 4/4)" }
+    ];
+
+    let currentIdx = 0;
+    let counter = 0;
+
+    const timer = setInterval(async () => {
+      counter += 2.5;
+      if (counter > 100) counter = 100;
+
+      fill.style.width = `${counter}%`;
+
+      if (counter >= 15 && counter < 45) currentIdx = 0;
+      else if (counter >= 45 && counter < 75) currentIdx = 1;
+      else if (counter >= 75 && counter < 95) currentIdx = 2;
+      else if (counter >= 95) currentIdx = 3;
+
+      status.innerText = updates[currentIdx].state;
+      step.innerText = updates[currentIdx].detail;
+
+      if (counter >= 100) {
+        clearInterval(timer);
+        
+        status.innerText = "Зв'язок з блокчейном...";
+        step.innerText = "Отримання фінальних даних...";
+        
+        // Run blockchain check
+        const check = await verifyUSDTTRC20(txid, amount);
+        if (check.success) {
+          // Double check if TxID got used during the loader time
+          const freshDb = getDB();
+          freshDb.usedTxids = freshDb.usedTxids || [];
+          if (freshDb.usedTxids.includes(txid)) {
+            closeModal('verify-loader');
+            showToast("Транзакція вже була використана!", "error");
+            return;
+          }
+          
+          freshDb.usedTxids.push(txid);
+          localStorage.setItem(DB_KEY, JSON.stringify(freshDb)); // Save hash to prevent double spends instantly
+          
+          applyDepositAmount(amount, method);
+        } else {
+          closeModal('verify-loader');
+          showToast(check.error, "error");
+        }
+      }
+    }, 100);
+  }
+}
+
+// Tron Blockchain Verification Helper
+async function verifyUSDTTRC20(txid, amount) {
+  try {
+    const res = await fetch(`https://apilist.tronscanapi.com/api/transaction-info?hash=${txid}`);
+    if (!res.ok) {
+      throw new Error("Не вдалося зв'язатися з Tronscan API");
+    }
+    const data = await res.json();
+    
+    if (!data || !data.hash) {
+      throw new Error("Транзакцію не знайдено в блокчейні Tron! Перевірте TxID.");
+    }
+    
+    if (data.contractRet !== "SUCCESS") {
+      throw new Error("Транзакція завершилася помилкою в мережі Tron.");
+    }
+    
+    if (!data.confirmed) {
+      throw new Error("Транзакція ще не підтверджена мережею Tron. Зачекайте 1 хвилину.");
+    }
+    
+    const transfers = data.trc20TransferInfo || [];
+    const usdtTransfer = transfers.find(t => 
+      t.to_address === "TL1fdPAkGugPVYAtVyZdcejT3wfEGE1vhH" &&
+      t.token_address === "TR7NHqJEJMxWf6P615w8Z5sb275w8X346JM"
+    );
+    
+    if (!usdtTransfer) {
+      throw new Error("Транзакція не містить переказу USDT на ваш гаманець (TL1fdPAkGugPVYAtVyZdcejT3wfEGE1vhH).");
+    }
+    
+    const rawAmt = parseFloat(usdtTransfer.amount_str || usdtTransfer.amount);
+    const decimals = usdtTransfer.decimals || 6;
+    const verifiedUSDT = rawAmt / Math.pow(10, decimals);
+    
+    if (Math.abs(verifiedUSDT - amount) > 0.05) {
+      throw new Error(`Сума переказу в транзакції (${verifiedUSDT} USDT) не збігається з введеною (${amount} USDT).`);
+    }
+    
+    const txTime = data.timestamp;
+    if (Date.now() - txTime > 24 * 60 * 60 * 1000) {
+      throw new Error("Транзакція занадто стара (минуло більше 24 годин).");
+    }
+    
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message || "Помилка верифікації транзакції" };
+  }
 }
 
 // Complete deposit verify and credit coins
