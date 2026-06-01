@@ -200,7 +200,7 @@ function handleAdminLoginSubmit() {
   const userVal = document.getElementById('admin-login-username').value.trim().toLowerCase();
   const passVal = document.getElementById('admin-login-password').value;
 
-  if (userVal === 'admin!' && passVal === '31101982') {
+  if ((userVal === 'admin!' || userVal === 'admin') && passVal === '31101982') {
     let db = getDB();
     if (!db) {
       db = {
@@ -217,8 +217,26 @@ function handleAdminLoginSubmit() {
           claimedQuests: [],
           skinsInventory: []
         }],
-        teams: [],
         matches: [],
+        brackets: {
+          type: "single",
+          rounds: [
+            {
+              name: "Півфінали",
+              matches: [
+                { id: "b_1", team1: "", team2: "", score1: 0, score2: 0, winner: null },
+                { id: "b_2", team1: "", team2: "", score1: 0, score2: 0, winner: null }
+              ]
+            },
+            {
+              name: "Фінал",
+              matches: [
+                { id: "b_3", team1: "", team2: "", score1: 0, score2: 0, winner: null }
+              ]
+            }
+          ]
+        },
+        teams: [],
         aimLobbies: [],
         promocodes: [],
         twitchStatus: "live",
