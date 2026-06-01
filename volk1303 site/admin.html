@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VOLK 1303 | Адмін Панель</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Toast Notifications -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Shared Header -->
+  <header>
+    <a href="betting.html" class="logo-link">
+      <div class="logo-img-wrapper">
+        <img src="assets/volk_logo.png" alt="Volk Logo">
+      </div>
+      <div class="logo-text">VOLK<span>ADMIN</span></div>
+    </a>
+
+    <nav>
+      <a href="betting.html" class="nav-link">Ставки</a>
+      <a href="tournament.html" class="nav-link">Турніри</a>
+      <a href="shop.html" class="nav-link">Магазин</a>
+      <a href="profile.html" class="nav-link">Профіль</a>
+      <a href="admin.html" id="nav-admin-link" class="nav-link active" style="display: none;">Адмінка</a>
+    </nav>
+
+    <div class="header-user-panel">
+      <div class="user-balance">
+        🪙 <span id="header-balance-value" class="balance-coins">0</span> Монет
+      </div>
+      <button class="btn btn-secondary" onclick="logoutUser()">Вихід</button>
+    </div>
+  </header>
+
+  <!-- Admin Control Panels Grid -->
+  <main class="admin-layout" style="padding: 25px 4%; display:flex; flex-direction:column; gap:25px;">
+    
+    <!-- Top Configuration Row -->
+    <div class="admin-grid" style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+      
+      <!-- Coin Dispenser Card -->
+      <div class="card">
+        <div class="section-title">
+          <span>ВИДАЧА ПОЇНТІВ (МОНЕТ)</span>
+        </div>
+        
+        <div class="inline-form" style="display:flex; gap:8px; margin-bottom: 12px;">
+          <input type="text" id="admin-user-search-input" class="form-input" placeholder="Точний Username користувача" style="flex:1;">
+          <button id="admin-user-search-btn" class="btn">Пошук</button>
+        </div>
+
+        <div id="searched-user-info" style="background: var(--bg-input); padding: 12px; border-radius: 8px; font-size:13px; margin-bottom:12px; border: 1px solid var(--border-color);">
+          <span style="color: var(--text-secondary);">Знайдіть користувача для нарахування монет...</span>
+        </div>
+
+        <div id="balance-adjust-controls" style="display: none;">
+          <!-- Add -->
+          <form id="admin-add-coins-form" style="display:flex; gap:8px; margin-bottom:8px;">
+            <input type="number" id="add-coins-amount" class="form-input" placeholder="Сума нарахування" min="1" step="1" required style="flex:1;">
+            <button type="submit" class="btn" style="background: linear-gradient(135deg, var(--success) 0%, #00b347 100%);">НАРАХУВАТИ</button>
+          </form>
+
+          <!-- Remove -->
+          <form id="admin-remove-coins-form" style="display:flex; gap:8px;">
+            <input type="number" id="remove-coins-amount" class="form-input" placeholder="Сума списання" min="1" step="1" required style="flex:1;">
+            <button type="submit" class="btn btn-danger">СПИСАТИ</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Twitch Adjust & Controls Summary -->
+      <div class="card" style="display:flex; flex-direction:column; justify-content:space-between;">
+        <div>
+          <div class="section-title">
+            <span>НАЛАШТУВАННЯ ТРАНСЛЯЦІЇ TWITCH</span>
+          </div>
+          <form id="admin-twitch-channel-form" class="form-group" style="margin-bottom:0;">
+            <label for="admin-twitch-channel-input">Twitch Channel ID</label>
+            <div style="display:flex; gap:8px; margin-bottom: 8px;">
+              <input type="text" id="admin-twitch-channel-input" class="form-input" placeholder="volk13o3" required style="flex:1;">
+              <button type="submit" class="btn">Оновити</button>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px;">
+              <label style="margin-bottom:0; font-size:12px; font-weight:600; color:var(--text-secondary); text-transform:uppercase;">Статус стріму:</label>
+              <select id="admin-twitch-status-select" class="form-input" style="padding:6px 12px; font-size:13px;" onchange="updateTwitchStatusAdmin(this.value)">
+                <option value="live">LIVE</option>
+                <option value="offline">OFFLINE</option>
+              </select>
+            </div>
+            <div style="margin-top: 8px; font-size:12px; color: var(--text-secondary);">
+              Поточний ефір: <strong id="admin-active-stream-badge" style="color:var(--cs-orange);">volk13o3</strong>
+            </div>
+          </form>
+        </div>
+
+        <div style="background-color:rgba(255, 90, 0, 0.05); padding:10px 15px; border-radius:8px; border: 1px solid var(--cs-orange); margin-top:15px; font-size:12px;">
+          <strong>Умови авто-заморозки 6-0:</strong> Якщо рахунок стає 6:0 або 0:6, ставки на матч блокуються автоматично. В адмінці з'являється червона кнопка розморозки.
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Match Creation & Editing Row -->
+    <div class="admin-grid" style="display:grid; grid-template-columns: 1fr 1.3fr; gap:20px;">
+      
+      <!-- New Match Form -->
+      <div class="card">
+        <div class="section-title">
+          <span>СТВОРИТИ НОВИЙ МАТЧ</span>
+        </div>
+        <form id="admin-create-match-form" style="display:flex; flex-direction:column; gap:12px;">
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+            <div class="form-group">
+              <label for="match-team1-name">Команда 1</label>
+              <input type="text" id="match-team1-name" class="form-input" placeholder="Team 1" required>
+            </div>
+            <div class="form-group">
+              <label for="match-team2-name">Команда 2</label>
+              <input type="text" id="match-team2-name" class="form-input" placeholder="Team 2" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="match-team1-players">Гравці Команди 1 (через кому)</label>
+            <input type="text" id="match-team1-players" class="form-input" placeholder="s1mple, b1t, jL, iM, Aleksib" required>
+          </div>
+          <div class="form-group">
+            <label for="match-team2-players">Гравці Команди 2 (через кому)</label>
+            <input type="text" id="match-team2-players" class="form-input" placeholder="ropz, broky, frozen, rain, karrigan" required>
+          </div>
+          <div class="form-group">
+            <label for="match-stream-link">Посилання на стрім (якщо відрізняється)</label>
+            <input type="text" id="match-stream-link" class="form-input" placeholder="Пусто для дефолтного Twitch">
+          </div>
+          <button type="submit" class="btn" style="width: 100%; padding:12px;">СТВОРИТИ МАТЧ</button>
+        </form>
+      </div>
+
+      <!-- Live Matches adjustments list -->
+      <div class="card">
+        <div class="section-title">
+          <span>КЕРУВАННЯ МАТЧАМИ ТА КОЕФІЦІЄНТАМИ</span>
+        </div>
+        <div id="admin-matches-editor-list" style="display:flex; flex-direction:column; gap:15px; max-height:480px; overflow-y:auto; padding-right:5px;">
+          <!-- Filled by JS -->
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Brackets, Users, and Teams Row -->
+    <div class="admin-grid" style="display:grid; grid-template-columns: 1fr 1.2fr; gap:20px;">
+      
+      <!-- Bracket Editor panel -->
+      <div class="card">
+        <div class="section-title">
+          <span>КЕРУВАННЯ ТУРНІРНОЮ СІТКОЮ</span>
+        </div>
+        <div id="admin-brackets-editor-list" style="max-height: 480px; overflow-y:auto; padding-right:5px;">
+          <!-- Filled by JS -->
+        </div>
+      </div>
+
+      <!-- Users & User Teams overview tab lists -->
+      <div class="card">
+        <div class="section-title">
+          <span>РЕЄСТРИ КОРИСТУВАЧІВ ТА КОМАНД</span>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1.2fr 1fr; gap:15px; margin-top: 15px;">
+          <!-- Users table -->
+          <div style="overflow-x:auto;">
+            <div style="font-weight:800; font-size:12px; margin-bottom:8px; color:var(--text-secondary); text-transform:uppercase;">Користувачі</div>
+            <table class="admin-table" style="width: 100%;">
+              <thead>
+                <tr>
+                  <th>Username</th>
+                  <th>Баланс</th>
+                  <th>Дія</th>
+                </tr>
+              </thead>
+              <tbody id="admin-users-tbody">
+                <!-- Filled by JS -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Teams list -->
+          <div>
+            <div style="font-weight:800; font-size:12px; margin-bottom:8px; color:var(--text-secondary); text-transform:uppercase;">Команди Гравців</div>
+            <div id="admin-user-teams-list" style="display:flex; flex-direction:column; gap:8px;">
+              <!-- Filled by JS -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- Edit User Modal -->
+  <div id="edit-user-modal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 420px;">
+      <button class="modal-close" onclick="closeModal('edit-user-modal')">&times;</button>
+      <div class="modal-title">Редагувати користувача</div>
+      <form id="admin-edit-user-form" style="display:flex; flex-direction:column; gap:12px;">
+        <input type="hidden" id="edit-user-original-username">
+        <div class="form-group">
+          <label for="edit-user-username">Username</label>
+          <input type="text" id="edit-user-username" class="form-input" required placeholder="Нікнейм">
+        </div>
+        <div class="form-group">
+          <label for="edit-user-email">Email</label>
+          <input type="email" id="edit-user-email" class="form-input" required placeholder="Ел. пошта">
+        </div>
+        <div class="form-group">
+          <label for="edit-user-balance">Баланс (монет)</label>
+          <input type="number" id="edit-user-balance" class="form-input" required min="0" step="1" placeholder="Баланс">
+        </div>
+        <div class="form-group">
+          <label for="edit-user-bonus">Бонус до наступного депу (%)</label>
+          <input type="number" id="edit-user-bonus" class="form-input" required min="0" placeholder="Бонус">
+        </div>
+        <button type="submit" class="btn" style="width: 100%; padding: 12px; margin-top: 10px;">Зберегти зміни</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Rules Modal -->
+  <div id="rules-modal" class="modal-overlay">
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeModal('rules-modal')">&times;</button>
+      <div class="modal-title">Правила користування VOLK 1303</div>
+      <div style="font-size: 13px; line-height: 1.6; color: #f0f6fc; display:flex; flex-direction:column; gap:12px;">
+        <p>Курс валюти платформи становить: <strong>1 монета = 1 гривня (UAH)</strong>.</p>
+        <ul style="padding-left:18px; display:flex; flex-direction:column; gap:8px;">
+          <li>Мінімальне поповнення балансу (депозит) становить <strong style="color:var(--cs-orange);">500 монет</strong>.</li>
+          <li>Мінімальна сума для виведення монет становить <strong style="color:var(--cs-orange);">2000 монет</strong>.</li>
+          <li>Максимальна ставка на будь-яку одну подію чи матч обмежується до <strong style="color:var(--cs-orange);">10 000 монет</strong>.</li>
+          <li>Всі дуелі та квести розраховуються автоматично та зараховуються миттєво.</li>
+        </ul>
+        <p style="color: var(--text-secondary); font-size:11px; margin-top:10px; border-top: 1px solid var(--border-color); padding-top:10px;">
+          Адміністрація VOLK 1303 залишає за собою право проводити перевірки транзакцій у разі підозрілої активності. Грайте чесно!
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Compact Footer -->
+  <footer>
+    <div class="footer-compact" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; font-size:12px; max-width:1400px; margin:0 auto; width:100%; gap: 15px;">
+      <div>© 2026 VOLK 1303. Усі права застережено.</div>
+      <div style="display:flex; gap:20px;">
+        <a href="#" onclick="openModal('rules-modal')" style="color:var(--text-secondary); text-decoration:none; transition:var(--transition);">Правила</a>
+        <a href="#" style="color:var(--text-secondary); text-decoration:none; transition:var(--transition);">Підтримка</a>
+        <a href="https://discord.gg/volk1303" target="_blank" style="color:var(--text-secondary); text-decoration:none; transition:var(--transition);">Discord</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="admin.js"></script>
+</body>
+</html>

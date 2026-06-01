@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VOLK 1303 | Авторизація</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Toast Notifications -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Landing Split Layout -->
+  <div class="auth-split-wrapper">
+    
+    <!-- Left Panel: Brand & Banner -->
+    <div class="auth-left-branding">
+      <div class="branding-logo">
+        <img src="assets/volk_logo.png" alt="Volk 1303 Logo">
+      </div>
+      <h1 class="branding-h1">VOLK<span>1303</span></h1>
+      <p class="branding-subtext">
+        Преміальна букмекерська платформа для вболівальників кіберспорту. Робіть прогнози в реальному часі, беріть участь у масштабних турнірах 1x1–5x5 та дивіться стріми з Twitch разом з нами.
+      </p>
+    </div>
+
+    <!-- Right Panel: Auth forms panel -->
+    <div class="auth-right-panel">
+      <div class="auth-form-card">
+        
+        <!-- Toggle Tabs -->
+        <div class="auth-tabs">
+          <button id="tab-login-btn" class="auth-tab-btn active" onclick="switchAuthTab('login')">ВХІД</button>
+          <button id="tab-register-btn" class="auth-tab-btn" onclick="switchAuthTab('register')">РЕЄСТРАЦІЯ</button>
+        </div>
+
+        <!-- Login Form -->
+        <form id="login-form">
+          <div class="modal-title" style="margin-bottom: 20px; font-size:18px;">Авторизація на платформі</div>
+          
+          <div class="form-group">
+            <label for="login-username">Ім'я користувача (Username)</label>
+            <input type="text" id="login-username" class="form-input" placeholder="Введіть ваш Username" required autocomplete="username">
+          </div>
+          
+          <button type="submit" class="btn" style="width: 100%; margin-top: 15px; padding: 12px;">УВІЙТИ В АКАУНТ</button>
+        </form>
+
+        <!-- Register Form -->
+        <form id="register-form" style="display: none;">
+          <div class="modal-title" style="margin-bottom: 20px; font-size:18px;">Створити новий акаунт</div>
+          
+          <div class="form-group">
+            <label for="reg-email">Електронна пошта</label>
+            <input type="email" id="reg-email" class="form-input" placeholder="example@mail.com" required autocomplete="email">
+          </div>
+          
+          <div class="form-group">
+            <label for="reg-username">Ім'я користувача (Username)</label>
+            <input type="text" id="reg-username" class="form-input" placeholder="Бажаний нікнейм" required autocomplete="username">
+          </div>
+
+          <div class="form-group">
+            <label for="reg-referral">Реферальний код (якщо є)</label>
+            <input type="text" id="reg-referral" class="form-input" placeholder="Код друга (Нікнейм)">
+          </div>
+
+          <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 15px;">
+            Реєструючись, ви отримуєте стартові 50 поінтів та право безкоштовного спіну в Колесі Фортуни.
+          </p>
+          
+          <button type="submit" class="btn" style="width: 100%; padding: 12px;">ЗАРЕЄСТРУВАТИСЯ</button>
+        </form>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Wheel of Fortune Modal (Spins on first register) -->
+  <div id="wheel-modal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 380px;">
+      <div class="modal-title">Колесо фортуни</div>
+      <p style="font-size:13px; color:var(--text-secondary); text-align:center; margin-bottom: 15px;">
+        Вам доступний 1 привітальний спін! Виграйте бонус на депозит або монети.
+      </p>
+
+      <div class="wheel-container">
+        <div class="wheel-wrapper">
+          <div class="wheel-arrow"></div>
+          <div id="wheel-canvas-container" class="wheel-canvas-container">
+            <canvas id="wheel-canvas" width="264" height="264"></canvas>
+          </div>
+          <div class="wheel-center-pin"></div>
+        </div>
+
+        <button id="wheel-spin-btn" class="btn" style="width: 100%; padding: 12px; font-size: 15px;">ОБЕРТАТИ КОЛЕСО</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shared App JS script -->
+  <script src="app.js"></script>
+  
+  <script>
+    // Tab toggler on the page
+    function switchAuthTab(tab) {
+      const loginForm = document.getElementById('login-form');
+      const regForm = document.getElementById('register-form');
+      const loginBtn = document.getElementById('tab-login-btn');
+      const regBtn = document.getElementById('tab-register-btn');
+
+      if (tab === 'login') {
+        loginForm.style.display = 'block';
+        regForm.style.display = 'none';
+        loginBtn.classList.add('active');
+        regBtn.classList.remove('active');
+      } else {
+        loginForm.style.display = 'none';
+        regForm.style.display = 'block';
+        loginBtn.classList.remove('active');
+        regBtn.classList.add('active');
+      }
+    }
+  </script>
+</body>
+</html>

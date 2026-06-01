@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VOLK 1303 | Профіль Користувача</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="smoke-bg.js"></script>
+</head>
+<body>
+
+  <!-- Toast Notifications -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Shared Header -->
+  <header>
+    <a href="betting.html" class="logo-link">
+      <div class="logo-img-wrapper">
+        <img src="assets/wolf_logo.png" alt="Wolf Logo">
+      </div>
+      <div class="logo-text">VOLK<span>1303</span></div>
+    </a>
+
+    <nav>
+      <a href="betting.html" class="nav-link">Ставки</a>
+      <a href="tournament.html" class="nav-link">Турніри</a>
+      <a href="profile.html" class="nav-link active">Профіль</a>
+      <a href="admin.html" id="nav-admin-link" class="nav-link" style="display: none;">Адмінка</a>
+    </nav>
+
+    <div class="header-user-panel">
+      <div class="user-balance">
+        🪙 <span id="header-balance-value" class="balance-coins">0</span> Монет
+      </div>
+      <button id="header-deposit-btn" class="btn">Поповнити</button>
+      <button class="btn btn-secondary" onclick="logoutUser()">Вихід</button>
+    </div>
+  </header>
+
+  <!-- User Dashboard Content -->
+  <main class="container">
+    <div class="profile-grid">
+      
+      <!-- Left Column: User Card & Faceit Integration -->
+      <div style="display: flex; flex-direction: column; gap: 20px;">
+        <aside class="user-card-header">
+          <div class="profile-avatar">
+            <img src="assets/wolf_logo.png" alt="User Avatar">
+          </div>
+          <div class="profile-username" id="prof-username">USERNAME</div>
+          <div class="profile-email" id="prof-email">user@mail.com</div>
+          
+          <button class="btn btn-secondary" style="width: 100%; margin-top: 25px;" onclick="logoutUser()">ВИЙТИ З АКАУНТУ</button>
+        </aside>
+
+        <div class="card" style="padding: 15px 15px 20px 15px;">
+          <div class="section-title" style="font-size:12px;">FACEIT ІНТЕГРАЦІЯ</div>
+          <div id="faceit-binding-container">
+            <!-- Loaded dynamically by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Stats & Log histories -->
+      <section style="display: flex; flex-direction: column; gap: 20px;">
+        
+        <!-- XP Progress Card -->
+        <div class="card" style="padding: 15px;">
+          <div class="section-title" style="font-size:12px; margin-bottom: 10px;">
+            <span>CS2 РАНГ ТА РІВЕНЬ ДОСВІДУ (XP)</span>
+            <span class="rank-badge-inline" id="user-cs2-rank-badge">Silver I</span>
+          </div>
+          <div class="xp-container" style="padding: 10px; background: transparent; border: none;">
+            <div class="xp-header" style="font-size: 11px;">
+              <span>Досвід: <strong id="user-xp-current">0</strong> / <strong id="user-xp-next">100</strong> XP</span>
+              <span id="user-xp-percent">0%</span>
+            </div>
+            <div class="xp-bar">
+              <div class="xp-fill" id="user-xp-fill" style="width: 0%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stats summary -->
+        <div class="profile-stats-card-grid">
+          <div class="profile-stat-box">
+            <div class="profile-stat-label">Поточний баланс</div>
+            <div class="profile-stat-value" id="prof-balance" style="color: var(--cs-orange);">0 🪙</div>
+          </div>
+          
+          <div class="profile-stat-box">
+            <div class="profile-stat-label">Бонус до депозиту</div>
+            <div class="profile-stat-value" id="prof-bonus">+0%</div>
+          </div>
+
+          <div class="profile-stat-box">
+            <div class="profile-stat-label">Чистий прибуток</div>
+            <div class="profile-stat-value" id="prof-stat-net-profit">0 🪙</div>
+          </div>
+        </div>
+
+        <div class="profile-stats-card-grid" style="grid-template-columns: 1fr 1fr;">
+          <div class="profile-stat-box">
+            <div class="profile-stat-label">Всього поповнено</div>
+            <div class="profile-stat-value" id="prof-stat-total-deposits">0 🪙</div>
+          </div>
+          
+          <div class="profile-stat-box">
+            <div class="profile-stat-label">Кількість ставок</div>
+            <div class="profile-stat-value" id="prof-stat-total-bets">0</div>
+          </div>
+        </div>
+
+        <!-- History tabs component -->
+        <div class="card">
+          <div class="profile-tabs">
+            <button class="profile-tab-btn active" id="btn-tab-bets" onclick="switchProfileTab('bets')">Історія ставок</button>
+            <button class="profile-tab-btn" id="btn-tab-deposits" onclick="switchProfileTab('deposits')">Історія поповнень</button>
+            <button class="profile-tab-btn" id="btn-tab-inventory" onclick="switchProfileTab('inventory')">Інвентар скінів</button>
+          </div>
+
+          <!-- History items containers -->
+          <div id="tab-bets" class="tab-pane active" style="display: block; max-height: 400px; overflow-y:auto;">
+            <div id="bets-history-list">
+              <!-- Filled by JS -->
+            </div>
+          </div>
+
+          <div id="tab-deposits" class="tab-pane" style="display: none; max-height: 400px; overflow-y:auto;">
+            <div id="deposits-history-list">
+              <!-- Filled by JS -->
+            </div>
+          </div>
+
+          <div id="tab-inventory" class="tab-pane" style="display: none; max-height: 400px; overflow-y:auto;">
+            <div class="inventory-grid" id="inventory-skins-list">
+              <!-- Filled dynamically by JS -->
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+    </div>
+  </main>
+
+  <!-- Deposit Modal -->
+  <div id="deposit-modal" class="modal-overlay">
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeModal('deposit-modal')">&times;</button>
+      <div class="modal-title">Поповнити баланс</div>
+      
+      <div class="payment-tabs">
+        <button class="payment-tab-btn active" id="dep-tab-trc" onclick="switchPaymentTab('trc')">USDT TRC20</button>
+        <button class="payment-tab-btn" id="dep-tab-mono" onclick="switchPaymentTab('mono')">MONOBANKA</button>
+      </div>
+
+      <!-- TRC20 Form -->
+      <div id="payment-trc" class="payment-method-details active">
+        <div class="qr-code-placeholder">
+          <svg viewBox="0 0 100 100" style="width:100%; height:100%;">
+            <rect width="100" height="100" fill="white"/>
+            <rect x="5" y="5" width="25" height="25" fill="#0c0d12"/>
+            <rect x="9" y="9" width="17" height="17" fill="white"/>
+            <rect x="12" y="12" width="11" height="11" fill="#0c0d12"/>
+            
+            <rect x="70" y="5" width="25" height="25" fill="#0c0d12"/>
+            <rect x="74" y="9" width="17" height="17" fill="white"/>
+            <rect x="77" y="12" width="11" height="11" fill="#0c0d12"/>
+            
+            <rect x="5" y="70" width="25" height="25" fill="#0c0d12"/>
+            <rect x="9" y="74" width="17" height="17" fill="white"/>
+            <rect x="12" y="77" width="11" height="11" fill="#0c0d12"/>
+
+            <rect x="35" y="10" width="10" height="20" fill="#0c0d12"/>
+            <rect x="50" y="15" width="15" height="15" fill="#0c0d12"/>
+            <rect x="35" y="45" width="30" height="10" fill="#0c0d12"/>
+            <rect x="10" y="35" width="15" height="25" fill="#0c0d12"/>
+            <rect x="80" y="35" width="10" height="35" fill="#0c0d12"/>
+            <rect x="55" y="65" width="20" height="20" fill="#0c0d12"/>
+          </svg>
+        </div>
+        <div class="copy-field">
+          <input type="text" value="TWe13o3VolkCS2BettingPlatformXyzTRC20" readonly style="flex:1;">
+          <button class="btn btn-secondary" style="padding: 4px 8px; font-size:11px;" onclick="navigator.clipboard.writeText('TWe13o3VolkCS2BettingPlatformXyzTRC20'); showToast('Адресу скопійовано!')">Скопіювати</button>
+        </div>
+        <form id="trc-deposit-form">
+          <div class="form-group">
+            <label for="trc-amount">Сума (монет)</label>
+            <input type="number" id="trc-amount" class="form-input" placeholder="Мін. 500 монет" min="500" required>
+          </div>
+          <div class="form-group">
+            <label for="trc-txid">TxID транзакції</label>
+            <input type="text" id="trc-txid" class="form-input" placeholder="TxID транзакції" required>
+          </div>
+          <button type="submit" class="btn" style="width: 100%; margin-top: 10px;">ВЕРЕФІКУВАТИ ДЕПОЗИТ</button>
+        </form>
+      </div>
+
+      <!-- Monobanka Form -->
+      <div id="payment-mono" class="payment-method-details">
+        <div class="qr-code-placeholder">
+          <svg viewBox="0 0 100 100" style="width:100%; height:100%;">
+            <rect width="100" height="100" fill="white"/>
+            <rect x="5" y="5" width="25" height="25" fill="#ff5a00"/>
+            <rect x="9" y="9" width="17" height="17" fill="white"/>
+            <rect x="12" y="12" width="11" height="11" fill="#ff5a00"/>
+            
+            <rect x="70" y="5" width="25" height="25" fill="#ff5a00"/>
+            <rect x="74" y="9" width="17" height="17" fill="white"/>
+            <rect x="77" y="12" width="11" height="11" fill="#ff5a00"/>
+            
+            <rect x="5" y="70" width="25" height="25" fill="#ff5a00"/>
+            <rect x="9" y="74" width="17" height="17" fill="white"/>
+            <rect x="12" y="77" width="11" height="11" fill="#ff5a00"/>
+
+            <rect x="35" y="15" width="20" height="20" fill="#ff5a00"/>
+            <rect x="40" y="45" width="25" height="20" fill="#ff5a00"/>
+            <rect x="75" y="40" width="15" height="25" fill="#ff5a00"/>
+            <rect x="45" y="70" width="20" height="15" fill="#ff5a00"/>
+          </svg>
+        </div>
+        <div class="copy-field">
+          <input type="text" value="https://send.monobank.ua/jar/volk13o3" readonly style="flex:1;">
+          <a href="https://send.monobank.ua/jar/volk13o3" target="_blank" class="btn btn-secondary" style="padding: 4px 8px; font-size:11px; text-decoration:none; display:flex; align-items:center;">ПЕРЕЙТИ</a>
+        </div>
+        <form id="mono-deposit-form">
+          <div class="form-group">
+            <label for="mono-amount">Сума (монет)</label>
+            <input type="number" id="mono-amount" class="form-input" placeholder="Мін. 500 монет" min="500" required>
+          </div>
+          <div class="form-group">
+            <label for="mono-sender-name">ПІБ відправника</label>
+            <input type="text" id="mono-sender-name" class="form-input" placeholder="Прізвище, Ім'я" required>
+          </div>
+          <button type="submit" class="btn" style="width: 100%; margin-top: 10px;">ВЕРЕФІКУВАТИ ДЕПОЗИТ</button>
+        </form>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Blockchain Deposit Loader -->
+  <div id="verify-loader" class="verify-loader-overlay">
+    <div class="loader-container">
+      <div style="width: 100px; height: 100px; margin-bottom: 10px;">
+        <img src="assets/wolf_logo.png" alt="Mascot" style="width:100%; height:100%; object-fit:contain; filter: drop-shadow(0 0 10px var(--wolf-red-glow));">
+      </div>
+      <div class="loader-status-text" id="loader-status">З'єднання з сервером...</div>
+      <div class="loader-progress-bar">
+        <div class="loader-progress-fill" id="loader-fill"></div>
+      </div>
+      <div class="loader-step-info" id="loader-step">Крок 1/4...</div>
+    </div>
+  </div>
+
+  <!-- Rules Modal -->
+  <div id="rules-modal" class="modal-overlay">
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeModal('rules-modal')">&times;</button>
+      <div class="modal-title">Правила користування VOLK 1303</div>
+      <div style="font-size: 13px; line-height: 1.6; color: #f0f6fc; display:flex; flex-direction:column; gap:12px;">
+        <p>Курс валюти платформи становить: <strong>1 монета = 1 гривня (UAH)</strong>.</p>
+        <ul style="padding-left:18px; display:flex; flex-direction:column; gap:8px;">
+          <li>Мінімальне поповнення балансу (депозит) становить <strong style="color:var(--cs-orange);">500 монет</strong>.</li>
+          <li>Мінімальна сума для виведення монет становить <strong style="color:var(--cs-orange);">2000 монет</strong>.</li>
+          <li>Максимальна ставка на будь-яку одну подію чи матч обмежується до <strong style="color:var(--cs-orange);">10 000 монет</strong>.</li>
+          <li>Всі дуелі та квести розраховуються автоматично та зараховуються миттєво.</li>
+        </ul>
+        <p style="color: var(--text-secondary); font-size:11px; margin-top:10px; border-top: 1px solid var(--border-color); padding-top:10px;">
+          Адміністрація VOLK 1303 залишає за собою право проводити перевірки транзакцій у разі підозрілої активності. Грайте чесно!
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Compact Footer -->
+  <footer>
+    <div class="footer-compact" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; font-size:12px; max-width:1400px; margin:0 auto; width:100%; gap: 15px;">
+      <div>© 2026 VOLK 1303. Усі права застережено.</div>
+      <div style="display:flex; gap:20px;">
+        <a href="#" onclick="openModal('rules-modal')" style="color:var(--text-secondary); text-decoration:none; transition:var(--transition);">Правила</a>
+        <a href="#" style="color:var(--text-secondary); text-decoration:none; transition:var(--transition);">Підтримка</a>
+        <a href="https://discord.gg/wolf1303" target="_blank" style="color:var(--text-secondary); text-decoration:none; transition:var(--transition);">Discord</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+  
+  <script>
+    // Local page script tab toggler
+    function switchProfileTab(tab) {
+      const tabBets = document.getElementById('tab-bets');
+      const tabDeps = document.getElementById('tab-deposits');
+      const tabInv = document.getElementById('tab-inventory');
+      
+      const btnBets = document.getElementById('btn-tab-bets');
+      const btnDeps = document.getElementById('btn-tab-deposits');
+      const btnInv = document.getElementById('btn-tab-inventory');
+
+      // Hide all panels
+      tabBets.style.display = 'none';
+      tabDeps.style.display = 'none';
+      tabInv.style.display = 'none';
+
+      // Deactivate all buttons
+      btnBets.classList.remove('active');
+      btnDeps.classList.remove('active');
+      btnInv.classList.remove('active');
+
+      // Show and activate target tab
+      if (tab === 'bets') {
+        tabBets.style.display = 'block';
+        btnBets.classList.add('active');
+      } else if (tab === 'deposits') {
+        tabDeps.style.display = 'block';
+        btnDeps.classList.add('active');
+      } else if (tab === 'inventory') {
+        tabInv.style.display = 'block';
+        btnInv.classList.add('active');
+      }
+    }
+  </script>
+</body>
+</html>

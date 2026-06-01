@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VOLK 1303 | Авторизація</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="smoke-bg.js"></script>
+  <style>
+    /* ── Auth page override ── */
+    body {
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+      background-image:
+        linear-gradient(to bottom, rgba(11,14,20,0.82) 0%, rgba(11,14,20,0.75) 50%, rgba(11,14,20,0.9) 100%),
+        url('assets/cs_tournament_bg.png');
+      background-size: cover;
+      background-position: center;
+      background-attachment: fixed;
+    }
+
+    /* Animated glow lines */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        linear-gradient(90deg, transparent 49.8%, rgba(255,90,0,0.035) 50%, transparent 50.2%),
+        linear-gradient(0deg,  transparent 49.8%, rgba(255,90,0,0.02)  50%, transparent 50.2%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Central wrapper */
+    .auth-page-center {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 520px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 28px;
+    }
+
+    /* Logo block above card */
+    .auth-logo-block {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .auth-logo-img {
+      width: 72px;
+      height: 72px;
+      object-fit: contain;
+      filter: drop-shadow(0 0 18px rgba(255,90,0,0.55));
+      animation: logo-pulse 3s ease-in-out infinite;
+    }
+
+    @keyframes logo-pulse {
+      0%, 100% { filter: drop-shadow(0 0 14px rgba(255,90,0,0.45)); }
+      50%       { filter: drop-shadow(0 0 28px rgba(255,90,0,0.75)); }
+    }
+
+    .auth-logo-title {
+      font-size: 32px;
+      font-weight: 900;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      background: linear-gradient(90deg, #ffffff 40%, var(--cs-orange) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .auth-logo-title span { color: var(--cs-orange); }
+
+    .auth-logo-sub {
+      font-size: 12px;
+      color: var(--text-secondary);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    /* Main card */
+    .auth-card {
+      width: 100%;
+      background: linear-gradient(145deg, #161b22 0%, #0f141c 100%);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 36px 40px 40px;
+      box-shadow:
+        0 0 0 1px rgba(255,90,0,0.05),
+        0 24px 60px rgba(0,0,0,0.55),
+        inset 0 1px 0 rgba(255,255,255,0.04);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Subtle top-edge glow */
+    .auth-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 10%; right: 10%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--cs-orange), transparent);
+      opacity: 0.5;
+    }
+
+    /* Tabs */
+    .auth-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      background: var(--bg-darker);
+      border-radius: 10px;
+      padding: 4px;
+      margin-bottom: 32px;
+      border: 1px solid var(--border-color);
+    }
+
+    .auth-tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      padding: 12px;
+      font-weight: 800;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      cursor: pointer;
+      border-radius: 7px;
+      transition: var(--transition);
+    }
+
+    .auth-tab-btn.active {
+      background: linear-gradient(135deg, rgba(255,90,0,0.15) 0%, rgba(255,90,0,0.05) 100%);
+      color: var(--cs-orange);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      border: 1px solid rgba(255,90,0,0.2);
+    }
+
+    /* Form labels */
+    .form-group label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    /* Inputs */
+    .form-input {
+      background: rgba(11,14,20,0.8);
+      border: 1px solid #2a2f3d;
+      color: var(--text-primary);
+      padding: 14px 16px;
+      border-radius: 10px;
+      outline: none;
+      font-size: 14px;
+      transition: var(--transition);
+      width: 100%;
+    }
+
+    .form-input:focus {
+      border-color: var(--cs-orange);
+      background: rgba(11,14,20,1);
+      box-shadow: 0 0 0 3px rgba(255,90,0,0.1);
+    }
+
+    .form-input::placeholder { color: #4a5568; }
+
+    /* Two-column grid for registration */
+    .reg-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0 18px;
+    }
+
+    .reg-grid .form-group { margin-bottom: 18px; }
+    .reg-grid .full-width  { grid-column: 1 / -1; }
+
+    /* Submit button */
+    .auth-submit-btn {
+      width: 100%;
+      padding: 15px;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      background: linear-gradient(135deg, var(--cs-orange) 0%, #e05500 50%, #cc4400 100%);
+      color: white;
+      text-transform: uppercase;
+      transition: var(--transition);
+      position: relative;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+
+    .auth-submit-btn::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.12) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    .auth-submit-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(255,90,0,0.4);
+      filter: brightness(1.08);
+    }
+
+    .auth-submit-btn:active { transform: translateY(0); }
+
+    /* Divider */
+    .auth-divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 20px 0 6px;
+      color: var(--text-secondary);
+      font-size: 11px;
+    }
+
+    .auth-divider::before,
+    .auth-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border-color);
+    }
+
+    /* Bonus info box */
+    .auth-bonus-box {
+      background: linear-gradient(135deg, rgba(255,90,0,0.08) 0%, rgba(255,26,64,0.05) 100%);
+      border: 1px solid rgba(255,90,0,0.2);
+      border-radius: 10px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .auth-bonus-icon {
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+
+    .auth-bonus-text {
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    .auth-bonus-text strong {
+      color: var(--cs-orange);
+      font-weight: 800;
+    }
+
+    /* Section label */
+    .auth-section-label {
+      font-size: 10px;
+      font-weight: 800;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 14px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    /* Bottom note under card */
+    .auth-bottom-note {
+      font-size: 12px;
+      color: #4a5568;
+      text-align: center;
+    }
+
+    @media (max-width: 540px) {
+      .auth-card { padding: 28px 22px 32px; }
+      .reg-grid { grid-template-columns: 1fr; }
+      .reg-grid .full-width { grid-column: 1; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Toast Notifications -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Centered Auth Wrapper -->
+  <div class="auth-page-center">
+
+    <!-- Logo -->
+    <div class="auth-logo-block">
+      <img src="assets/wolf_logo.png" alt="VOLK 1303" class="auth-logo-img">
+      <div class="auth-logo-title">VOLK<span>1303</span></div>
+      <div class="auth-logo-sub">Преміальна букмекерська платформа</div>
+    </div>
+
+    <!-- Auth Card -->
+    <div class="auth-card">
+
+      <!-- Tabs -->
+      <div class="auth-tabs">
+        <button id="tab-login-btn" class="auth-tab-btn active" onclick="switchAuthTab('login')">Вхід</button>
+        <button id="tab-register-btn" class="auth-tab-btn" onclick="switchAuthTab('register')">Реєстрація</button>
+      </div>
+
+      <!-- ── LOGIN FORM ── -->
+      <form id="login-form">
+
+        <div class="auth-section-label">Авторизація</div>
+
+        <div class="form-group" style="margin-bottom:18px;">
+          <label for="login-username">Юзернейм або пошта</label>
+          <input type="text" id="login-username" class="form-input"
+            placeholder="Username або email@mail.com" required autocomplete="username">
+        </div>
+
+        <div class="form-group" style="margin-bottom:8px;">
+          <label for="login-password">Пароль</label>
+          <input type="password" id="login-password" class="form-input"
+            placeholder="Введіть пароль" required autocomplete="current-password">
+        </div>
+
+        <button type="submit" class="auth-submit-btn">Увійти в акаунт</button>
+
+      </form>
+
+      <!-- ── REGISTER FORM ── -->
+      <form id="register-form" style="display:none;">
+
+        <!-- Bonus box -->
+        <div class="auth-bonus-box">
+          <div class="auth-bonus-icon">🎁</div>
+          <div class="auth-bonus-text">
+            Реєстрація дає <strong>+50 монет</strong> та <strong>безкоштовний спін</strong> у Колесі Фортуни!
+          </div>
+        </div>
+
+        <div class="auth-section-label">Особисті дані</div>
+
+        <div class="reg-grid">
+          <div class="form-group">
+            <label for="reg-username">Username</label>
+            <input type="text" id="reg-username" class="form-input"
+              placeholder="Нікнейм" required autocomplete="username">
+          </div>
+
+          <div class="form-group">
+            <label for="reg-email">Електронна пошта</label>
+            <input type="email" id="reg-email" class="form-input"
+              placeholder="email@mail.com" required autocomplete="email">
+          </div>
+
+          <div class="form-group">
+            <label for="reg-password">Пароль</label>
+            <input type="password" id="reg-password" class="form-input"
+              placeholder="Мін. 6 символів" required autocomplete="new-password">
+          </div>
+
+          <div class="form-group">
+            <label for="reg-password-confirm">Підтвердження</label>
+            <input type="password" id="reg-password-confirm" class="form-input"
+              placeholder="Повторіть пароль" required autocomplete="new-password">
+          </div>
+        </div>
+
+        <button type="submit" class="auth-submit-btn">Створити акаунт</button>
+
+      </form>
+
+    </div><!-- /.auth-card -->
+
+    <div class="auth-bottom-note">© 2026 VOLK 1303. Усі права застережено.</div>
+
+  </div><!-- /.auth-page-center -->
+
+  <!-- Wheel of Fortune Modal -->
+  <div id="wheel-modal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 380px;">
+      <div class="modal-title">Колесо фортуни</div>
+      <p style="font-size:13px; color:var(--text-secondary); text-align:center; margin-bottom: 15px;">
+        Вам доступний 1 привітальний спін! Виграйте бонус на депозит або монети.
+      </p>
+      <div class="wheel-container">
+        <div class="wheel-wrapper">
+          <div class="wheel-arrow"></div>
+          <div id="wheel-canvas-container" class="wheel-canvas-container">
+            <canvas id="wheel-canvas" width="304" height="304"></canvas>
+          </div>
+          <div class="wheel-center-pin"></div>
+        </div>
+        <button id="wheel-spin-btn" class="btn" style="width: 100%; padding: 12px; font-size: 15px;">ОБЕРТАТИ КОЛЕСО</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+
+  <script>
+    function switchAuthTab(tab) {
+      const loginForm = document.getElementById('login-form');
+      const regForm   = document.getElementById('register-form');
+      const loginBtn  = document.getElementById('tab-login-btn');
+      const regBtn    = document.getElementById('tab-register-btn');
+
+      if (tab === 'login') {
+        loginForm.style.display = 'block';
+        regForm.style.display   = 'none';
+        loginBtn.classList.add('active');
+        regBtn.classList.remove('active');
+      } else {
+        loginForm.style.display = 'none';
+        regForm.style.display   = 'block';
+        loginBtn.classList.remove('active');
+        regBtn.classList.add('active');
+      }
+    }
+  </script>
+</body>
+</html>

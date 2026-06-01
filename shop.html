@@ -1,0 +1,205 @@
+﻿<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VOLK 1303 | Магазин Нагород CS2</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Toast Notifications -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Rules Modal -->
+  <div id="rules-modal" class="modal-overlay">
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeModal('rules-modal')">&times;</button>
+      <div class="modal-title">Правила користування VOLK 1303</div>
+      <div style="font-size: 13px; line-height: 1.6; color: #f0f6fc; display:flex; flex-direction:column; gap:12px;">
+        <p>Курс валюти платформи становить: <strong>1 монета = 1 гривня (UAH)</strong>.</p>
+        <ul style="padding-left:18px; display:flex; flex-direction:column; gap:8px;">
+          <li>Мінімальне поповнення балансу (депозит) становить <strong style="color:var(--cs-orange);">500 монет</strong>.</li>
+          <li>Мінімальна сума для виведення монет становить <strong style="color:var(--cs-orange);">2000 монет</strong>.</li>
+          <li>Максимальна ставка на будь-яку одну подію чи матч обмежується до <strong style="color:var(--cs-orange);">10 000 монет</strong>.</li>
+          <li>Всі дуелі та квести розраховуються автоматично та зараховуються миттєво.</li>
+        </ul>
+        <p style="color: var(--text-secondary); font-size:11px; margin-top:10px; border-top: 1px solid var(--border-color); padding-top:10px;">
+          Адміністрація VOLK 1303 залишає за собою право проводити перевірки транзакцій у разі підозрілої активності. Грайте чесно!
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shared Header -->
+  <header>
+    <a href="betting.html" class="logo-link">
+      <div class="logo-img-wrapper">
+        <img src="assets/wolf_logo.png" alt="Wolf Logo">
+      </div>
+      <div class="logo-text">VOLK<span>1303</span></div>
+    </a>
+
+    <nav>
+      <a href="betting.html" class="nav-link">Ставки</a>
+      <a href="tournament.html" class="nav-link">Турніри</a>
+      <a href="profile.html" class="nav-link">Профіль</a>
+      <a href="admin.html" id="nav-admin-link" class="nav-link" style="display: none;">Адмінка</a>
+    </nav>
+
+    <div class="header-user-panel">
+      <div class="user-balance">
+        🪙 <span id="header-balance-value" class="balance-coins">0</span> Монет
+      </div>
+      <button id="header-deposit-btn" class="btn">Поповнити</button>
+      <button class="btn btn-secondary" onclick="logoutUser()">Вихід</button>
+    </div>
+  </header>
+
+  <!-- Blockchain Deposit Loader -->
+  <div id="verify-loader" class="verify-loader-overlay">
+    <div class="loader-container">
+      <div style="width: 100px; height: 100px; margin-bottom: 10px;">
+        <img src="assets/wolf_logo.png" alt="Mascot" style="width:100%; height:100%; object-fit:contain; filter: drop-shadow(0 0 10px var(--wolf-red-glow));">
+      </div>
+      <div class="loader-status-text" id="loader-status">З'єднання з сервером...</div>
+      <div class="loader-progress-bar">
+        <div class="loader-progress-fill" id="loader-fill"></div>
+      </div>
+      <div class="loader-step-info" id="loader-step">Крок 1/4...</div>
+    </div>
+  </div>
+
+  <!-- Deposit Modal -->
+  <div id="deposit-modal" class="modal-overlay">
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeModal('deposit-modal')">&times;</button>
+      <div class="modal-title">Поповнити баланс</div>
+      
+      <div class="payment-tabs">
+        <button class="payment-tab-btn active" id="dep-tab-trc" onclick="switchPaymentTab('trc')">USDT TRC20</button>
+        <button class="payment-tab-btn" id="dep-tab-mono" onclick="switchPaymentTab('mono')">MONOBANKA</button>
+      </div>
+
+      <!-- TRC20 Form -->
+      <div id="payment-trc" class="payment-method-details active">
+        <div class="qr-code-placeholder">
+          <svg viewBox="0 0 100 100" style="width:100%; height:100%;">
+            <rect width="100" height="100" fill="white"/>
+            <rect x="5" y="5" width="25" height="25" fill="#0c0d12"/>
+            <rect x="9" y="9" width="17" height="17" fill="white"/>
+            <rect x="12" y="12" width="11" height="11" fill="#0c0d12"/>
+            
+            <rect x="70" y="5" width="25" height="25" fill="#0c0d12"/>
+            <rect x="74" y="9" width="17" height="17" fill="white"/>
+            <rect x="77" y="12" width="11" height="11" fill="#0c0d12"/>
+            
+            <rect x="5" y="70" width="25" height="25" fill="#0c0d12"/>
+            <rect x="9" y="74" width="17" height="17" fill="white"/>
+            <rect x="12" y="77" width="11" height="11" fill="#0c0d12"/>
+
+            <rect x="35" y="10" width="10" height="20" fill="#0c0d12"/>
+            <rect x="50" y="15" width="15" height="15" fill="#0c0d12"/>
+            <rect x="35" y="45" width="30" height="10" fill="#0c0d12"/>
+            <rect x="10" y="35" width="15" height="25" fill="#0c0d12"/>
+            <rect x="80" y="35" width="10" height="35" fill="#0c0d12"/>
+            <rect x="55" y="65" width="20" height="20" fill="#0c0d12"/>
+          </svg>
+        </div>
+        <div class="copy-field">
+          <input type="text" value="TWe13o3VolkCS2BettingPlatformXyzTRC20" readonly style="flex:1;">
+          <button class="btn btn-secondary" style="padding: 4px 8px; font-size:11px;" onclick="navigator.clipboard.writeText('TWe13o3VolkCS2BettingPlatformXyzTRC20'); showToast('Адресу скопійовано!')">Скопіювати</button>
+        </div>
+        <form id="trc-deposit-form">
+          <div class="form-group">
+            <label for="trc-amount">Сума (монет)</label>
+            <input type="number" id="trc-amount" class="form-input" placeholder="Мін. 500 монет" min="500" required>
+          </div>
+          <div class="form-group">
+            <label for="trc-txid">TxID транзакції</label>
+            <input type="text" id="trc-txid" class="form-input" placeholder="TxID транзакції" required>
+          </div>
+          <button type="submit" class="btn" style="width: 100%; margin-top: 10px;">ВЕРЕФІКУВАТИ ДЕПОЗИТ</button>
+        </form>
+      </div>
+
+      <!-- Monobanka Form -->
+      <div id="payment-mono" class="payment-method-details">
+        <div class="qr-code-placeholder">
+          <svg viewBox="0 0 100 100" style="width:100%; height:100%;">
+            <rect width="100" height="100" fill="white"/>
+            <rect x="5" y="5" width="25" height="25" fill="#ff5a00"/>
+            <rect x="9" y="9" width="17" height="17" fill="white"/>
+            <rect x="12" y="12" width="11" height="11" fill="#ff5a00"/>
+            
+            <rect x="70" y="5" width="25" height="25" fill="#ff5a00"/>
+            <rect x="74" y="9" width="17" height="17" fill="white"/>
+            <rect x="77" y="12" width="11" height="11" fill="#ff5a00"/>
+            
+            <rect x="5" y="70" width="25" height="25" fill="#ff5a00"/>
+            <rect x="9" y="74" width="17" height="17" fill="white"/>
+            <rect x="12" y="77" width="11" height="11" fill="#ff5a00"/>
+
+            <rect x="35" y="15" width="20" height="20" fill="#ff5a00"/>
+            <rect x="40" y="45" width="25" height="20" fill="#ff5a00"/>
+            <rect x="75" y="40" width="15" height="25" fill="#ff5a00"/>
+            <rect x="45" y="70" width="20" height="15" fill="#ff5a00"/>
+          </svg>
+        </div>
+        <div class="copy-field">
+          <input type="text" value="https://send.monobank.ua/jar/volk13o3" readonly style="flex:1;">
+          <a href="https://send.monobank.ua/jar/volk13o3" target="_blank" class="btn btn-secondary" style="padding: 4px 8px; font-size:11px; text-decoration:none; display:flex; align-items:center;">ПЕРЕЙТИ</a>
+        </div>
+        <form id="mono-deposit-form">
+          <div class="form-group">
+            <label for="mono-amount">Сума (монет)</label>
+            <input type="number" id="mono-amount" class="form-input" placeholder="Мін. 500 монет" min="500" required>
+          </div>
+          <div class="form-group">
+            <label for="mono-sender-name">ПІБ відправника</label>
+            <input type="text" id="mono-sender-name" class="form-input" placeholder="Прізвище, Ім'я" required>
+          </div>
+          <button type="submit" class="btn" style="width: 100%; margin-top: 10px;">ВЕРЕФІКУВАТИ ДЕПОЗИТ</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Standalone Marketplace Grid -->
+  <main class="container">
+    <div class="card" style="padding: 25px;">
+      <div class="section-title">
+        <span>МАГАЗИН СКІНІВ CS2</span>
+        <div style="display:flex; gap:8px;" id="shop-filter-bar">
+          <button class="btn btn-secondary" onclick="filterShopItems('all')" id="shop-filter-all" style="padding:6px 12px; font-size:11px; border-color:var(--cs-orange);">Всі</button>
+          <button class="btn btn-secondary" onclick="filterShopItems('knives')" id="shop-filter-knives" style="padding:6px 12px; font-size:11px;">Ніжки</button>
+          <button class="btn btn-secondary" onclick="filterShopItems('weapons')" id="shop-filter-weapons" style="padding:6px 12px; font-size:11px;">Зброя</button>
+          <button class="btn btn-secondary" onclick="filterShopItems('cases')" id="shop-filter-cases" style="padding:6px 12px; font-size:11px;">Кейси</button>
+        </div>
+      </div>
+      
+      <p style="font-size:13px; color:#b0b0b0; margin-bottom: 20px;">
+        Обмінюйте виграні монети на скіни зброї CS2. Всі придбані скіни автоматично потрапляють у ваш інвентар у Профілі.
+      </p>
+
+      <div class="shop-grid" id="standalone-shop-container">
+        <!-- Loaded dynamically by JS -->
+      </div>
+    </div>
+  </main>
+
+  <!-- Compact Footer -->
+  <footer>
+    <div class="footer-compact" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; font-size:12px; max-width:1400px; margin:0 auto; width:100%; gap: 15px;">
+      <div>© 2026 VOLK 1303. Усі права застережено.</div>
+      <div style="display:flex; gap:20px;">
+        <a href="#" onclick="openModal('rules-modal')" style="color:var(--text-secondary); text-decoration:none; transition:var(--transition);">Правила</a>
+        <a href="#" style="color:var(--text-secondary); text-decoration:none; transition:var(--transition);">Підтримка</a>
+        <a href="https://discord.gg/wolf1303" target="_blank" style="color:var(--text-secondary); text-decoration:none; transition:var(--transition);">Discord</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

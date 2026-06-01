@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VOLK 1303 | Турніри Challengermode</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="smoke-bg.js"></script>
+</head>
+<body>
+
+  <!-- Toast Notifications -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Shared Header -->
+  <header>
+    <a href="betting.html" class="logo-link">
+      <div class="logo-img-wrapper">
+        <img src="assets/wolf_logo.png" alt="Wolf Logo">
+      </div>
+      <div class="logo-text">VOLK<span>1303</span></div>
+    </a>
+
+    <nav>
+      <a href="betting.html" class="nav-link">Ставки</a>
+      <a href="tournament.html" class="nav-link active">Турніри</a>
+      <a href="profile.html" class="nav-link">Профіль</a>
+      <a href="admin.html" id="nav-admin-link" class="nav-link" style="display: none;">Адмінка</a>
+    </nav>
+
+    <div class="header-user-panel">
+      <div class="user-balance">
+        🪙 <span id="header-balance-value" class="balance-coins">0</span> Монет
+      </div>
+      <button id="header-deposit-btn" class="btn">Поповнити</button>
+      <button class="btn btn-secondary" onclick="logoutUser()">Вихід</button>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="container">
+    <div class="tournament-grid">
+
+      <!-- Left: Team Creator / Info -->
+      <div style="display:flex; flex-direction:column; gap:20px;">
+
+        <!-- Team Panel -->
+        <div class="card">
+          <div class="section-title">Моя команда (5х5)</div>
+          <div id="team-info-display" style="display:none;"></div>
+          <form id="team-creation-form" style="display:flex; flex-direction:column; gap:0;">
+
+            <div style="display:flex; align-items:center; gap:15px; margin-bottom:20px;">
+              <div style="width:55px; height:55px; border-radius:8px; border:1px solid var(--border-color); overflow:hidden; background:var(--bg-input); display:flex; align-items:center; justify-content:center;">
+                <img src="assets/wolf_logo.png" alt="Default Avatar" id="team-form-avatar-preview" style="width:100%; height:100%; object-fit:contain;">
+              </div>
+              <div style="flex:1;">
+                <div class="form-group" style="margin-bottom:8px;">
+                  <label for="team-name-input">Назва команди</label>
+                  <input type="text" id="team-name-input" class="form-input" placeholder="Введіть назву" required style="padding:8px 12px; font-size:13px;">
+                </div>
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom:12px;">
+              <label for="team-tag-input">Тег [макс. 4 символи]</label>
+              <input type="text" id="team-tag-input" class="form-input" placeholder="напр: VOLK" maxlength="4" required style="padding:8px 12px; font-size:13px;">
+            </div>
+
+            <div class="section-title" style="margin-top:15px; font-size:13px; border-left-color:var(--text-secondary);">Склад гравців (5x5)</div>
+
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <div class="form-group" style="margin-bottom:0;">
+                <label>Гравець 1 (Капітан)</label>
+                <input type="text" id="player-1-input" class="form-input" placeholder="Username" required style="padding:8px 12px; font-size:12px;" readonly>
+              </div>
+              <div class="form-group" style="margin-bottom:0;">
+                <label>Гравець 2</label>
+                <input type="text" id="player-2-input" class="form-input" placeholder="Username" required style="padding:8px 12px; font-size:12px;">
+              </div>
+              <div class="form-group" style="margin-bottom:0;">
+                <label>Гравець 3</label>
+                <input type="text" id="player-3-input" class="form-input" placeholder="Username" required style="padding:8px 12px; font-size:12px;">
+              </div>
+              <div class="form-group" style="margin-bottom:0;">
+                <label>Гравець 4</label>
+                <input type="text" id="player-4-input" class="form-input" placeholder="Username" required style="padding:8px 12px; font-size:12px;">
+              </div>
+              <div class="form-group" style="margin-bottom:0;">
+                <label>Гравець 5</label>
+                <input type="text" id="player-5-input" class="form-input" placeholder="Username" required style="padding:8px 12px; font-size:12px;">
+              </div>
+            </div>
+
+            <button type="submit" class="btn" style="width:100%; margin-top:18px; padding:12px;">СТВОРИТИ КОМАНДУ</button>
+          </form>
+        </div>
+
+      </div>
+
+      <!-- Right: Bracket + 1v1 -->
+      <div style="display:flex; flex-direction:column; gap:20px;">
+
+        <!-- Tournament Bracket -->
+        <div class="card">
+          <div class="section-title">
+            <span>ТУРНІРНА СІТКА</span>
+            <span class="rank-badge-inline">CHALLENGERMODE</span>
+          </div>
+          <div class="bracket-tree" id="tournament-bracket-visual">
+            <!-- Filled by JS -->
+          </div>
+        </div>
+
+        <!-- Cyber Lobbies & Duels -->
+        <div class="card">
+          <div class="section-title">⚔️ КІБЕРСПОРТИВНІ ЛОБІ ТА ДУЕЛІ</div>
+          <p style="font-size:12px; color:var(--text-secondary); margin-bottom:15px; line-height:1.6;">
+            Створюйте власні дуелі або приєднуйтесь до командних боїв. Виберіть формат від дуелі 1v1 до повномасштабного матчу 5v5!
+          </p>
+
+          <!-- Format Select Tabs -->
+          <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; background: rgba(11, 14, 20, 0.4); padding: 15px; border-radius: 10px; border: 1px solid var(--border-color);">
+            <div style="font-size: 11px; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 2px; letter-spacing: 0.5px;">Оберіть формат бою:</div>
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
+              <button class="btn format-select-btn active" id="btn-format-1v1" onclick="selectLobbyFormat('1v1')" style="padding: 8px 4px; font-size: 11px; font-weight: 800;">1 vs 1</button>
+              <button class="btn btn-secondary format-select-btn" id="btn-format-2v2" onclick="selectLobbyFormat('2v2')" style="padding: 8px 4px; font-size: 11px; font-weight: 800;">2 vs 2</button>
+              <button class="btn btn-secondary format-select-btn" id="btn-format-3v3" onclick="selectLobbyFormat('3v3')" style="padding: 8px 4px; font-size: 11px; font-weight: 800;">3 vs 3</button>
+              <button class="btn btn-secondary format-select-btn" id="btn-format-5v5" onclick="selectLobbyFormat('5v5')" style="padding: 8px 4px; font-size: 11px; font-weight: 800;">5 vs 5</button>
+            </div>
+            
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; margin-top: 4px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.03);">
+              <span style="color:var(--text-secondary);">Вартість: <strong id="lbl-format-fee" style="color:white; font-weight:800;">50 🪙</strong></span>
+              <span style="color:var(--text-secondary);">Виграш: <strong id="lbl-format-prize" style="color:var(--cs-orange); font-weight:800;">95 🪙</strong></span>
+            </div>
+          </div>
+
+          <div class="lobby-grid" id="aim-lobbies-container">
+            <!-- Filled dynamically by JS -->
+          </div>
+
+          <div style="display:flex; justify-content:center; margin-top:20px;">
+            <button class="btn" id="btn-create-lobby" onclick="handleCreateLobby()" style="padding:12px 24px; font-size:13px; font-weight:800; width:100%;">⚔️ СТВОРУТИ ЛОБІ (50 🪙)</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- Deposit Modal -->
+  <div id="deposit-modal" class="modal-overlay">
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeModal('deposit-modal')">×</button>
+      <div class="modal-title">Поповнити баланс</div>
+
+      <div class="payment-tabs">
+        <button class="payment-tab-btn active" id="dep-tab-trc" onclick="switchPaymentTab('trc')">USDT TRC20</button>
+        <button class="payment-tab-btn" id="dep-tab-mono" onclick="switchPaymentTab('mono')">MONOBANKA</button>
+      </div>
+
+      <!-- TRC20 Form -->
+      <div id="payment-trc" class="payment-method-details active">
+        <div class="qr-code-placeholder">
+          <svg viewBox="0 0 100 100" style="width:100%; height:100%;">
+            <rect width="100" height="100" fill="white"/>
+            <rect x="5" y="5" width="25" height="25" fill="#0c0d12"/>
+            <rect x="9" y="9" width="17" height="17" fill="white"/>
+            <rect x="12" y="12" width="11" height="11" fill="#0c0d12"/>
+            <rect x="70" y="5" width="25" height="25" fill="#0c0d12"/>
+            <rect x="74" y="9" width="17" height="17" fill="white"/>
+            <rect x="77" y="12" width="11" height="11" fill="#0c0d12"/>
+            <rect x="5" y="70" width="25" height="25" fill="#0c0d12"/>
+            <rect x="9" y="74" width="17" height="17" fill="white"/>
+            <rect x="12" y="77" width="11" height="11" fill="#0c0d12"/>
+            <rect x="35" y="10" width="10" height="20" fill="#0c0d12"/>
+            <rect x="50" y="15" width="15" height="15" fill="#0c0d12"/>
+            <rect x="35" y="45" width="30" height="10" fill="#0c0d12"/>
+            <rect x="10" y="35" width="15" height="25" fill="#0c0d12"/>
+            <rect x="80" y="35" width="10" height="35" fill="#0c0d12"/>
+            <rect x="55" y="65" width="20" height="20" fill="#0c0d12"/>
+          </svg>
+        </div>
+        <div class="copy-field">
+          <input type="text" value="TWe13o3VolkCS2BettingPlatformXyzTRC20" readonly style="flex:1;">
+          <button class="btn btn-secondary" style="padding:4px 8px; font-size:11px;" onclick="navigator.clipboard.writeText('TWe13o3VolkCS2BettingPlatformXyzTRC20'); showToast('Адресу скопійовано!')">Копіювати</button>
+        </div>
+        <form id="trc-deposit-form">
+          <div class="form-group">
+            <label for="trc-amount">Сума (монет)</label>
+            <input type="number" id="trc-amount" class="form-input" placeholder="Мін. 500 монет" min="500" required>
+          </div>
+          <div class="form-group">
+            <label for="trc-txid">TxID транзакції</label>
+            <input type="text" id="trc-txid" class="form-input" placeholder="TxID транзакції" required>
+          </div>
+          <button type="submit" class="btn" style="width:100%; margin-top:10px;">ВЕРЕФІКУВАТИ ДЕПОЗИТ</button>
+        </form>
+      </div>
+
+      <!-- Monobanka Form -->
+      <div id="payment-mono" class="payment-method-details">
+        <div class="qr-code-placeholder">
+          <svg viewBox="0 0 100 100" style="width:100%; height:100%;">
+            <rect width="100" height="100" fill="white"/>
+            <rect x="5" y="5" width="25" height="25" fill="#ff5a00"/>
+            <rect x="9" y="9" width="17" height="17" fill="white"/>
+            <rect x="12" y="12" width="11" height="11" fill="#ff5a00"/>
+            <rect x="70" y="5" width="25" height="25" fill="#ff5a00"/>
+            <rect x="74" y="9" width="17" height="17" fill="white"/>
+            <rect x="77" y="12" width="11" height="11" fill="#ff5a00"/>
+            <rect x="5" y="70" width="25" height="25" fill="#ff5a00"/>
+            <rect x="9" y="74" width="17" height="17" fill="white"/>
+            <rect x="12" y="77" width="11" height="11" fill="#ff5a00"/>
+            <rect x="35" y="15" width="20" height="20" fill="#ff5a00"/>
+            <rect x="40" y="45" width="25" height="20" fill="#ff5a00"/>
+            <rect x="75" y="40" width="15" height="25" fill="#ff5a00"/>
+            <rect x="45" y="70" width="20" height="15" fill="#ff5a00"/>
+          </svg>
+        </div>
+        <div class="copy-field">
+          <input type="text" value="https://send.monobank.ua/jar/volk13o3" readonly style="flex:1;">
+          <a href="https://send.monobank.ua/jar/volk13o3" target="_blank" class="btn btn-secondary" style="padding:4px 8px; font-size:11px; text-decoration:none; display:flex; align-items:center;">ПЕРЕЙТИ</a>
+        </div>
+        <form id="mono-deposit-form">
+          <div class="form-group">
+            <label for="mono-amount">Сума (монет)</label>
+            <input type="number" id="mono-amount" class="form-input" placeholder="Мін. 500 монет" min="500" required>
+          </div>
+          <div class="form-group">
+            <label for="mono-sender-name">ПІБ відправника</label>
+            <input type="text" id="mono-sender-name" class="form-input" placeholder="Прізвище, Ім'я" required>
+          </div>
+          <button type="submit" class="btn" style="width:100%; margin-top:10px;">ВЕРЕФІКУВАТИ ДЕПОЗИТ</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Blockchain Deposit Loader -->
+  <div id="verify-loader" class="verify-loader-overlay">
+    <div class="loader-container">
+      <div style="width:100px; height:100px; margin-bottom:10px;">
+        <img src="assets/wolf_logo.png" alt="Mascot" style="width:100%; height:100%; object-fit:contain; filter: drop-shadow(0 0 10px var(--wolf-red-glow));">
+      </div>
+      <div class="loader-status-text" id="loader-status">З'єднання з сервером...</div>
+      <div class="loader-progress-bar">
+        <div class="loader-progress-fill" id="loader-fill"></div>
+      </div>
+      <div class="loader-step-info" id="loader-step">Крок 1/4...</div>
+    </div>
+  </div>
+
+  <!-- Rules Modal -->
+  <div id="rules-modal" class="modal-overlay">
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeModal('rules-modal')">×</button>
+      <div class="modal-title">Правила користування VOLK 1303</div>
+      <div style="font-size:13px; line-height:1.6; color:#f0f6fc; display:flex; flex-direction:column; gap:12px;">
+        <p>Курс валюти платформи: <strong>1 монета = 1 гривня (UAH)</strong>.</p>
+        <ul style="padding-left:18px; display:flex; flex-direction:column; gap:8px;">
+          <li>Мінімальний депозит: <strong style="color:var(--cs-orange);">500 монет</strong>.</li>
+          <li>Мінімальний вивід: <strong style="color:var(--cs-orange);">2000 монет</strong>.</li>
+          <li>Максимальна ставка: <strong style="color:var(--cs-orange);">10 000 монет</strong>.</li>
+          <li>Всі дуелі та квести розраховуються автоматично.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-compact" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; font-size:12px; max-width:1400px; margin:0 auto; width:100%; gap:15px;">
+      <div>© 2026 VOLK 1303. Усі права застережено.</div>
+      <div style="display:flex; gap:20px;">
+        <a href="#" onclick="openModal('rules-modal')" style="color:var(--text-secondary); text-decoration:none;">Правила</a>
+        <a href="#" style="color:var(--text-secondary); text-decoration:none;">Підтримка</a>
+        <a href="https://discord.gg/wolf1303" target="_blank" style="color:var(--text-secondary); text-decoration:none;">Discord</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
