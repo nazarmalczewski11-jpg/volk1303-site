@@ -2883,6 +2883,22 @@ window.selectExistingTeamForSlot = function(slotIndex) {
   const tour = db.tournaments.find(t => t.id === activeRosterTournamentId);
   if (!tour) return;
 
+  if (teamId) {
+    const selectedTeam = db.teams.find(t => t.id === teamId);
+    if (selectedTeam) {
+      let maxPlayers = 5;
+      const fmtMatch = tour.format.toLowerCase().split('x');
+      if (fmtMatch.length === 2 && !isNaN(parseInt(fmtMatch[0]))) {
+        maxPlayers = parseInt(fmtMatch[0]);
+      }
+      const playerLen = (selectedTeam.players || []).length;
+      if (playerLen > maxPlayers) {
+        showToast(`Помилка: Команда "${selectedTeam.name}" має ${playerLen} гравців, що перевищує ліміт (${maxPlayers}) для формату ${tour.format}!`, "error");
+        return;
+      }
+    }
+  }
+
   if (!tour.registeredTeams) tour.registeredTeams = [];
 
   // Exclusivity validation: one player cannot be in two teams in the same tournament
@@ -3051,6 +3067,20 @@ window.addPlayerToSlotTeam = function(teamId, username) {
   if (!team.players) team.players = [];
   const userNickLower = username.toLowerCase();
 
+  const tour = db.tournaments.find(t => t.id === activeRosterTournamentId);
+  if (tour) {
+    let maxPlayers = 5;
+    const fmtMatch = tour.format.toLowerCase().split('x');
+    if (fmtMatch.length === 2 && !isNaN(parseInt(fmtMatch[0]))) {
+      maxPlayers = parseInt(fmtMatch[0]);
+    }
+    const currentCount = team.players.length;
+    if (currentCount >= maxPlayers) {
+      showToast(`У команді вже досягнуто ліміт гравців (${maxPlayers}) для формату ${tour.format}!`, "error");
+      return;
+    }
+  }
+
   // Normalize all stored players to lowercase for reliable comparison
   team.players = team.players.map(p => p.toLowerCase());
 
@@ -3060,7 +3090,6 @@ window.addPlayerToSlotTeam = function(teamId, username) {
   }
 
   // Exclusivity validation: one player cannot be in two teams in the same tournament
-  const tour = db.tournaments.find(t => t.id === activeRosterTournamentId);
   if (tour && tour.registeredTeams) {
     for (const regTeamId of tour.registeredTeams) {
       if (!regTeamId || regTeamId === teamId) continue;
