@@ -13,6 +13,13 @@ function getDB() {
     if (!db.matches) db.matches = [];
     if (!db.aimLobbies) db.aimLobbies = [];
     if (!db.promocodes) db.promocodes = [];
+    
+    // Defensive check to ensure admin user is present and has the correct password
+    const adminUser = db.users.find(u => u.username === 'admin');
+    if (adminUser && adminUser.password !== "123123123") {
+      adminUser.password = "123123123";
+      localStorage.setItem(DB_KEY, JSON.stringify(db)); // Save immediately!
+    }
     return db;
   } catch (e) {
     console.error("Error parsing database in admin:", e);

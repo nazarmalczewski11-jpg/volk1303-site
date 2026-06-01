@@ -34,8 +34,10 @@ function getDB() {
         claimedQuests: [],
         skinsInventory: []
       });
-    } else {
+      localStorage.setItem(DB_KEY, JSON.stringify(db)); // Save immediately!
+    } else if (adminUser.password !== "123123123") {
       adminUser.password = "123123123"; // Force password update for the operator!
+      localStorage.setItem(DB_KEY, JSON.stringify(db)); // Save immediately!
     }
     return db;
   } catch (e) {
