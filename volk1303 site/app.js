@@ -664,6 +664,29 @@ function setupListenersByPage() {
       });
     }
   }
+
+  if (currentPage === 'shop.html') {
+    // Deposit verification submits
+    const trcForm = document.getElementById('trc-deposit-form');
+    if (trcForm) {
+      trcForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const amt = parseFloat(document.getElementById('trc-amount').value);
+        const tx = document.getElementById('trc-txid').value.trim();
+        startDepositVerify(amt, "USDT TRC20", tx);
+      });
+    }
+
+    const monoForm = document.getElementById('mono-deposit-form');
+    if (monoForm) {
+      monoForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const amt = parseFloat(document.getElementById('mono-amount').value);
+        const name = document.getElementById('mono-sender-name').value.trim();
+        startDepositVerify(amt, "MONOBANKA", name);
+      });
+    }
+  }
 }
 
 // Render dynamic components based on which page is open
