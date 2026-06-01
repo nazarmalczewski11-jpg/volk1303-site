@@ -117,6 +117,14 @@ document.addEventListener('DOMContentLoaded', () => {
 function checkAdminAuth() {
   const db = getDB();
   const overlay = document.getElementById('admin-login-overlay');
+  const urlParams = new URLSearchParams(window.location.search);
+
+  if (urlParams.has('logout') && db) {
+    db.currentUser = null;
+    saveDB(db);
+    // Clear URL query parameter without reloading page
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
 
   if (!db || db.currentUser !== 'admin!') {
     if (overlay) {
