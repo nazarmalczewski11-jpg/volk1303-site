@@ -198,6 +198,15 @@ function setupAdminListeners() {
       createNewPromocodeAdmin();
     });
   }
+
+  // Teams Creator Form
+  const newTeamForm = document.getElementById('admin-create-team-form');
+  if (newTeamForm) {
+    newTeamForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      createNewTeamAdmin();
+    });
+  }
 }
 
 // Global selected user state in Coin Dispenser
@@ -838,46 +847,271 @@ window.settleMatchPayouts = function(id, winningTeamIdx) {
   showToast(`Ставки розраховано! Переможець: ${winnerName}`, "success");
 };
 
-// Render Bracket editor panels
+// Tab switching functionality
+window.switchAdminTab = function(tabId) {
+  document.querySelectorAll('.admin-tab-item').forEach(item => {
+    item.classList.remove('active');
+  });
+  document.querySelectorAll('.admin-content-pane').forEach(pane => {
+    pane.classList.remove('active');
+  });
+
+  const activeBtn = Array.from(document.querySelectorAll('.admin-tab-item')).find(btn => 
+    btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(`'${tabId}'`)
+  );
+  if (activeBtn) activeBtn.classList.add('active');
+
+  const targetPane = document.getElementById(`pane-${tabId}`);
+  if (targetPane) targetPane.classList.add('active');
+
+  const titleMap = {
+    'dashboard': 'Дашборд (Зведений огляд)',
+    'betting': 'Керування ставками та матчами',
+    'brackets': 'Турнірна сітка Challengermode',
+    'teams': 'Команди та склади гравців',
+    'users': 'Баланси та реєстри користувачів',
+    'promocodes': 'Центр керування промокодами',
+    'stream': 'Налаштування стріму Twitch'
+  };
+  
+  const barTitle = document.getElementById('admin-current-tab-title');
+  if (barTitle) barTitle.innerText = titleMap[tabId] || 'Панель оператора';
+};
+
+// Create a new team in admin console
+function createNewTeamAdmin() {
+  const db = getDB();
+  const nameInput = document.getElementById('team-name-input-admin');
+  const tagInput = document.getElementById('team-tag-input-admin');
+  const formatInput = document.getElementById('team-format-input-admin');
+  const playersInput = document.getElementById('team-players-input-admin');
+
+  if (!nameInput || !tagInput || !formatInput || !playersInput) return;
+
+  const name = nameInput.value.trim();
+  const tag = tagInput.value.trim().toUpperCase();
+  const format = formatInput.value;
+  const playersRaw = playersInput.value.split(',').map(p => p.trim()).filter(p => p !== "");
+
+  if (!name || !tag || playersRaw.length === 0) {
+    showToast("Будь ласка, заповніть усі обов'язкові поля!", "error");
+    return;
+  }
+
+  if (db.teams.some(t => t.name.toLowerCase() === name.toLowerCase())) {
+    showToast("Команда з такою назвою вже існує!", "error");
+    return;
+  }
+
+  const newTeam = {
+    id: `team_${Date.now()}`,
+    name: name,
+    tag: tag,
+    format: format,
+    players: playersRaw,
+    owner: "ADMIN"
+  };
+
+  db.teams.push(newTeam);
+  saveDB(db);
+
+  showToast(`Команду ${name} успішно створено!`, "success");
+
+  nameInput.value = "";
+  tagInput.value = "";
+  playersInput.value = "";
+
+  renderAdminPanel();
+}
+
+// Delete a team from admin panel
+window.deleteTeamAdmin = function(id) {
+  if (!confirm("Ви впевнені, що хочете видалити цю команду?")) return;
+  const db = getDB();
+  const team = db.teams.find(t => t.id === id);
+  if (!team) return;
+  
+  db.teams = db.teams.filter(t => t.id !== id);
+  saveDB(db);
+  showToast(`Команду ${team.name} видалено!`, "success");
+  renderAdminPanel();
+};
+
+// Generate tournament grid
+window.generateNewBracket = function() {
+  const db = getDB();
+  const typeSelect = document.getElementById('admin-bracket-type-select');
+  const formatSelect = document.getElementById('admin-bracket-format-select');
+
+  if (!typeSelect || !formatSelect) return;
+
+  const selectedType = typeSelect.value;
+  const selectedFormat = formatSelect.value;
+
+  if (!confirm(`Згенерувати нову сітку ${selectedType.toUpperCase()} (${selectedFormat})? Попередню сітку буде стерто.`)) {
+    return;
+  }
+
+  let rounds = [];
+
+  if (selectedType === 'single-4') {
+    rounds = [
+      {
+        name: "Півфінали",
+        matches: [
+          { id: "s4_1", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null },
+          { id: "s4_2", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null }
+        ]
+      },
+      {
+        name: "Фінал",
+        matches: [
+          { id: "s4_3", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null }
+        ]
+      }
+    ];
+  } else if (selectedType === 'single-8') {
+    rounds = [
+      {
+        name: "Чвертьфінали",
+        matches: [
+          { id: "s8_1", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null },
+          { id: "s8_2", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null },
+          { id: "s8_3", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null },
+          { id: "s8_4", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null }
+        ]
+      },
+      {
+        name: "Півфінали",
+        matches: [
+          { id: "s8_5", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null },
+          { id: "s8_6", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null }
+        ]
+      },
+      {
+        name: "Фінал",
+        matches: [
+          { id: "s8_7", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null }
+        ]
+      }
+    ];
+  } else if (selectedType === 'double-4') {
+    rounds = [
+      {
+        name: "Верхня сітка: Півфінали",
+        matches: [
+          { id: "ub_1", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null },
+          { id: "ub_2", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null }
+        ]
+      },
+      {
+        name: "Верхня сітка: Фінал",
+        matches: [
+          { id: "ub_3", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null }
+        ]
+      },
+      {
+        name: "Нижня сітка: Раунд 1",
+        matches: [
+          { id: "lb_1", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null }
+        ]
+      },
+      {
+        name: "Нижня сітка: Фінал лузерів",
+        matches: [
+          { id: "lb_2", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null }
+        ]
+      },
+      {
+        name: "Гранд-фінал",
+        matches: [
+          { id: "gf_1", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null }
+        ]
+      }
+    ];
+  }
+
+  db.brackets = {
+    type: selectedType,
+    format: selectedFormat,
+    rounds: rounds
+  };
+
+  saveDB(db);
+  showToast(`Турнірну сітку ${selectedType.toUpperCase()} згенеровано!`, "success");
+  renderAdminPanel();
+};
+
+// Render Bracket editor panels with select dropdowns
 function renderAdminBracketsEditor(brackets) {
   const container = document.getElementById('admin-brackets-editor-list');
   if (!container) return;
   container.innerHTML = "";
 
   if (!brackets || !brackets.rounds) {
-    container.innerHTML = "Сітка не налаштована.";
+    container.innerHTML = "Сітка не налаштована. Скористайтеся формою вище, щоб згенерувати сітку.";
     return;
   }
 
+  const db = getDB();
+  const format = brackets.format || '5x5';
+  const matchingTeams = (db.teams || []).filter(t => t.format === format);
+
   brackets.rounds.forEach((round, roundIdx) => {
     const div = document.createElement('div');
-    div.style.marginBottom = "15px";
-    div.style.borderBottom = "1px solid var(--border-color)";
-    div.style.paddingBottom = "10px";
+    div.style.marginBottom = "20px";
+    div.style.border = "1px solid var(--border-color)";
+    div.style.background = "rgba(255,255,255,0.01)";
+    div.style.borderRadius = "8px";
+    div.style.padding = "15px";
 
-    div.innerHTML = `<h5 style="color:var(--cs-orange); margin-bottom:8px; text-transform:uppercase; font-size:12px; font-weight:800;">${round.name}</h5>`;
+    div.innerHTML = `<h5 style="color:var(--cs-orange); margin: 0 0 12px 0; text-transform:uppercase; font-size:13px; font-weight:800; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:5px;">${round.name}</h5>`;
 
     round.matches.forEach((match, matchIdx) => {
       const matchBox = document.createElement('div');
       matchBox.style.display = "flex";
-      matchBox.style.gap = "8px";
+      matchBox.style.gap = "15px";
       matchBox.style.alignItems = "center";
-      matchBox.style.marginBottom = "8px";
+      matchBox.style.marginBottom = "10px";
       matchBox.style.background = "var(--bg-input)";
-      matchBox.style.padding = "8px";
-      matchBox.style.borderRadius = "6px";
+      matchBox.style.padding = "12px";
+      matchBox.style.borderRadius = "8px";
+
+      // Dropdown selects for Team 1
+      let selectT1 = `<select id="br-t1-${match.id}" class="form-input" style="padding:6px 10px; font-size:11px; width:100%; margin-bottom:6px;">`;
+      selectT1 += `<option value="">Очікується</option>`;
+      matchingTeams.forEach(t => {
+        const isSelected = (match.team1 && match.team1.toLowerCase() === t.name.toLowerCase()) ? 'selected' : '';
+        selectT1 += `<option value="${t.name}" ${isSelected}>${t.name}</option>`;
+      });
+      if (match.team1 && match.team1 !== 'Очікується' && !matchingTeams.some(t => t.name.toLowerCase() === match.team1.toLowerCase())) {
+        selectT1 += `<option value="${match.team1}" selected>${match.team1}</option>`;
+      }
+      selectT1 += `</select>`;
+
+      // Dropdown selects for Team 2
+      let selectT2 = `<select id="br-t2-${match.id}" class="form-input" style="padding:6px 10px; font-size:11px; width:100%; margin-bottom:6px;">`;
+      selectT2 += `<option value="">Очікується</option>`;
+      matchingTeams.forEach(t => {
+        const isSelected = (match.team2 && match.team2.toLowerCase() === t.name.toLowerCase()) ? 'selected' : '';
+        selectT2 += `<option value="${t.name}" ${isSelected}>${t.name}</option>`;
+      });
+      if (match.team2 && match.team2 !== 'Очікується' && !matchingTeams.some(t => t.name.toLowerCase() === match.team2.toLowerCase())) {
+        selectT2 += `<option value="${match.team2}" selected>${match.team2}</option>`;
+      }
+      selectT2 += `</select>`;
 
       matchBox.innerHTML = `
         <div style="flex:1;">
-          <input type="text" id="br-t1-${match.id}" class="form-input" value="${match.team1 || ''}" placeholder="Команда 1" style="padding:6px; font-size:11px; width:100%; margin-bottom:4px;">
-          <input type="number" id="br-s1-${match.id}" class="form-input" value="${match.score1}" placeholder="0" style="padding:6px; font-size:11px; width:100%;">
+          ${selectT1}
+          <input type="number" id="br-s1-${match.id}" class="form-input" value="${match.score1}" placeholder="0" style="padding:6px 10px; font-size:11px; width:100%;">
         </div>
-        <div style="font-size:11px; font-weight:800; color:var(--text-secondary);">VS</div>
+        <div style="font-size:12px; font-weight:900; color:var(--cs-orange); text-align:center;">VS</div>
         <div style="flex:1;">
-          <input type="text" id="br-t2-${match.id}" class="form-input" value="${match.team2 || ''}" placeholder="Команда 2" style="padding:6px; font-size:11px; width:100%; margin-bottom:4px;">
-          <input type="number" id="br-s2-${match.id}" class="form-input" value="${match.score2}" placeholder="0" style="padding:6px; font-size:11px; width:100%;">
+          ${selectT2}
+          <input type="number" id="br-s2-${match.id}" class="form-input" value="${match.score2}" placeholder="0" style="padding:6px 10px; font-size:11px; width:100%;">
         </div>
-        <button class="btn" style="padding: 10px 14px; font-size:11px; font-weight:800;" onclick="saveAdminBracketMatch('${match.id}', ${roundIdx}, ${matchIdx})">OK</button>
+        <button class="btn" style="padding: 12px 18px; font-size:12px; font-weight:800; background:linear-gradient(135deg, var(--cs-orange) 0%, #ff5500 100%);" onclick="saveAdminBracketMatch('${match.id}', ${roundIdx}, ${matchIdx})">OK</button>
       `;
       div.appendChild(matchBox);
     });
@@ -886,7 +1120,7 @@ function renderAdminBracketsEditor(brackets) {
   });
 }
 
-// Save Bracket Match and propagate winner
+// Save Bracket Match and propagate winner / loser dynamically
 window.saveAdminBracketMatch = function(matchId, roundIdx, matchIdx) {
   const db = getDB();
   const round = db.brackets.rounds[roundIdx];
@@ -902,29 +1136,84 @@ window.saveAdminBracketMatch = function(matchId, roundIdx, matchIdx) {
   match.team2 = t2;
   match.score2 = s2;
 
+  let winner = null;
+  let loser = null;
   if (t1 && t2) {
-    if (s1 > s2) match.winner = t1;
-    else if (s2 > s1) match.winner = t2;
-    else match.winner = null;
-  } else {
-    match.winner = null;
+    if (s1 > s2) {
+      winner = t1;
+      loser = t2;
+    } else if (s2 > s1) {
+      winner = t2;
+      loser = t1;
+    }
   }
+  match.winner = winner;
 
-  // Autopropagate to next round if available
-  if (db.brackets.rounds.length > roundIdx + 1) {
-    const nextRound = db.brackets.rounds[roundIdx + 1];
-    const nextMatchIdx = Math.floor(matchIdx / 2);
-    const nextMatch = nextRound.matches[nextMatchIdx];
-    
-    if (matchIdx % 2 === 0) {
-      nextMatch.team1 = match.winner;
-    } else {
-      nextMatch.team2 = match.winner;
+  const type = db.brackets.type;
+
+  if (type === 'double-4') {
+    const findMatch = (id) => {
+      for (let r of db.brackets.rounds) {
+        let m = r.matches.find(item => item.id === id);
+        if (m) return m;
+      }
+      return null;
+    };
+
+    const ub_1 = findMatch('ub_1');
+    const ub_2 = findMatch('ub_2');
+    const ub_3 = findMatch('ub_3');
+    const lb_1 = findMatch('lb_1');
+    const lb_2 = findMatch('lb_2');
+    const gf_1 = findMatch('gf_1');
+
+    if (matchId === 'ub_1') {
+      if (ub_3) ub_3.team1 = winner;
+      if (lb_1) lb_1.team1 = loser;
+    } else if (matchId === 'ub_2') {
+      if (ub_3) ub_3.team2 = winner;
+      if (lb_1) lb_1.team2 = loser;
+    } else if (matchId === 'lb_1') {
+      if (lb_2) lb_2.team1 = winner;
+    } else if (matchId === 'ub_3') {
+      if (gf_1) gf_1.team1 = winner;
+      if (lb_2) lb_2.team2 = loser;
+    } else if (matchId === 'lb_2') {
+      if (gf_1) gf_1.team2 = winner;
+    }
+  } else if (type === 'single-4') {
+    if (roundIdx === 0) {
+      const nextRound = db.brackets.rounds[1];
+      const nextMatch = nextRound.matches[0];
+      if (matchIdx === 0) {
+        nextMatch.team1 = winner;
+      } else {
+        nextMatch.team2 = winner;
+      }
+    }
+  } else if (type === 'single-8') {
+    if (roundIdx === 0) {
+      const nextRound = db.brackets.rounds[1];
+      const nextMatch = nextRound.matches[Math.floor(matchIdx / 2)];
+      if (matchIdx % 2 === 0) {
+        nextMatch.team1 = winner;
+      } else {
+        nextMatch.team2 = winner;
+      }
+    } else if (roundIdx === 1) {
+      const nextRound = db.brackets.rounds[2];
+      const nextMatch = nextRound.matches[0];
+      if (matchIdx === 0) {
+        nextMatch.team1 = winner;
+      } else {
+        nextMatch.team2 = winner;
+      }
     }
   }
 
   saveDB(db);
-  showToast("Турнірну сітку оновлено!", "success");
+  showToast("Турнірну сітку оновлено та просунуто переможців!", "success");
+  renderAdminPanel();
 };
 
 // Render registered User Teams list card
@@ -934,7 +1223,7 @@ function renderAdminUserTeamsList(teams) {
   container.innerHTML = "";
 
   if (teams.length === 0) {
-    container.innerHTML = `<span style="color:var(--text-secondary); font-size:11px; text-align:center; display:block; padding:10px; background:var(--bg-input); border-radius:6px; border:1px dashed var(--border-color);">Команд 5х5 не створено</span>`;
+    container.innerHTML = `<span style="color:var(--text-secondary); font-size:11px; text-align:center; display:block; padding:10px; background:var(--bg-input); border-radius:6px; border:1px dashed var(--border-color);">Команд не створено</span>`;
     return;
   }
 
@@ -946,14 +1235,21 @@ function renderAdminUserTeamsList(teams) {
     div.style.border = "1px solid var(--border-color)";
     div.style.fontSize = "12px";
     div.style.lineHeight = "1.5";
+    div.style.marginBottom = "8px";
 
     div.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
         <strong style="color:var(--cs-orange); font-size:13px;">${team.name} [${team.tag}]</strong>
-        <span style="font-size:10px; color:var(--text-secondary);">Власник: ${team.owner.toUpperCase()}</span>
+        <div>
+          <span style="font-size:10px; color:var(--text-secondary); margin-right:8px;">Формат: ${team.format}</span>
+          <button class="btn btn-danger" style="padding:2px 6px; font-size:9px;" onclick="deleteTeamAdmin('${team.id}')">Видалити</button>
+        </div>
       </div>
-      <div style="color:white; font-size:11px; font-family:monospace; opacity:0.8;">
+      <div style="color:white; font-size:11px; font-family:monospace; opacity:0.8; margin-bottom:5px;">
         Склад: ${team.players.join(', ')}
+      </div>
+      <div style="font-size:10px; color:var(--text-secondary);">
+        Власник: ${team.owner.toUpperCase()}
       </div>
     `;
     container.appendChild(div);

@@ -1213,102 +1213,226 @@ function renderBracketsTree(brackets) {
     return;
   }
 
-  // Check if at least one match has been configured (i.e. has at least one real team that is not empty and not "Очікується")
-  let hasAnyConfiguredMatch = false;
-  brackets.rounds.forEach(round => {
-    round.matches.forEach(match => {
-      const t1 = match.team1;
-      const t2 = match.team2;
-      const isT1Active = t1 && t1.trim() !== "" && t1 !== "Очікується";
-      const isT2Active = t2 && t2.trim() !== "" && t2 !== "Очікується";
-      if (isT1Active || isT2Active) {
-        hasAnyConfiguredMatch = true;
-      }
-    });
-  });
+  // Render Format badge dynamically
+  const formatBadge = document.getElementById('tournament-format-badge');
+  if (formatBadge) {
+    formatBadge.innerText = `ФОРМАТ: ${brackets.format || '5x5'}`;
+  }
 
-  if (!hasAnyConfiguredMatch) {
-    // Show a premium dark esports empty state banner
-    container.innerHTML = `
-      <div class="empty-bracket-state" style="width:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:50px 30px; text-align:center; background:rgba(30, 31, 42, 0.4); border:1px dashed var(--border-color); border-radius:12px; box-shadow:inset 0 0 20px rgba(0,0,0,0.5);">
-        <div style="font-size:48px; margin-bottom:15px; filter: drop-shadow(0 0 10px rgba(255,90,0,0.3)); animation: float 3s ease-in-out infinite;">🏆</div>
-        <h3 style="color:white; font-size:16px; font-weight:800; text-transform:uppercase; margin-bottom:10px; letter-spacing:1px;">Турнірна сітка очікує старту</h3>
-        <p style="color:var(--text-secondary); font-size:12px; max-width:420px; line-height:1.6; margin:0;">
-          Матчі з'являться тут після того, як адміністратор внесе їх до сітки у панелі керування. Слідкуйте за оновленнями!
-        </p>
+  // Helper to render a single match node
+  const createMatchNode = (match) => {
+    const node = document.createElement('div');
+    node.className = "bracket-match-node";
+    node.style.cursor = "pointer";
+    
+    const t1 = match.team1 || 'Очікується';
+    const t2 = match.team2 || 'Очікується';
+    
+    const isT1Active = t1 !== 'Очікується' && t1.trim() !== "";
+    const isT2Active = t2 !== 'Очікується' && t2.trim() !== "";
+    
+    const t1Winner = match.winner === t1 && isT1Active;
+    const t2Winner = match.winner === t2 && isT2Active;
+    const hasWinner = match.winner !== null;
+    
+    if (match.winner === null && isT1Active && isT2Active) {
+      node.classList.add('active-highlight');
+    }
+    
+    node.innerHTML = `
+      <div class="bracket-node-team ${hasWinner ? (t1Winner ? 'winner' : 'loser') : ''}" onclick="event.stopPropagation(); inspectTeamRoster('${t1}')">
+        <span style="font-weight: 700;">${t1}</span>
+        <span style="font-weight:800; font-family:'Roboto Mono';">${match.score1}</span>
+      </div>
+      <div class="bracket-node-team ${hasWinner ? (t2Winner ? 'winner' : 'loser') : ''}" onclick="event.stopPropagation(); inspectTeamRoster('${t2}')">
+        <span style="font-weight: 700;">${t2}</span>
+        <span style="font-weight:800; font-family:'Roboto Mono';">${match.score2}</span>
       </div>
     `;
+    return node;
+  };
+
+  // 1. DOUBLE ELIMINATION (4 TEAMS) VISUAL RENDERING FLOW
+  if (brackets.type === 'double-4') {
+    container.style.display = "flex";
+    container.style.flexDirection = "column";
+    container.style.gap = "25px";
+    
+    // Locate match slots from rounds
+    const ub_1 = brackets.rounds[0].matches[0];
+    const ub_2 = brackets.rounds[0].matches[1];
+    const ub_3 = brackets.rounds[1].matches[0];
+    const lb_1 = brackets.rounds[2].matches[0];
+    const lb_2 = brackets.rounds[3].matches[0];
+    const gf_1 = brackets.rounds[4].matches[0];
+    
+    // Upper Bracket Wrapper
+    const ubSection = document.createElement('div');
+    ubSection.innerHTML = `<div style="font-size:11px; font-weight:800; color:var(--cs-orange); margin-bottom:12px; text-transform:uppercase; letter-spacing:1px; border-left:3px solid var(--cs-orange); padding-left:8px; display:inline-block;">ВЕРХНЯ СІТКА (UPPER BRACKET)</div>`;
+    
+    const ubGrid = document.createElement('div');
+    ubGrid.style.display = "flex";
+    ubGrid.style.gap = "25px";
+    ubGrid.style.alignItems = "center";
+    
+    const colUB1 = document.createElement('div');
+    colUB1.className = "bracket-round-column";
+    colUB1.innerHTML = `<div style="font-size:10px; color:var(--text-secondary); font-weight:800; text-transform:uppercase; margin-bottom:8px; text-align:center;">Півфінали</div>`;
+    colUB1.appendChild(createMatchNode(ub_1));
+    colUB1.appendChild(createMatchNode(ub_2));
+    
+    const colUB2 = document.createElement('div');
+    colUB2.className = "bracket-round-column";
+    colUB2.innerHTML = `<div style="font-size:10px; color:var(--text-secondary); font-weight:800; text-transform:uppercase; margin-bottom:8px; text-align:center;">Фінал</div>`;
+    colUB2.appendChild(createMatchNode(ub_3));
+    
+    ubGrid.appendChild(colUB1);
+    ubGrid.appendChild(colUB2);
+    ubSection.appendChild(ubGrid);
+    
+    // Lower Bracket Wrapper
+    const lbSection = document.createElement('div');
+    lbSection.style.marginTop = "10px";
+    lbSection.innerHTML = `<div style="font-size:11px; font-weight:800; color:#ff1a40; margin-bottom:12px; text-transform:uppercase; letter-spacing:1px; border-left:3px solid #ff1a40; padding-left:8px; display:inline-block;">НИЖНЯ СІТКА (LOWER BRACKET)</div>`;
+    
+    const lbGrid = document.createElement('div');
+    lbGrid.style.display = "flex";
+    lbGrid.style.gap = "25px";
+    lbGrid.style.alignItems = "center";
+    
+    const colLB1 = document.createElement('div');
+    colLB1.className = "bracket-round-column";
+    colLB1.innerHTML = `<div style="font-size:10px; color:var(--text-secondary); font-weight:800; text-transform:uppercase; margin-bottom:8px; text-align:center;">Раунд 1</div>`;
+    colLB1.appendChild(createMatchNode(lb_1));
+    
+    const colLB2 = document.createElement('div');
+    colLB2.className = "bracket-round-column";
+    colLB2.innerHTML = `<div style="font-size:10px; color:var(--text-secondary); font-weight:800; text-transform:uppercase; margin-bottom:8px; text-align:center;">Фінал лузерів</div>`;
+    colLB2.appendChild(createMatchNode(lb_2));
+    
+    lbGrid.appendChild(colLB1);
+    lbGrid.appendChild(colLB2);
+    lbSection.appendChild(lbGrid);
+    
+    // Grand Final Wrapper
+    const gfSection = document.createElement('div');
+    gfSection.style.marginTop = "10px";
+    gfSection.innerHTML = `<div style="font-size:11px; font-weight:800; color:#ffb703; margin-bottom:12px; text-transform:uppercase; letter-spacing:1px; border-left:3px solid #ffb703; padding-left:8px; display:inline-block;">ГРАНД-ФІНАЛ</div>`;
+    
+    const gfGrid = document.createElement('div');
+    gfGrid.style.display = "flex";
+    gfGrid.style.gap = "25px";
+    gfGrid.style.alignItems = "center";
+    
+    const colGF = document.createElement('div');
+    colGF.className = "bracket-round-column";
+    colGF.innerHTML = `<div style="font-size:10px; color:var(--text-secondary); font-weight:800; text-transform:uppercase; margin-bottom:8px; text-align:center;">Гранд-фінал</div>`;
+    colGF.appendChild(createMatchNode(gf_1));
+    
+    gfGrid.appendChild(colGF);
+    gfSection.appendChild(gfGrid);
+    
+    container.appendChild(ubSection);
+    container.appendChild(lbSection);
+    container.appendChild(gfSection);
     return;
   }
 
-  // If there are configured matches, render columns
+  // 2. SINGLE ELIMINATION (4 / 8 TEAMS) RENDERING FLOW
+  container.style.display = "flex";
+  container.style.flexDirection = "row";
+  container.style.gap = "25px";
+  container.style.alignItems = "center";
+
   brackets.rounds.forEach(round => {
     const col = document.createElement('div');
     col.className = "bracket-round-column";
 
     const title = document.createElement('div');
-    title.style.fontSize = "11px";
+    title.style.fontSize = "10px";
     title.style.textTransform = "uppercase";
     title.style.color = "var(--text-secondary)";
     title.style.fontWeight = "800";
     title.style.textAlign = "center";
-    title.style.marginBottom = "5px";
+    title.style.marginBottom = "8px";
     title.innerText = round.name;
     col.appendChild(title);
 
-    let renderedAnyMatch = false;
-
     round.matches.forEach(match => {
-      const t1 = match.team1;
-      const t2 = match.team2;
-      const isT1Active = t1 && t1.trim() !== "" && t1 !== "Очікується";
-      const isT2Active = t2 && t2.trim() !== "" && t2 !== "Очікується";
-
-      // Only render the match node if it has been added by the admin
-      if (isT1Active || isT2Active) {
-        renderedAnyMatch = true;
-        const node = document.createElement('div');
-        node.className = "bracket-match-node";
-        
-        const t1Winner = match.winner === match.team1;
-        const t2Winner = match.winner === match.team2;
-        const hasWinner = match.winner !== null;
-
-        const isActive = match.winner === null && isT1Active && isT2Active;
-        if (isActive) {
-          node.classList.add('active-highlight');
-        }
-
-        node.innerHTML = `
-          <div class="bracket-node-team ${hasWinner ? (t1Winner ? 'winner' : 'loser') : ''}">
-            <span>${match.team1 || 'Очікується'}</span>
-            <span style="font-weight:800; font-family:'Roboto Mono';">${match.score1}</span>
-          </div>
-          <div class="bracket-node-team ${hasWinner ? (t2Winner ? 'winner' : 'loser') : ''}">
-            <span>${match.team2 || 'Очікується'}</span>
-            <span style="font-weight:800; font-family:'Roboto Mono';">${match.score2}</span>
-          </div>
-        `;
-        col.appendChild(node);
-      }
+      col.appendChild(createMatchNode(match));
     });
-
-    if (!renderedAnyMatch) {
-      const placeholder = document.createElement('div');
-      placeholder.style.fontSize = "11px";
-      placeholder.style.color = "var(--text-secondary)";
-      placeholder.style.textAlign = "center";
-      placeholder.style.padding = "20px 10px";
-      placeholder.style.border = "1px dashed rgba(255,255,255,0.08)";
-      placeholder.style.borderRadius = "8px";
-      placeholder.style.opacity = "0.5";
-      placeholder.innerText = "Очікується розклад";
-      col.appendChild(placeholder);
-    }
 
     container.appendChild(col);
   });
 }
+
+// Global inspect team players roster modal display
+window.inspectTeamRoster = function(teamName) {
+  if (!teamName || teamName === "" || teamName === "Очікується") return;
+  const db = getDB();
+  const team = db.teams.find(t => t.name.toLowerCase() === teamName.toLowerCase());
+  
+  const modal = document.getElementById('roster-modal');
+  const title = document.getElementById('roster-modal-title');
+  const tag = document.getElementById('roster-modal-tag');
+  const playersContainer = document.getElementById('roster-modal-players');
+  
+  if (!modal || !title || !tag || !playersContainer) return;
+  
+  title.innerText = teamName.toUpperCase();
+  
+  if (team) {
+    tag.style.display = 'inline-block';
+    tag.innerText = team.tag.toUpperCase();
+    playersContainer.innerHTML = "";
+    
+    team.players.forEach((player, idx) => {
+      const pDiv = document.createElement('div');
+      pDiv.style.display = "flex";
+      pDiv.style.justifyContent = "space-between";
+      pDiv.style.alignItems = "center";
+      pDiv.style.padding = "10px 12px";
+      pDiv.style.background = "rgba(255,255,255,0.02)";
+      pDiv.style.border = "1px solid rgba(255,255,255,0.05)";
+      pDiv.style.borderRadius = "6px";
+      pDiv.style.fontSize = "13px";
+      pDiv.style.color = "white";
+      
+      pDiv.innerHTML = `
+        <span style="font-weight:700; color:var(--text-secondary);">${idx + 1}.</span>
+        <span style="font-weight:800; color:white; font-family:monospace;">${player}</span>
+        <span style="font-size:11px; opacity:0.6; color:var(--cs-orange);">ACTIVE</span>
+      `;
+      playersContainer.appendChild(pDiv);
+    });
+  } else {
+    // Elegant stand-by standby elements if the team record is not yet in the DB
+    tag.style.display = 'none';
+    playersContainer.innerHTML = "";
+    const mockPlayers = ["Гравець 1", "Гравець 2", "Гравець 3", "Гравець 4", "Гравець 5"];
+    mockPlayers.forEach((player, idx) => {
+      const pDiv = document.createElement('div');
+      pDiv.style.display = "flex";
+      pDiv.style.justifyContent = "space-between";
+      pDiv.style.alignItems = "center";
+      pDiv.style.padding = "10px 12px";
+      pDiv.style.background = "rgba(255,255,255,0.02)";
+      pDiv.style.border = "1px solid rgba(255,255,255,0.05)";
+      pDiv.style.borderRadius = "6px";
+      pDiv.style.fontSize = "13px";
+      pDiv.style.color = "white";
+      
+      pDiv.innerHTML = `
+        <span style="font-weight:700; color:var(--text-secondary);">${idx + 1}.</span>
+        <span style="font-weight:800; color:white; opacity:0.5; font-family:monospace;">${player}</span>
+        <span style="font-size:11px; opacity:0.4;">STANDBY</span>
+      `;
+      playersContainer.appendChild(pDiv);
+    });
+  }
+  
+  openModal('roster-modal');
+};
 
 // ==========================================
 // PAGE ACTIONS: profile.html
