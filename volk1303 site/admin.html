@@ -378,15 +378,15 @@
 
       <!-- Tournament Roster Management Modal -->
       <div id="tournament-roster-modal" class="modal-overlay">
-        <div class="modal-content" style="max-width: 760px; border-color: var(--cs-orange);">
-          <button class="modal-close" onclick="closeModal('tournament-roster-modal')">&times;</button>
-          <div class="modal-title">🛡️ Керування слотами та учасниками</div>
-          <div style="font-size:12px; color:var(--text-secondary); margin-bottom:15px;" id="roster-modal-desc">
-            Формат: <strong style="color:white;" id="roster-format-val">5x5</strong> | Заповнено слотів: <strong style="color:var(--cs-orange);" id="roster-count-val">0/4</strong>. Керуйте командами та складами гравців безпосередньо у слотах нижче.
+        <div class="modal-content" style="max-width: 900px; width: 95%; border-color: var(--cs-orange); box-shadow: 0 0 25px rgba(255, 90, 0, 0.25); border-radius: 12px; padding: 24px;">
+          <button class="modal-close" onclick="closeModal('tournament-roster-modal')" style="font-size: 28px; top: 15px; right: 20px;">&times;</button>
+          <div class="modal-title" style="font-size: 20px; font-weight: 800; color: white; display: flex; align-items: center; gap: 8px;">🛡️ Керування слотами та учасниками</div>
+          <div style="font-size: 13px; color: var(--text-secondary); margin-top: 6px; margin-bottom: 20px;" id="roster-modal-desc">
+            Формат гри: <strong style="color: white; background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px;" id="roster-format-val">5x5</strong> &nbsp;|&nbsp; Заповнено слотів: <strong style="color: var(--cs-orange); background: rgba(255, 90, 0, 0.1); padding: 2px 6px; border-radius: 4px;" id="roster-count-val">0/4</strong>. Керуйте командами та складами гравців безпосередньо у слотах нижче.
           </div>
 
           <!-- Slots Container -->
-          <div id="roster-slots-container" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap:12px; max-height:560px; overflow-y:auto; padding-right:5px; padding-bottom:5px;">
+          <div id="roster-slots-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 16px; max-height: 620px; overflow-y: auto; padding-right: 5px; padding-bottom: 5px;">
             <!-- Filled dynamically by JS -->
           </div>
         </div>
