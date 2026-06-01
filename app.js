@@ -717,8 +717,7 @@ function handleLoginSubmit() {
 }
 
 // Handle Registration Form Submit
-function handleRegisterSubmit() {
-  const db = getDB();
+async function handleRegisterSubmit() {
   const email = document.getElementById('reg-email').value.trim();
   const username = document.getElementById('reg-username').value.trim().toLowerCase();
   const password = document.getElementById('reg-password').value;
@@ -739,17 +738,55 @@ function handleRegisterSubmit() {
     return;
   }
 
-  // Duplicate username check
+  // Visual feedback to prevent double-clicks
+  const submitBtn = document.querySelector('#register-form .auth-submit-btn');
+  const originalBtnText = submitBtn.innerText;
+  submitBtn.disabled = true;
+  submitBtn.innerText = "ПЕРЕВІРКА ДАНИХ...";
+
+  let latestUsers = [];
+  try {
+    // Force pull fresh database users list from KVDB to prevent race-condition duplicates
+    const res = await fetch(CLOUD_BUCKET + 'users', { cache: 'no-store' });
+    if (res.ok) {
+      latestUsers = await res.json();
+    }
+  } catch (e) {
+    console.error("Помилка синхронізації при перевірці дублікатів:", e);
+  }
+
+  const db = getDB();
+  
+  // Merge any missing users to ensure local DB matches cloud
+  if (Array.isArray(latestUsers)) {
+    let dbChanged = false;
+    latestUsers.forEach(cu => {
+      const exists = db.users.some(u => u.username.toLowerCase() === cu.username.toLowerCase());
+      if (!exists) {
+        db.users.push(cu);
+        dbChanged = true;
+      }
+    });
+    if (dbChanged) {
+      localStorage.setItem(DB_KEY, JSON.stringify(db));
+    }
+  }
+
+  // Check duplicate username
   const duplicate = db.users.find(u => u.username === username);
   if (duplicate) {
     showToast("Цей нікнейм вже зайнятий!", "error");
+    submitBtn.disabled = false;
+    submitBtn.innerText = originalBtnText;
     return;
   }
 
-  // Duplicate email check
+  // Check duplicate email
   const dupEmail = db.users.find(u => u.email.toLowerCase() === email.toLowerCase());
   if (dupEmail) {
     showToast("Ця пошта вже зареєстрована!", "error");
+    submitBtn.disabled = false;
+    submitBtn.innerText = originalBtnText;
     return;
   }
 
@@ -776,7 +813,11 @@ function handleRegisterSubmit() {
   db.users.push(newUser);
   db.currentUser = username;
   sessionStorage.setItem('logged_visit_' + username, 'true');
-  saveDB(db);
+  
+  await saveDB(db);
+
+  submitBtn.disabled = false;
+  submitBtn.innerText = originalBtnText;
 
   showToast("Акаунт створено! Ви отримали 50 поінтів.", "success");
 

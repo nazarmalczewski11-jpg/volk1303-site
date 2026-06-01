@@ -699,10 +699,32 @@ window.deletePromocodeAdmin = function(code) {
   showToast(`Промокод ${code} видалено!`, "success");
 };
 
+// Memory state for tracking registered usernames
+let knownUsernames = null;
+
+function checkNewRegistrations(db) {
+  if (!db || !db.users) return;
+  const currentNames = db.users.map(u => u.username.toLowerCase());
+  
+  if (knownUsernames !== null) {
+    db.users.forEach(u => {
+      const uname = u.username.toLowerCase();
+      if (uname !== 'admin' && !knownUsernames.has(uname)) {
+        showToast(`🔔 Новий гравець @${u.username.toUpperCase()} зареєструвався на сайті!`, 'success');
+      }
+    });
+  }
+  
+  knownUsernames = new Set(currentNames);
+}
+
 // Render Admin Panels
 function renderAdminPanel() {
   const db = getDB();
   if (!db) return;
+
+  // Track and notify about new registrations in real-time
+  checkNewRegistrations(db);
 
   // Header display
   const adminName = document.getElementById('sidebar-admin-username');
@@ -775,8 +797,10 @@ function renderDashboardOpsLog(db) {
   // Compile registrations
   db.users.forEach(u => {
     if (u && u.username && u.username !== 'admin') {
+      const regEvent = u.loginHistory ? u.loginHistory.find(h => h.type === 'register') : null;
+      const regTime = regEvent ? regEvent.date : "2026-06-01 12:00";
       events.push({
-        time: "2026-06-01 12:00", // Baseline date
+        time: regTime,
         tag: "reg",
         text: `Новий гравець <strong>${u.username.toUpperCase()}</strong> зареєструвався в системі`
       });
