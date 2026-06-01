@@ -3,10 +3,11 @@ const DB_KEY = 'volk_site_v4';
 const CLOUD_BUCKET = 'https://kvdb.io/RewyBV3ePoEzaKv2H17apy/';
 
 let isSyncing = false;
+let activePushes = 0;
 
 // Pull and sync from cloud
 async function syncWithCloud() {
-  if (isSyncing) return;
+  if (isSyncing || activePushes > 0) return;
   isSyncing = true;
   
   const db = getDB();
@@ -221,6 +222,7 @@ window.syncWithCloud = syncWithCloud;
 
 // Push local changes to cloud
 async function pushToCloud(db) {
+  activePushes++;
   try {
     await Promise.all([
       fetch(CLOUD_BUCKET + 'users', { method: 'POST', body: JSON.stringify(db.users) }),
@@ -239,6 +241,8 @@ async function pushToCloud(db) {
     ]);
   } catch (e) {
     console.error("Failed to push to cloud:", e);
+  } finally {
+    activePushes = Math.max(0, activePushes - 1);
   }
 }
 
@@ -2395,7 +2399,7 @@ window.saveTournamentAdmin = function() {
     tour.status = status;
     
     // If maximum teams changed, initialize new brackets
-    if (tour.maxTeams !== maxTeams || tour.system !== system) {
+    if (parseInt(tour.maxTeams, 10) !== parseInt(maxTeams, 10) || tour.system !== system) {
       tour.maxTeams = maxTeams;
       tour.system = system;
       tour.brackets = generateBracketStructure(maxTeams, system);
@@ -2693,6 +2697,29 @@ window.selectExistingTeamForSlot = function(slotIndex) {
   if (!tour) return;
 
   if (!tour.registeredTeams) tour.registeredTeams = [];
+
+  // Exclusivity validation: one player cannot be in two teams in the same tournament
+  if (teamId) {
+    const selectedTeam = db.teams.find(t => t.id === teamId);
+    if (selectedTeam && selectedTeam.players && selectedTeam.players.length > 0) {
+      const selectedPlayersLower = selectedTeam.players.map(p => p.toLowerCase());
+      for (let i = 0; i < tour.registeredTeams.length; i++) {
+        if (i === slotIndex) continue; // Skip the slot being overwritten
+        const otherTeamId = tour.registeredTeams[i];
+        if (!otherTeamId || otherTeamId === teamId) continue;
+        const otherTeam = db.teams.find(t => t.id === otherTeamId);
+        if (otherTeam && otherTeam.players) {
+          for (const p of otherTeam.players) {
+            if (selectedPlayersLower.includes(p.toLowerCase())) {
+              showToast(`Помилка: Гравець @${p.toUpperCase()} вже бере участь у цьому турнірі в складі команди "${otherTeam.name}"!`, "error");
+              return;
+            }
+          }
+        }
+      }
+    }
+  }
+
   tour.registeredTeams[slotIndex] = teamId;
 
   rebuildBracketTeamSlots(tour);
@@ -2838,6 +2865,21 @@ window.addPlayerToSlotTeam = function(teamId, username) {
   if (team.players.includes(userNickLower)) {
     showToast("Цей гравець вже є у команді!", "error");
     return;
+  }
+
+  // Exclusivity validation: one player cannot be in two teams in the same tournament
+  const tour = db.tournaments.find(t => t.id === activeRosterTournamentId);
+  if (tour && tour.registeredTeams) {
+    for (const regTeamId of tour.registeredTeams) {
+      if (!regTeamId || regTeamId === teamId) continue;
+      const otherTeam = db.teams.find(t => t.id === regTeamId);
+      if (otherTeam && otherTeam.players) {
+        if (otherTeam.players.map(p => p.toLowerCase()).includes(userNickLower)) {
+          showToast(`Помилка: Гравець @${username.toUpperCase()} вже бере участь у цьому турнірі в складі команди "${otherTeam.name}"!`, "error");
+          return;
+        }
+      }
+    }
   }
 
   team.players.push(userNickLower);
