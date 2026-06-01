@@ -2915,13 +2915,59 @@ window.placeTournamentBet = function(tourId, teamId, teamName, odds) {
     return;
   }
 
-  const amountStr = prompt(`Ставка на команду "${teamName}" (коеф. x${odds})\nВаш баланс: ${user.balance} 🪙\nВведіть суму ставки:`);
-  if (!amountStr) return;
-  const amount = parseInt(amountStr);
+  // Prepopulate the bet modal
+  document.getElementById('bet-modal-tour-id').value = tourId;
+  document.getElementById('bet-modal-team-id').value = teamId;
+  document.getElementById('bet-modal-team-name').innerText = teamName;
+  document.getElementById('bet-modal-odds').innerText = 'x' + odds.toFixed(2);
+  document.getElementById('bet-modal-balance').innerText = user.balance;
+  document.getElementById('bet-modal-amount').value = '';
+  document.getElementById('bet-modal-amount').max = user.balance;
+  document.getElementById('bet-modal-payout').innerText = '0 🪙';
+  
+  // Save odds in element data attribute for easy payout calculation
+  document.getElementById('bet-modal-odds').dataset.odds = odds;
+
+  openModal('bet-modal');
+};
+
+window.calculateBetModalPayout = function() {
+  const amount = parseFloat(document.getElementById('bet-modal-amount').value) || 0;
+  const odds = parseFloat(document.getElementById('bet-modal-odds').dataset.odds) || 0;
+  const payout = Math.round(amount * odds);
+  document.getElementById('bet-modal-payout').innerText = payout + ' 🪙';
+};
+
+window.submitBetModalForm = function(event) {
+  event.preventDefault();
+  const db = getDB();
+  const tourId = document.getElementById('bet-modal-tour-id').value;
+  const teamId = document.getElementById('bet-modal-team-id').value;
+  const teamName = document.getElementById('bet-modal-team-name').innerText;
+  const odds = parseFloat(document.getElementById('bet-modal-odds').dataset.odds) || 0;
+  
+  const amountInput = document.getElementById('bet-modal-amount');
+  const amount = parseInt(amountInput.value, 10);
+  
+  const tour = db.tournaments.find(t => t.id === tourId);
+  if (!tour) {
+    showToast('Турнір не знайдено!', 'error');
+    closeModal('bet-modal');
+    return;
+  }
+
+  const user = db.users.find(u => u.username === db.currentUser);
+  if (!user) {
+    showToast('Увійдіть в акаунт для ставки!', 'error');
+    closeModal('bet-modal');
+    return;
+  }
+
   if (isNaN(amount) || amount < 1) {
     showToast('Введіть коректну суму!', 'error');
     return;
   }
+
   if (amount > user.balance) {
     showToast('Недостатньо монет на балансі!', 'error');
     return;
@@ -2943,6 +2989,7 @@ window.placeTournamentBet = function(tourId, teamId, teamName, odds) {
   });
 
   saveDB(db);
+  closeModal('bet-modal');
   showToast(`Ставку ${amount} 🪙 на "${teamName}" (x${odds}) прийнято!`, 'success');
   renderTournamentBettingPortal(tourId);
 };
