@@ -1351,7 +1351,88 @@ window.generateNewBracket = function() {
   renderAdminPanel();
 };
 
-// Render Bracket editor panels with select dropdowns
+// =============================================
+// v2 PANNABLE BRACKET HELPERS — admin.js
+// =============================================
+
+/** Draw SVG bracket connector line */
+function _adminDrawLine(svg, x1, y1, x2, y2) {
+  const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+  line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+  line.setAttribute('stroke', 'rgba(255,255,255,0.1)');
+  line.setAttribute('stroke-width', '2');
+  line.setAttribute('stroke-linecap', 'round');
+  svg.appendChild(line);
+}
+
+/** Attach mouse/touch panning to a bracket canvas */
+function _adminAddPan(wrapper, inner) {
+  let dragging = false, panX = 0, panY = 0, sx = 0, sy = 0;
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const apply = () => { inner.style.transform = `translate(${panX}px,${panY}px)`; };
+
+  wrapper.addEventListener('mousedown', e => {
+    if (e.button !== 0 || e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
+    dragging = true; sx = e.clientX - panX; sy = e.clientY - panY;
+    wrapper.style.cursor = 'grabbing'; e.preventDefault();
+  });
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const iW = parseFloat(inner.style.width) || inner.scrollWidth;
+    const iH = parseFloat(inner.style.height) || inner.scrollHeight;
+    panX = clamp(e.clientX - sx, Math.min(0, wrapper.clientWidth  - iW), 0);
+    panY = clamp(e.clientY - sy, Math.min(0, wrapper.clientHeight - iH), 0);
+    apply();
+  });
+  document.addEventListener('mouseup', () => { dragging = false; wrapper.style.cursor = 'grab'; });
+}
+
+/** Build an editable match node for the admin bracket canvas */
+function _createAdminMatchNode(match, roundIdx, matchIdx, teams) {
+  const node = document.createElement('div');
+  node.className = 'bracket-match-node-v2';
+  node.style.cursor = 'default';
+
+  if (!match) {
+    node.style.opacity = '0.4';
+    node.innerHTML = `
+      <div class="bracket-team"><span>Очікується</span></div>
+      <div class="bracket-team"><span>Очікується</span></div>`;
+    return node;
+  }
+
+  // Build team option lists
+  const makeOpts = (selected) => {
+    let opts = `<option value="">Очікується</option>`;
+    teams.forEach(t => {
+      const sel = selected && selected.toLowerCase() === t.name.toLowerCase() ? 'selected' : '';
+      opts += `<option value="${t.name}" ${sel}>${t.name}</option>`;
+    });
+    // Add custom value if not in list
+    if (selected && selected !== 'Очікується' && !teams.some(t => t.name.toLowerCase() === selected.toLowerCase())) {
+      opts += `<option value="${selected}" selected>${selected}</option>`;
+    }
+    return opts;
+  };
+
+  node.innerHTML = `
+    <div style="padding:7px 9px;display:flex;gap:6px;align-items:center;border-bottom:1px solid rgba(255,255,255,0.06);">
+      <select id="br-t1-${match.id}" class="form-input" style="flex:1;padding:5px 7px;font-size:10px;min-width:0;">${makeOpts(match.team1)}</select>
+      <input type="number" id="br-s1-${match.id}" class="form-input" value="${match.score1}" style="width:40px;padding:5px 5px;font-size:11px;font-weight:800;text-align:center;flex-shrink:0;">
+    </div>
+    <div style="text-align:center;padding:2px 0;font-size:9px;font-weight:900;color:var(--cs-orange);letter-spacing:1.5px;">VS</div>
+    <div style="padding:7px 9px;display:flex;gap:6px;align-items:center;border-bottom:1px solid rgba(255,255,255,0.06);">
+      <select id="br-t2-${match.id}" class="form-input" style="flex:1;padding:5px 7px;font-size:10px;min-width:0;">${makeOpts(match.team2)}</select>
+      <input type="number" id="br-s2-${match.id}" class="form-input" value="${match.score2}" style="width:40px;padding:5px 5px;font-size:11px;font-weight:800;text-align:center;flex-shrink:0;">
+    </div>
+    <div style="padding:7px 9px;">
+      <button class="btn" style="width:100%;padding:6px 10px;font-size:10px;font-weight:800;letter-spacing:0.5px;" onclick="saveAdminBracketMatch('${match.id}',${roundIdx},${matchIdx})">✓ ЗБЕРЕГТИ</button>
+    </div>`;
+  return node;
+}
+
+// Render Admin Bracket editor — visual pannable canvas with inline editing
 function renderAdminBracketsEditor(brackets) {
   // Update demo tournament controls display status
   const db = getDB();
@@ -1363,7 +1444,6 @@ function renderAdminBracketsEditor(brackets) {
       statusBadge.style.background = "rgba(0, 255, 102, 0.1)";
       statusBadge.style.color = "#00ff66";
       statusBadge.style.borderColor = "rgba(0, 255, 102, 0.3)";
-      
       toggleBtn.innerText = "🛑 ЗУПИНИТИ СИМУЛЯЦІЮ";
       toggleBtn.style.background = "rgba(255, 26, 64, 0.15)";
       toggleBtn.style.color = "#ff1a40";
@@ -1373,7 +1453,6 @@ function renderAdminBracketsEditor(brackets) {
       statusBadge.style.background = "rgba(255, 26, 64, 0.1)";
       statusBadge.style.color = "#ff1a40";
       statusBadge.style.borderColor = "rgba(255, 26, 64, 0.3)";
-      
       toggleBtn.innerText = "🚀 ЗАПУСТИТИ ДЕМО-ТУРНІР";
       toggleBtn.style.background = "";
       toggleBtn.style.color = "";
@@ -1383,77 +1462,169 @@ function renderAdminBracketsEditor(brackets) {
 
   const container = document.getElementById('admin-brackets-editor-list');
   if (!container) return;
-  container.innerHTML = "";
+  container.innerHTML = '';
 
   if (!brackets || !brackets.rounds) {
-    container.innerHTML = "Сітка не налаштована. Скористайтеся формою вище, щоб згенерувати сітку.";
+    container.innerHTML = '<div style="padding:25px;text-align:center;color:var(--text-secondary);font-size:13px;">Сітка не налаштована. Скористайтеся формою вище, щоб згенерувати сітку.</div>';
     return;
   }
 
   const format = brackets.format || '5x5';
   const matchingTeams = (db.teams || []).filter(t => t.format === format);
 
-  brackets.rounds.forEach((round, roundIdx) => {
-    const div = document.createElement('div');
-    div.style.marginBottom = "20px";
-    div.style.border = "1px solid var(--border-color)";
-    div.style.background = "rgba(255,255,255,0.01)";
-    div.style.borderRadius = "8px";
-    div.style.padding = "15px";
+  const NODE_W = 255, GAP = 65, PAD = 36;
+  const rounds = brackets.rounds;
+  const nodeFactory = (m, rIdx, mIdx) => _createAdminMatchNode(m, rIdx, mIdx, matchingTeams);
 
-    div.innerHTML = `<h5 style="color:var(--cs-orange); margin: 0 0 12px 0; text-transform:uppercase; font-size:13px; font-weight:800; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:5px;">${round.name}</h5>`;
+  // ── DOUBLE-4 (special section layout) ─────────────────────────────────────
+  if (brackets.type === 'double-4') {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'bracket-canvas-wrapper';
+    wrapper.style.cssText = 'height:560px;max-height:560px;';
 
-    round.matches.forEach((match, matchIdx) => {
-      const matchBox = document.createElement('div');
-      matchBox.style.display = "flex";
-      matchBox.style.gap = "15px";
-      matchBox.style.alignItems = "center";
-      matchBox.style.marginBottom = "10px";
-      matchBox.style.background = "var(--bg-input)";
-      matchBox.style.padding = "12px";
-      matchBox.style.borderRadius = "8px";
+    const inner = document.createElement('div');
+    inner.className = 'bracket-canvas-inner';
+    inner.style.cssText = `position:absolute;flex-direction:column;gap:28px;padding:${PAD}px;min-width:${NODE_W * 2 + GAP + 60}px;`;
 
-      // Dropdown selects for Team 1
-      let selectT1 = `<select id="br-t1-${match.id}" class="form-input" style="padding:6px 10px; font-size:11px; width:100%; margin-bottom:6px;">`;
-      selectT1 += `<option value="">Очікується</option>`;
-      matchingTeams.forEach(t => {
-        const isSelected = (match.team1 && match.team1.toLowerCase() === t.name.toLowerCase()) ? 'selected' : '';
-        selectT1 += `<option value="${t.name}" ${isSelected}>${t.name}</option>`;
-      });
-      if (match.team1 && match.team1 !== 'Очікується' && !matchingTeams.some(t => t.name.toLowerCase() === match.team1.toLowerCase())) {
-        selectT1 += `<option value="${match.team1}" selected>${match.team1}</option>`;
+    const getM = id => { for (let r of rounds) { let m = r.matches.find(x => x.id === id); if (m) return m; } return null; };
+    const ub1 = getM('ub_1'), ub2 = getM('ub_2'), ub3 = getM('ub_3');
+    const lb1 = getM('lb_1'), lb2 = getM('lb_2'), gf1 = getM('gf_1');
+
+    // Determine roundIdx / matchIdx for each match
+    const findRoundMatch = (id) => {
+      for (let rIdx = 0; rIdx < rounds.length; rIdx++) {
+        const mIdx = rounds[rIdx].matches.findIndex(x => x.id === id);
+        if (mIdx >= 0) return [rIdx, mIdx];
       }
-      selectT1 += `</select>`;
+      return [0, 0];
+    };
 
-      // Dropdown selects for Team 2
-      let selectT2 = `<select id="br-t2-${match.id}" class="form-input" style="padding:6px 10px; font-size:11px; width:100%; margin-bottom:6px;">`;
-      selectT2 += `<option value="">Очікується</option>`;
-      matchingTeams.forEach(t => {
-        const isSelected = (match.team2 && match.team2.toLowerCase() === t.name.toLowerCase()) ? 'selected' : '';
-        selectT2 += `<option value="${t.name}" ${isSelected}>${t.name}</option>`;
+    const makeSection = (label, color, cols) => {
+      const sec = document.createElement('div');
+      const lbl = document.createElement('div');
+      lbl.style.cssText = `font-size:10px;font-weight:800;color:${color};margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;border-left:3px solid ${color};padding-left:7px;display:inline-block;`;
+      lbl.innerText = label;
+      sec.appendChild(lbl);
+      const row = document.createElement('div');
+      row.style.cssText = `display:flex;gap:${GAP}px;align-items:flex-start;`;
+      cols.forEach(col => {
+        const colEl = document.createElement('div');
+        colEl.style.cssText = `display:flex;flex-direction:column;gap:15px;min-width:${NODE_W}px;`;
+        const cTitle = document.createElement('div');
+        cTitle.className = 'bracket-round-label'; cTitle.innerText = col.name;
+        colEl.appendChild(cTitle);
+        col.items.forEach(({ match, rIdx, mIdx }) => {
+          colEl.appendChild(match ? nodeFactory(match, rIdx, mIdx) : nodeFactory(null, rIdx, mIdx));
+        });
+        row.appendChild(colEl);
       });
-      if (match.team2 && match.team2 !== 'Очікується' && !matchingTeams.some(t => t.name.toLowerCase() === match.team2.toLowerCase())) {
-        selectT2 += `<option value="${match.team2}" selected>${match.team2}</option>`;
-      }
-      selectT2 += `</select>`;
+      sec.appendChild(row);
+      return sec;
+    };
 
-      matchBox.innerHTML = `
-        <div style="flex:1;">
-          ${selectT1}
-          <input type="number" id="br-s1-${match.id}" class="form-input" value="${match.score1}" placeholder="0" style="padding:6px 10px; font-size:11px; width:100%;">
-        </div>
-        <div style="font-size:12px; font-weight:900; color:var(--cs-orange); text-align:center;">VS</div>
-        <div style="flex:1;">
-          ${selectT2}
-          <input type="number" id="br-s2-${match.id}" class="form-input" value="${match.score2}" placeholder="0" style="padding:6px 10px; font-size:11px; width:100%;">
-        </div>
-        <button class="btn" style="padding: 12px 18px; font-size:12px; font-weight:800; background:linear-gradient(135deg, var(--cs-orange) 0%, #ff5500 100%);" onclick="saveAdminBracketMatch('${match.id}', ${roundIdx}, ${matchIdx})">OK</button>
-      `;
-      div.appendChild(matchBox);
+    const ri = (id) => findRoundMatch(id);
+
+    inner.appendChild(makeSection('ВЕРХНЯ СІТКА (UPPER BRACKET)', 'var(--cs-orange)', [
+      { name: 'Півфінали UB', items: [
+        { match: ub1, rIdx: ri('ub_1')[0], mIdx: ri('ub_1')[1] },
+        { match: ub2, rIdx: ri('ub_2')[0], mIdx: ri('ub_2')[1] }
+      ]},
+      { name: 'UB Фінал', items: [
+        { match: ub3, rIdx: ri('ub_3')[0], mIdx: ri('ub_3')[1] }
+      ]}
+    ]));
+    inner.appendChild(makeSection('НИЖНЯ СІТКА (LOWER BRACKET)', '#ff1a40', [
+      { name: 'LB Раунд 1', items: [
+        { match: lb1, rIdx: ri('lb_1')[0], mIdx: ri('lb_1')[1] }
+      ]},
+      { name: 'LB Фінал', items: [
+        { match: lb2, rIdx: ri('lb_2')[0], mIdx: ri('lb_2')[1] }
+      ]}
+    ]));
+    inner.appendChild(makeSection('ГРАНД-ФІНАЛ', '#ffb703', [
+      { name: 'Grand Final', items: [
+        { match: gf1, rIdx: ri('gf_1')[0], mIdx: ri('gf_1')[1] }
+      ]}
+    ]));
+
+    const hint = document.createElement('div');
+    hint.className = 'bracket-drag-hint'; hint.innerHTML = '✋ Тягніть для прокрутки';
+    wrapper.appendChild(hint);
+    _adminAddPan(wrapper, inner);
+    wrapper.appendChild(inner);
+    container.appendChild(wrapper);
+    return;
+  }
+
+  // ── SINGLE ELIMINATION ─────────────────────────────────────────────────────
+  const NODE_H = 148; // height of editable admin node
+  const maxM = rounds[0].matches.length;
+  const SLOT_H = Math.max(NODE_H + 50, 200);
+  const totalH = maxM * SLOT_H;
+  const totalW = rounds.length * NODE_W + (rounds.length - 1) * GAP + PAD * 2;
+  const canvasH = totalH + PAD * 2 + 24;
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'bracket-canvas-wrapper';
+  wrapper.style.height = Math.min(Math.max(canvasH, 280), 580) + 'px';
+
+  const inner = document.createElement('div');
+  inner.className = 'bracket-canvas-inner';
+  inner.style.width  = totalW + 'px';
+  inner.style.height = canvasH + 'px';
+
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('width', totalW); svg.setAttribute('height', canvasH);
+  svg.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;z-index:1;';
+  inner.appendChild(svg);
+
+  const pos = [];
+
+  rounds.forEach((round, rIdx) => {
+    const x = PAD + rIdx * (NODE_W + GAP);
+    const mCnt = round.matches.length;
+    const slotH = totalH / mCnt;
+    pos[rIdx] = [];
+
+    const title = document.createElement('div');
+    title.className = 'bracket-round-label';
+    title.style.cssText = `position:absolute;left:${x}px;top:${PAD}px;width:${NODE_W}px;`;
+    title.innerText = round.name;
+    inner.appendChild(title);
+
+    round.matches.forEach((match, mIdx) => {
+      const cy    = PAD + 24 + mIdx * slotH + slotH / 2;
+      const nodeY = cy - NODE_H / 2;
+      pos[rIdx][mIdx] = { rightX: x + NODE_W, leftX: x, cy };
+
+      const node = nodeFactory(match, rIdx, mIdx);
+      node.style.cssText = `position:absolute;left:${x}px;top:${nodeY}px;width:${NODE_W}px;z-index:2;`;
+      inner.appendChild(node);
     });
-
-    container.appendChild(div);
   });
+
+  // Draw connectors
+  for (let rIdx = 0; rIdx < rounds.length - 1; rIdx++) {
+    rounds[rIdx + 1].matches.forEach((_, nMIdx) => {
+      const s1  = pos[rIdx][nMIdx * 2];
+      const s2  = pos[rIdx][nMIdx * 2 + 1];
+      const dst = pos[rIdx + 1][nMIdx];
+      if (!dst) return;
+      const midX = dst.leftX - GAP / 2;
+      if (s1) _adminDrawLine(svg, s1.rightX, s1.cy, midX, s1.cy);
+      if (s2) _adminDrawLine(svg, s2.rightX, s2.cy, midX, s2.cy);
+      if (s1 && s2) _adminDrawLine(svg, midX, s1.cy, midX, s2.cy);
+      const srcCY = s1 && s2 ? (s1.cy + s2.cy) / 2 : (s1 ? s1.cy : s2 ? s2.cy : dst.cy);
+      _adminDrawLine(svg, midX, srcCY, dst.leftX, dst.cy);
+    });
+  }
+
+  const hint = document.createElement('div');
+  hint.className = 'bracket-drag-hint'; hint.innerHTML = '✋ Тягніть для прокрутки';
+  wrapper.appendChild(hint);
+  _adminAddPan(wrapper, inner);
+  wrapper.appendChild(inner);
+  container.appendChild(wrapper);
 }
 
 // Save Bracket Match and propagate winner / loser dynamically

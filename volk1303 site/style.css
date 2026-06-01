@@ -435,13 +435,14 @@ nav {
     grid-template-columns: 1fr;
   }
   .sidebar-right {
-    position: fixed;
-    bottom: 0;
-    right: 0;
-    width: 100vw;
-    z-index: 100;
-    max-height: 80vh;
-    box-shadow: 0 -10px 30px rgba(0,0,0,0.5);
+    position: static;
+    width: 100%;
+    max-height: none;
+    box-shadow: none;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    z-index: 1;
   }
 }
 
@@ -1118,7 +1119,119 @@ nav {
   border-radius: 4px;
 }
 
-/* Bracket tree visual styles */
+/* ==========================================
+   BRACKET CANVAS — Pannable Bracket View
+   ========================================== */
+
+/* Outer wrapper — handles overflow + drag cursor */
+.bracket-canvas-wrapper {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  cursor: grab;
+  background: rgba(12, 13, 20, 0.65);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.bracket-canvas-wrapper:active { cursor: grabbing; }
+
+/* Inner canvas — moved by JS transform */
+.bracket-canvas-inner {
+  position: absolute;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0;
+  will-change: transform;
+  transform: translate(0, 0);
+}
+
+/* v2 match node — used for both user and admin views */
+.bracket-match-node-v2 {
+  background: var(--bg-card);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 4px 22px rgba(0,0,0,0.4);
+  position: relative;
+  z-index: 2;
+  flex-shrink: 0;
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+
+.bracket-match-node-v2.active {
+  border-color: var(--cs-orange);
+  animation: bracket-node-pulse 2s infinite alternate;
+}
+
+@keyframes bracket-node-pulse {
+  0%   { box-shadow: 0 0 8px rgba(255,107,0,0.25), 0 4px 22px rgba(0,0,0,0.4); }
+  100% { box-shadow: 0 0 22px rgba(255,107,0,0.55), 0 4px 22px rgba(0,0,0,0.4); }
+}
+
+/* Team row inside a bracket node */
+.bracket-team {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 13px;
+  font-size: 12px;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  cursor: pointer;
+  transition: background 0.18s;
+  gap: 8px;
+  line-height: 1.3;
+}
+.bracket-team:last-of-type { border-bottom: none; }
+.bracket-team:hover { background: rgba(255,255,255,0.04); }
+
+.bracket-team.winner {
+  color: var(--success);
+  font-weight: 800;
+  background: rgba(0,255,102,0.06);
+}
+.bracket-team.loser {
+  color: var(--text-secondary);
+  opacity: 0.48;
+}
+
+.bracket-team-score {
+  font-family: 'Roboto Mono', monospace;
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--cs-orange);
+  flex-shrink: 0;
+}
+.bracket-team-score.winner-score { color: var(--success); }
+
+/* Round column title */
+.bracket-round-label {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  text-align: center;
+  margin-bottom: 10px;
+  letter-spacing: 0.6px;
+}
+
+/* Pan hint overlay text */
+.bracket-drag-hint {
+  position: absolute;
+  bottom: 10px;
+  left: 14px;
+  font-size: 10px;
+  color: rgba(255,255,255,0.18);
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* ==========================================
+   LEGACY bracket compat (kept for safety)
+   ========================================== */
 .bracket-tree, .bracket-wrapper {
   display: flex;
   gap: 30px;
@@ -1152,14 +1265,8 @@ nav {
 }
 
 @keyframes border-pulse {
-  0% {
-    box-shadow: 0 0 4px rgba(255, 107, 0, 0.2);
-    border-color: var(--border-color);
-  }
-  100% {
-    box-shadow: 0 0 12px rgba(255, 107, 0, 0.5);
-    border-color: var(--cs-orange);
-  }
+  0%   { box-shadow: 0 0 4px rgba(255,107,0,0.2);  border-color: var(--border-color); }
+  100% { box-shadow: 0 0 12px rgba(255,107,0,0.5); border-color: var(--cs-orange); }
 }
 
 .bracket-node-team {
@@ -1169,30 +1276,15 @@ nav {
   font-size: 12px;
   border-bottom: 1px solid var(--border-color);
 }
-
-.bracket-node-team:last-child {
-  border-bottom: none;
-}
-
-.bracket-node-team.winner {
-  color: var(--success);
-  font-weight: 800;
-  animation: win-flash 1s ease-out;
-}
+.bracket-node-team:last-child { border-bottom: none; }
+.bracket-node-team.winner { color: var(--success); font-weight: 800; animation: win-flash 1s ease-out; }
 
 @keyframes win-flash {
-  0% {
-    background-color: rgba(0, 255, 102, 0.2);
-  }
-  100% {
-    background-color: transparent;
-  }
+  0%   { background-color: rgba(0,255,102,0.2); }
+  100% { background-color: transparent; }
 }
 
-.bracket-node-team.loser {
-  color: var(--text-secondary);
-  opacity: 0.6;
-}
+.bracket-node-team.loser { color: var(--text-secondary); opacity: 0.6; }
 
 /* ==========================================
    PAGE: profile.html (User Dashboard Stats)
@@ -2155,4 +2247,449 @@ footer {
   color: white;
   font-weight: 800;
 }
+
+/* ==========================================
+   DATABASE DASHBOARD & USER INSPECTOR STYLES
+   ========================================== */
+.ops-log-tag.tag-mono {
+  background: rgba(230, 0, 120, 0.1);
+  color: #ff2d88;
+  border: 1px solid rgba(230, 0, 120, 0.2);
+}
+
+.ops-log-tag.tag-danger {
+  background: rgba(255, 26, 64, 0.1);
+  color: var(--wolf-red);
+  border: 1px solid rgba(255, 26, 64, 0.2);
+}
+
+/* Drawer Backdrop Overlay */
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  z-index: 999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.drawer-overlay.active {
+  opacity: 1;
+  pointer-events: all;
+}
+
+/* Slide-out User Inspector Drawer */
+.user-inspector-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 420px;
+  max-width: 100%;
+  height: 100vh;
+  background-color: #0b0c12;
+  border-left: 1px solid var(--border-color);
+  box-shadow: -10px 0 30px rgba(0,0,0,0.5);
+  z-index: 1000;
+  transform: translateX(100%);
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.user-inspector-drawer.active {
+  transform: translateX(0);
+}
+
+.drawer-header {
+  padding: 15px 20px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #10121a;
+  height: 70px;
+}
+
+.user-avatar-circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--cs-orange) 0%, #ff5500 100%);
+  color: white;
+  font-weight: 900;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 10px rgba(255, 90, 0, 0.3);
+}
+
+.drawer-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 24px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.drawer-close-btn:hover {
+  color: white;
+}
+
+.inspector-tab-btn {
+  transition: var(--transition);
+}
+
+.inspector-tab-btn:hover {
+  color: white;
+  background-color: rgba(255,255,255,0.02);
+}
+
+.inspector-tab-btn.active {
+  background: var(--cs-orange) !important;
+  color: white !important;
+  box-shadow: 0 2px 10px rgba(255, 90, 0, 0.2);
+}
+
+.mini-metric-box {
+  box-shadow: inset 0 0 8px rgba(0,0,0,0.4);
+}
+
+/* ==========================================
+   PREMIUM ADMIN STYLING OVERHAUL (DATABASE & LAYOUT)
+   ========================================== */
+
+/* Modern Card-Style Tables */
+.admin-table {
+  width: 100%;
+  border-collapse: separate !important;
+  border-spacing: 0 8px !important;
+  margin-top: 5px;
+}
+
+.admin-table thead th {
+  background: transparent !important;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 10px 16px;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.05);
+  text-align: left;
+}
+
+.admin-table tbody tr {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.admin-table tbody tr td {
+  padding: 12px 16px;
+  vertical-align: middle;
+  background-color: #11131a !important; /* Slightly darker than card for contrast */
+  border-top: 1px solid rgba(255, 255, 255, 0.04) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04) !important;
+  color: var(--text-primary);
+  font-size: 13px;
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
+}
+
+/* Rounded corners for row cards */
+.admin-table tbody tr td:first-child {
+  border-left: 3px solid transparent !important;
+  border-top-left-radius: 8px !important;
+  border-bottom-left-radius: 8px !important;
+  font-weight: bold;
+}
+
+.admin-table tbody tr td:last-child {
+  border-right: 1px solid rgba(255, 255, 255, 0.04) !important;
+  border-top-right-radius: 8px !important;
+  border-bottom-right-radius: 8px !important;
+}
+
+/* Hover effects for rows */
+.admin-table tbody tr:hover {
+  transform: translateY(-2px);
+}
+
+.admin-table tbody tr:hover td {
+  background-color: #161922 !important;
+  border-top-color: rgba(255, 107, 0, 0.25) !important;
+  border-bottom-color: rgba(255, 107, 0, 0.25) !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.35);
+}
+
+.admin-table tbody tr:hover td:first-child {
+  border-left: 3px solid var(--cs-orange) !important; /* CS Orange left glow indicator */
+}
+
+.admin-table tbody tr:hover td:last-child {
+  border-right: 1px solid rgba(255, 107, 0, 0.25) !important;
+}
+
+/* Modern Glassmorphism Controls inside Database Tab */
+.db-tabs-container {
+  background: rgba(16, 18, 26, 0.8) !important;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+}
+
+.db-sub-tabs .profile-tab-btn {
+  background: rgba(255, 255, 255, 0.02) !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+  color: var(--text-secondary) !important;
+  box-shadow: none !important;
+  padding: 8px 18px !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  border-radius: 8px !important;
+  text-transform: uppercase;
+  transition: var(--transition) !important;
+}
+
+.db-sub-tabs .profile-tab-btn:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: white !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+.db-sub-tabs .profile-tab-btn.active {
+  background: linear-gradient(135deg, var(--cs-orange) 0%, #ff5500 100%) !important;
+  color: white !important;
+  border-color: var(--cs-orange) !important;
+  box-shadow: 0 0 15px var(--cs-orange-glow) !important;
+}
+
+/* Sleek Neon Glow Search & Form Inputs */
+.db-toolbar .form-input {
+  background: rgba(16, 18, 26, 0.5) !important;
+  border: 1px solid var(--border-color) !important;
+  color: white !important;
+  border-radius: 8px !important;
+  padding: 8px 14px !important;
+  font-size: 13px !important;
+  transition: var(--transition) !important;
+}
+
+.db-toolbar .form-input:focus {
+  border-color: var(--cs-orange) !important;
+  box-shadow: 0 0 12px var(--cs-orange-glow) !important;
+  background: rgba(16, 18, 26, 0.85) !important;
+  outline: none;
+}
+
+/* Sidebar Hover Interactions */
+.admin-tab-item {
+  transition: padding-left 0.25s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.25s, color 0.25s, border-left-color 0.25s !important;
+}
+
+.admin-tab-item:hover {
+  padding-left: 20px !important; /* Slide animation */
+  background-color: rgba(255, 90, 0, 0.05) !important;
+  color: white !important;
+}
+
+.admin-tab-item.active {
+  padding-left: 20px !important;
+  background: linear-gradient(90deg, rgba(255, 90, 0, 0.12) 0%, rgba(255, 90, 0, 0.02) 100%) !important;
+}
+
+/* Custom Sleek Scrollbar in admin area */
+.admin-main::-webkit-scrollbar,
+.db-panes-wrapper div::-webkit-scrollbar,
+.ops-log-box::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.admin-main::-webkit-scrollbar-track,
+.db-panes-wrapper div::-webkit-scrollbar-track,
+.ops-log-box::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+.admin-main::-webkit-scrollbar-thumb,
+.db-panes-wrapper div::-webkit-scrollbar-thumb,
+.ops-log-box::-webkit-scrollbar-thumb {
+  background: rgba(255, 107, 0, 0.25);
+  border-radius: 4px;
+  transition: background 0.3s ease;
+}
+
+.admin-main::-webkit-scrollbar-thumb:hover,
+.db-panes-wrapper div::-webkit-scrollbar-thumb:hover,
+.ops-log-box::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 107, 0, 0.65);
+}
+
+/* Action Buttons inside Table Row Card */
+.admin-table .btn, .admin-table .btn-secondary {
+  padding: 6px 12px !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  text-transform: uppercase;
+  border-radius: 6px !important;
+  transition: var(--transition) !important;
+}
+
+.admin-table .btn {
+  background: linear-gradient(135deg, rgba(255, 107, 0, 0.15) 0%, rgba(255, 107, 0, 0.3) 100%) !important;
+  border: 1px solid rgba(255, 107, 0, 0.4) !important;
+  color: white !important;
+}
+
+.admin-table .btn:hover {
+  background: linear-gradient(135deg, var(--cs-orange) 0%, #ff5500 100%) !important;
+  border-color: var(--cs-orange) !important;
+  box-shadow: 0 0 10px var(--cs-orange-glow) !important;
+}
+
+.admin-table .btn-secondary {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: var(--text-secondary) !important;
+}
+
+.admin-table .btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.15) !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+  color: white !important;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ==========================================
+   MOBILE RESPONSIVENESS PATCHES
+   ========================================== */
+@media (max-width: 900px) {
+  /* Admin panel layout conversion */
+  .admin-container {
+    grid-template-columns: 1fr !important;
+    display: flex;
+    flex-direction: column;
+  }
+  .admin-sidebar {
+    position: static !important;
+    height: auto !important;
+    width: 100% !important;
+    border-right: none !important;
+    border-bottom: 1px solid var(--border-color);
+    padding: 15px !important;
+    gap: 15px !important;
+  }
+  .admin-sidebar-brand {
+    justify-content: center !important;
+    padding-bottom: 10px !important;
+  }
+  .admin-tabs-list {
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+    gap: 5px !important;
+  }
+  .admin-tab-item {
+    padding: 8px 12px !important;
+    font-size: 11px !important;
+    width: auto !important;
+    border-left: none !important;
+    border-bottom: 2px solid transparent !important;
+  }
+  .admin-tab-item.active {
+    background: rgba(255, 90, 0, 0.1) !important;
+    border-bottom-color: var(--cs-orange) !important;
+  }
+  .admin-sidebar-profile {
+    justify-content: center !important;
+    gap: 15px !important;
+    padding-top: 10px !important;
+  }
+  .admin-main {
+    height: auto !important;
+    overflow-y: visible !important;
+  }
+  .admin-content-pane {
+    padding: 20px 15px !important;
+  }
+  .admin-content-pane > div[style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 768px) {
+  /* Main site header responsive stacking */
+  header {
+    flex-direction: column !important;
+    gap: 10px !important;
+    padding: 12px 15px !important;
+    position: static !important;
+  }
+  .logo-link {
+    justify-content: center !important;
+  }
+  nav {
+    justify-content: center !important;
+    width: 100% !important;
+    flex-wrap: wrap !important;
+    gap: 4px !important;
+  }
+  .nav-link {
+    padding: 6px 10px !important;
+    font-size: 11px !important;
+  }
+  .header-user-panel {
+    justify-content: center !important;
+    width: 100% !important;
+    gap: 10px !important;
+  }
+  .user-balance {
+    font-size: 12px !important;
+    padding: 4px 10px !important;
+  }
+  .header-user-panel .btn {
+    padding: 6px 12px !important;
+    font-size: 10px !important;
+  }
+  
+  /* Tables wrapper for horizontal scroll */
+  .admin-table-wrapper, .card > div {
+    overflow-x: auto;
+  }
+}
+
+@media (max-width: 600px) {
+  /* Compact font sizes on cards and tables on small phones */
+  .admin-table th, .admin-table td {
+    padding: 6px 4px !important;
+    font-size: 10px !important;
+  }
+  .admin-content-pane .card {
+    padding: 12px !important;
+  }
+  .metrics-row, .admin-metrics-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  .metric-card {
+    padding: 12px !important;
+    gap: 10px !important;
+  }
+  .metric-card-icon {
+    width: 32px !important;
+    height: 32px !important;
+    font-size: 14px !important;
+  }
+  .metric-card-value {
+    font-size: 15px !important;
+  }
+  .user-inspector-drawer {
+    width: 100% !important;
+  }
+}
+
 

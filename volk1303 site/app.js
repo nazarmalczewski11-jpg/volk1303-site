@@ -1350,6 +1350,7 @@ window.switchPaymentTab = function(method) {
   document.getElementById(`payment-${method}`).classList.add('active');
 };
 
+// Start deposit loader verify sequence (7 seconds)
 // Start deposit loader verify sequence
 async function startDepositVerify(amount, method, references) {
   if (isNaN(amount) || amount < 500) {
@@ -1738,181 +1739,258 @@ window.disbandUserTeam = function() {
   renderPageContent();
 };
 
-// Render Bracket visual tree nodes
+// =============================================
+// v2 PANNABLE BRACKET RENDERING — app.js
+// =============================================
+
+/** Draw a single SVG line segment for bracket connectors */
+function _drawBracketLine(svg, x1, y1, x2, y2) {
+  const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+  line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+  line.setAttribute('stroke', 'rgba(255,255,255,0.11)');
+  line.setAttribute('stroke-width', '2');
+  line.setAttribute('stroke-linecap', 'round');
+  svg.appendChild(line);
+}
+
+/** Attach mouse/touch panning to a bracket canvas wrapper */
+function _addBracketPan(wrapper, inner) {
+  let dragging = false, panX = 0, panY = 0, sx = 0, sy = 0;
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const apply = () => { inner.style.transform = `translate(${panX}px,${panY}px)`; };
+
+  wrapper.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    dragging = true; sx = e.clientX - panX; sy = e.clientY - panY;
+    wrapper.style.cursor = 'grabbing'; e.preventDefault();
+  });
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const iW = parseFloat(inner.style.width) || inner.scrollWidth;
+    const iH = parseFloat(inner.style.height) || inner.scrollHeight;
+    panX = clamp(e.clientX - sx, Math.min(0, wrapper.clientWidth  - iW), 0);
+    panY = clamp(e.clientY - sy, Math.min(0, wrapper.clientHeight - iH), 0);
+    apply();
+  });
+  document.addEventListener('mouseup', () => { dragging = false; wrapper.style.cursor = 'grab'; });
+
+  // Touch support
+  let tx = 0, ty = 0;
+  wrapper.addEventListener('touchstart', e => {
+    tx = e.touches[0].clientX - panX; ty = e.touches[0].clientY - panY;
+  }, { passive: true });
+  wrapper.addEventListener('touchmove', e => {
+    const iW = parseFloat(inner.style.width) || inner.scrollWidth;
+    const iH = parseFloat(inner.style.height) || inner.scrollHeight;
+    panX = clamp(e.touches[0].clientX - tx, Math.min(0, wrapper.clientWidth  - iW), 0);
+    panY = clamp(e.touches[0].clientY - ty, Math.min(0, wrapper.clientHeight - iH), 0);
+    apply(); e.preventDefault();
+  }, { passive: false });
+}
+
+/** Build a read-only bracket match node (user-facing) */
+function _createBracketMatchNode(match) {
+  const node = document.createElement('div');
+  node.className = 'bracket-match-node-v2';
+
+  if (!match) {
+    node.style.opacity = '0.4';
+    node.innerHTML = `
+      <div class="bracket-team"><span>Очікується</span><span class="bracket-team-score">—</span></div>
+      <div class="bracket-team"><span>Очікується</span><span class="bracket-team-score">—</span></div>`;
+    return node;
+  }
+
+  const t1 = match.team1 || 'Очікується';
+  const t2 = match.team2 || 'Очікується';
+  const t1A = t1 !== 'Очікується' && t1.trim() !== '';
+  const t2A = t2 !== 'Очікується' && t2.trim() !== '';
+  const t1W = match.winner === t1 && t1A;
+  const t2W = match.winner === t2 && t2A;
+  const hw  = match.winner != null;
+
+  if (!hw && t1A && t2A) node.classList.add('active');
+
+  const c1 = hw ? (t1W ? 'winner' : 'loser') : '';
+  const c2 = hw ? (t2W ? 'winner' : 'loser') : '';
+  const safe = s => String(s || '').replace(/'/g, "\\'");
+
+  node.innerHTML = `
+    <div class="bracket-team ${c1}" onclick="event.stopPropagation(); if(typeof inspectTeamRoster==='function') inspectTeamRoster('${safe(t1)}')">
+      <span style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:155px;">${t1}</span>
+      <span class="bracket-team-score ${t1W ? 'winner-score' : ''}">${match.score1 !== undefined ? match.score1 : '—'}</span>
+    </div>
+    <div class="bracket-team ${c2}" onclick="event.stopPropagation(); if(typeof inspectTeamRoster==='function') inspectTeamRoster('${safe(t2)}')">
+      <span style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:155px;">${t2}</span>
+      <span class="bracket-team-score ${t2W ? 'winner-score' : ''}">${match.score2 !== undefined ? match.score2 : '—'}</span>
+    </div>`;
+  return node;
+}
+
+/** Render single-/double-elimination bracket as a pannable canvas */
 function renderBracketsTree(brackets) {
   const container = document.getElementById('tournament-bracket-visual');
   if (!container) return;
-  container.innerHTML = "";
+  container.innerHTML = '';
 
   if (!brackets || !brackets.rounds) {
-    container.innerHTML = "Сітка не налаштована.";
+    container.innerHTML = '<div style="padding:30px;color:var(--text-secondary);text-align:center;font-size:13px;">Сітка не налаштована.</div>';
     return;
   }
 
-  // Render Format badge dynamically
-  const formatBadge = document.getElementById('tournament-format-badge');
-  if (formatBadge) {
-    formatBadge.innerText = `ФОРМАТ: ${brackets.format || '5x5'}`;
+  // Format badge
+  const badge = document.getElementById('tournament-format-badge');
+  if (badge) badge.innerText = `ФОРМАТ: ${brackets.format || '5x5'}`;
+
+  // ── DOUBLE-4 ──────────────────────────────────────────────────────────────
+  if (brackets.type === 'double-4') {
+    _renderDouble4Tree(container, brackets.rounds, _createBracketMatchNode);
+    return;
   }
 
-  // Helper to render a single match node
-  const createMatchNode = (match) => {
-    const node = document.createElement('div');
-    node.className = "bracket-match-node";
-    node.style.cursor = "pointer";
-    
-    if (!match) {
-      node.style.opacity = "0.5";
-      node.innerHTML = `
-        <div class="bracket-node-team"><span>Очікується</span><span>0</span></div>
-        <div class="bracket-node-team"><span>Очікується</span><span>0</span></div>
-      `;
-      return node;
-    }
-    
-    const t1 = match.team1 || 'Очікується';
-    const t2 = match.team2 || 'Очікується';
-    
-    const isT1Active = t1 !== 'Очікується' && t1.trim() !== "";
-    const isT2Active = t2 !== 'Очікується' && t2.trim() !== "";
-    
-    const t1Winner = match.winner === t1 && isT1Active;
-    const t2Winner = match.winner === t2 && isT2Active;
-    const hasWinner = match.winner !== null;
-    
-    if (match.winner === null && isT1Active && isT2Active) {
-      node.classList.add('active-highlight');
-    }
-    
-    node.innerHTML = `
-      <div class="bracket-node-team ${hasWinner ? (t1Winner ? 'winner' : 'loser') : ''}" onclick="event.stopPropagation(); inspectTeamRoster('${t1}')">
-        <span style="font-weight: 700;">${t1}</span>
-        <span style="font-weight:800; font-family:'Roboto Mono';">${match.score1}</span>
-      </div>
-      <div class="bracket-node-team ${hasWinner ? (t2Winner ? 'winner' : 'loser') : ''}" onclick="event.stopPropagation(); inspectTeamRoster('${t2}')">
-        <span style="font-weight: 700;">${t2}</span>
-        <span style="font-weight:800; font-family:'Roboto Mono';">${match.score2}</span>
-      </div>
-    `;
-    return node;
+  // ── SINGLE ELIMINATION ────────────────────────────────────────────────────
+  const NODE_W = 220, NODE_H = 90, GAP = 70, PAD = 36;
+  const rounds = brackets.rounds;
+  const maxM = rounds[0].matches.length;
+  const SLOT_H = Math.max(NODE_H + 50, 140);
+  const totalH = maxM * SLOT_H;
+  const totalW = rounds.length * NODE_W + (rounds.length - 1) * GAP + PAD * 2;
+  const canvasH = totalH + PAD * 2 + 24; // 24 for title
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'bracket-canvas-wrapper';
+  wrapper.style.height = Math.min(Math.max(canvasH, 260), 580) + 'px';
+
+  const inner = document.createElement('div');
+  inner.className = 'bracket-canvas-inner';
+  inner.style.width  = totalW + 'px';
+  inner.style.height = canvasH + 'px';
+
+  // SVG connector layer
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('width', totalW); svg.setAttribute('height', canvasH);
+  svg.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;z-index:1;';
+  inner.appendChild(svg);
+
+  const pos = []; // pos[r][m] = { rightX, leftX, cy }
+
+  rounds.forEach((round, rIdx) => {
+    const x = PAD + rIdx * (NODE_W + GAP);
+    const mCnt = round.matches.length;
+    const slotH = totalH / mCnt;
+    pos[rIdx] = [];
+
+    // Round title
+    const title = document.createElement('div');
+    title.className = 'bracket-round-label';
+    title.style.cssText = `position:absolute;left:${x}px;top:${PAD}px;width:${NODE_W}px;`;
+    title.innerText = round.name;
+    inner.appendChild(title);
+
+    round.matches.forEach((match, mIdx) => {
+      const cy    = PAD + 24 + mIdx * slotH + slotH / 2;
+      const nodeY = cy - NODE_H / 2;
+      pos[rIdx][mIdx] = { rightX: x + NODE_W, leftX: x, cy };
+
+      const node = _createBracketMatchNode(match);
+      node.style.cssText = `position:absolute;left:${x}px;top:${nodeY}px;width:${NODE_W}px;z-index:2;`;
+      inner.appendChild(node);
+    });
+  });
+
+  // Draw connector lines between rounds
+  for (let rIdx = 0; rIdx < rounds.length - 1; rIdx++) {
+    rounds[rIdx + 1].matches.forEach((_, nMIdx) => {
+      const s1  = pos[rIdx][nMIdx * 2];
+      const s2  = pos[rIdx][nMIdx * 2 + 1];
+      const dst = pos[rIdx + 1][nMIdx];
+      if (!dst) return;
+
+      const midX = dst.leftX - GAP / 2;
+
+      if (s1) _drawBracketLine(svg, s1.rightX, s1.cy, midX, s1.cy);
+      if (s2) _drawBracketLine(svg, s2.rightX, s2.cy, midX, s2.cy);
+      if (s1 && s2) _drawBracketLine(svg, midX, s1.cy, midX, s2.cy);
+
+      const srcCY = s1 && s2 ? (s1.cy + s2.cy) / 2 : (s1 ? s1.cy : s2 ? s2.cy : dst.cy);
+      _drawBracketLine(svg, midX, srcCY, dst.leftX, dst.cy);
+    });
+  }
+
+  // Pan hint
+  const hint = document.createElement('div');
+  hint.className = 'bracket-drag-hint';
+  hint.innerHTML = '✋ Тягніть для прокрутки';
+  wrapper.appendChild(hint);
+
+  _addBracketPan(wrapper, inner);
+  wrapper.appendChild(inner);
+  container.appendChild(wrapper);
+}
+
+/** Shared double-4 section renderer (used by both user + admin views) */
+function _renderDouble4Tree(container, rounds, nodeFactory, nodeW) {
+  nodeW = nodeW || 220;
+  const GAP = 70;
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'bracket-canvas-wrapper';
+  wrapper.style.height = '520px';
+
+  const inner = document.createElement('div');
+  inner.className = 'bracket-canvas-inner';
+  inner.style.cssText = `position:absolute;flex-direction:column;gap:28px;padding:30px;min-width:${nodeW * 3 + GAP * 2 + 60}px;`;
+
+  const getM = id => { for (let r of rounds) { let m = r.matches.find(x => x.id === id); if (m) return m; } return null; };
+  const ub1 = getM('ub_1'), ub2 = getM('ub_2'), ub3 = getM('ub_3');
+  const lb1 = getM('lb_1'), lb2 = getM('lb_2'), gf1 = getM('gf_1');
+
+  const makeSection = (label, color, cols) => {
+    const sec = document.createElement('div');
+    const lbl = document.createElement('div');
+    lbl.style.cssText = `font-size:10px;font-weight:800;color:${color};margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;border-left:3px solid ${color};padding-left:7px;display:inline-block;`;
+    lbl.innerText = label;
+    sec.appendChild(lbl);
+    const row = document.createElement('div');
+    row.style.cssText = `display:flex;gap:${GAP}px;align-items:center;`;
+    cols.forEach(col => {
+      const colEl = document.createElement('div');
+      colEl.style.cssText = `display:flex;flex-direction:column;gap:15px;min-width:${nodeW}px;`;
+      const cTitle = document.createElement('div');
+      cTitle.className = 'bracket-round-label'; cTitle.innerText = col.name;
+      colEl.appendChild(cTitle);
+      col.matches.forEach(m => colEl.appendChild(nodeFactory(m)));
+      row.appendChild(colEl);
+    });
+    sec.appendChild(row);
+    return sec;
   };
 
-  // 1. DOUBLE ELIMINATION (4 TEAMS) VISUAL RENDERING FLOW
-  if (brackets.type === 'double-4') {
-    container.style.display = "flex";
-    container.style.flexDirection = "column";
-    container.style.gap = "25px";
-    
-    // Locate match slots from rounds with safety guards
-    const ub_1 = brackets.rounds[0] && brackets.rounds[0].matches ? brackets.rounds[0].matches[0] : null;
-    const ub_2 = brackets.rounds[0] && brackets.rounds[0].matches ? brackets.rounds[0].matches[1] : null;
-    const ub_3 = brackets.rounds[1] && brackets.rounds[1].matches ? brackets.rounds[1].matches[0] : null;
-    const lb_1 = brackets.rounds[2] && brackets.rounds[2].matches ? brackets.rounds[2].matches[0] : null;
-    const lb_2 = brackets.rounds[3] && brackets.rounds[3].matches ? brackets.rounds[3].matches[0] : null;
-    const gf_1 = brackets.rounds[4] && brackets.rounds[4].matches ? brackets.rounds[4].matches[0] : null;
-    
-    // Upper Bracket Wrapper
-    const ubSection = document.createElement('div');
-    ubSection.innerHTML = `<div style="font-size:11px; font-weight:800; color:var(--cs-orange); margin-bottom:12px; text-transform:uppercase; letter-spacing:1px; border-left:3px solid var(--cs-orange); padding-left:8px; display:inline-block;">ВЕРХНЯ СІТКА (UPPER BRACKET)</div>`;
-    
-    const ubGrid = document.createElement('div');
-    ubGrid.style.display = "flex";
-    ubGrid.style.gap = "25px";
-    ubGrid.style.alignItems = "center";
-    
-    const colUB1 = document.createElement('div');
-    colUB1.className = "bracket-round-column";
-    colUB1.innerHTML = `<div style="font-size:10px; color:var(--text-secondary); font-weight:800; text-transform:uppercase; margin-bottom:8px; text-align:center;">Півфінали</div>`;
-    colUB1.appendChild(createMatchNode(ub_1));
-    colUB1.appendChild(createMatchNode(ub_2));
-    
-    const colUB2 = document.createElement('div');
-    colUB2.className = "bracket-round-column";
-    colUB2.innerHTML = `<div style="font-size:10px; color:var(--text-secondary); font-weight:800; text-transform:uppercase; margin-bottom:8px; text-align:center;">Фінал</div>`;
-    colUB2.appendChild(createMatchNode(ub_3));
-    
-    ubGrid.appendChild(colUB1);
-    ubGrid.appendChild(colUB2);
-    ubSection.appendChild(ubGrid);
-    
-    // Lower Bracket Wrapper
-    const lbSection = document.createElement('div');
-    lbSection.style.marginTop = "10px";
-    lbSection.innerHTML = `<div style="font-size:11px; font-weight:800; color:#ff1a40; margin-bottom:12px; text-transform:uppercase; letter-spacing:1px; border-left:3px solid #ff1a40; padding-left:8px; display:inline-block;">НИЖНЯ СІТКА (LOWER BRACKET)</div>`;
-    
-    const lbGrid = document.createElement('div');
-    lbGrid.style.display = "flex";
-    lbGrid.style.gap = "25px";
-    lbGrid.style.alignItems = "center";
-    
-    const colLB1 = document.createElement('div');
-    colLB1.className = "bracket-round-column";
-    colLB1.innerHTML = `<div style="font-size:10px; color:var(--text-secondary); font-weight:800; text-transform:uppercase; margin-bottom:8px; text-align:center;">Раунд 1</div>`;
-    colLB1.appendChild(createMatchNode(lb_1));
-    
-    const colLB2 = document.createElement('div');
-    colLB2.className = "bracket-round-column";
-    colLB2.innerHTML = `<div style="font-size:10px; color:var(--text-secondary); font-weight:800; text-transform:uppercase; margin-bottom:8px; text-align:center;">Фінал лузерів</div>`;
-    colLB2.appendChild(createMatchNode(lb_2));
-    
-    lbGrid.appendChild(colLB1);
-    lbGrid.appendChild(colLB2);
-    lbSection.appendChild(lbGrid);
-    
-    // Grand Final Wrapper
-    const gfSection = document.createElement('div');
-    gfSection.style.marginTop = "10px";
-    gfSection.innerHTML = `<div style="font-size:11px; font-weight:800; color:#ffb703; margin-bottom:12px; text-transform:uppercase; letter-spacing:1px; border-left:3px solid #ffb703; padding-left:8px; display:inline-block;">ГРАНД-ФІНАЛ</div>`;
-    
-    const gfGrid = document.createElement('div');
-    gfGrid.style.display = "flex";
-    gfGrid.style.gap = "25px";
-    gfGrid.style.alignItems = "center";
-    
-    const colGF = document.createElement('div');
-    colGF.className = "bracket-round-column";
-    colGF.innerHTML = `<div style="font-size:10px; color:var(--text-secondary); font-weight:800; text-transform:uppercase; margin-bottom:8px; text-align:center;">Гранд-фінал</div>`;
-    colGF.appendChild(createMatchNode(gf_1));
-    
-    gfGrid.appendChild(colGF);
-    gfSection.appendChild(gfGrid);
-    
-    container.appendChild(ubSection);
-    container.appendChild(lbSection);
-    container.appendChild(gfSection);
-    return;
-  }
+  inner.appendChild(makeSection('ВЕРХНЯ СІТКА (UPPER BRACKET)', 'var(--cs-orange)', [
+    { name: 'Півфінали', matches: [ub1, ub2] },
+    { name: 'UB Фінал',  matches: [ub3] }
+  ]));
+  inner.appendChild(makeSection('НИЖНЯ СІТКА (LOWER BRACKET)', '#ff1a40', [
+    { name: 'LB Раунд 1', matches: [lb1] },
+    { name: 'LB Фінал',   matches: [lb2] }
+  ]));
+  inner.appendChild(makeSection('ГРАНД-ФІНАЛ', '#ffb703', [
+    { name: 'Grand Final', matches: [gf1] }
+  ]));
 
-  // 2. SINGLE ELIMINATION (4 / 8 TEAMS) RENDERING FLOW
-  container.style.display = "flex";
-  container.style.flexDirection = "row";
-  container.style.gap = "25px";
-  container.style.alignItems = "center";
+  const hint = document.createElement('div');
+  hint.className = 'bracket-drag-hint'; hint.innerHTML = '✋ Тягніть для прокрутки';
+  wrapper.appendChild(hint);
 
-  brackets.rounds.forEach(round => {
-    const col = document.createElement('div');
-    col.className = "bracket-round-column";
-
-    const title = document.createElement('div');
-    title.style.fontSize = "10px";
-    title.style.textTransform = "uppercase";
-    title.style.color = "var(--text-secondary)";
-    title.style.fontWeight = "800";
-    title.style.textAlign = "center";
-    title.style.marginBottom = "8px";
-    title.innerText = round.name;
-    col.appendChild(title);
-
-    round.matches.forEach(match => {
-      col.appendChild(createMatchNode(match));
-    });
-
-    container.appendChild(col);
-  });
+  _addBracketPan(wrapper, inner);
+  wrapper.appendChild(inner);
+  container.appendChild(wrapper);
 }
 
 // Global inspect team players roster modal display
 window.inspectTeamRoster = function(teamName) {
+
   if (!teamName || teamName === "" || teamName === "Очікується") return;
   const db = getDB();
   const team = db.teams.find(t => t.name.toLowerCase() === teamName.toLowerCase());
