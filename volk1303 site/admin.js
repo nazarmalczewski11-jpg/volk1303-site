@@ -1385,6 +1385,23 @@ window.switchAdminTab = function(tabId) {
   updateAdminNotificationBadges();
 };
 
+// Get maximum allowed players based on the format string
+function getMaxPlayersForFormat(formatStr) {
+  if (!formatStr) return 99;
+  const normalized = formatStr.toLowerCase().replace(/\s+/g, '');
+  // Matches patterns like 2x2, 2v2, 2н2 (Ukrainian н), 2на2, 2-2, 2_2, 2х2 (cyrillic х)
+  const match = normalized.match(/^(\d+)(?:x|v|на|н|-|\u0445)?\d*$/);
+  if (match) {
+    const num = parseInt(match[1], 10);
+    if (!isNaN(num)) return num;
+  }
+  const anyDigit = normalized.match(/(\d+)/);
+  if (anyDigit) {
+    return parseInt(anyDigit[1], 10);
+  }
+  return 99;
+}
+
 // Create a new team in admin console
 function createNewTeamAdmin() {
   const db = getDB();
@@ -1402,6 +1419,12 @@ function createNewTeamAdmin() {
 
   if (!name || !tag || playersRaw.length === 0) {
     showToast("Будь ласка, заповніть усі обов'язкові поля!", "error");
+    return;
+  }
+
+  const maxAllowed = getMaxPlayersForFormat(format);
+  if (playersRaw.length > maxAllowed) {
+    showToast(`Помилка: Максимальна кількість учасників для формату ${format} становить ${maxAllowed}!`, "error");
     return;
   }
 
@@ -2167,9 +2190,7 @@ function updateAdminNotificationBadges() {
   const db = getDB();
   if (!db) return;
 
-  const verifyBtn = Array.from(document.querySelectorAll('.admin-tab-item')).find(btn => 
-    btn.getAttribute('onclick') && btn.getAttribute('onclick').includes("'deposits-verify'")
-  );
+  const verifyBtn = document.querySelector('button[onclick*="deposits-verify"]');
   if (!verifyBtn) return;
 
   const isCurrentlyOnVerifyTab = verifyBtn.classList.contains('active');
@@ -2181,25 +2202,25 @@ function updateAdminNotificationBadges() {
     return;
   }
 
-  // Find the latest pending deposit timestamp based on id (dep_1234567890)
-  let latestPendingTime = 0;
-  pending.forEach(d => {
-    const tsStr = d.id.replace('dep_', '');
-    const ts = parseInt(tsStr, 10);
-    if (!isNaN(ts) && ts > latestPendingTime) {
-      latestPendingTime = ts;
-    }
-  });
-
   if (isCurrentlyOnVerifyTab) {
-    localStorage.setItem('admin_last_viewed_deposit_time', latestPendingTime.toString());
+    // If operator is on the tab, mark all pending deposits as read immediately
+    let changed = false;
+    db.pendingDeposits.forEach(d => {
+      if (d.status === "pending" && !d.isRead) {
+        d.isRead = true;
+        changed = true;
+      }
+    });
+    if (changed) {
+      saveDB(db);
+    }
     const existingDot = verifyBtn.querySelector('.notification-badge-dot');
     if (existingDot) existingDot.remove();
   } else {
-    const lastViewedTimeStr = localStorage.getItem('admin_last_viewed_deposit_time') || "0";
-    const lastViewedTime = parseInt(lastViewedTimeStr, 10) || 0;
+    // If not on the tab, check if there is any pending deposit that is unread
+    const hasUnreadPending = pending.some(d => !d.isRead);
 
-    if (latestPendingTime > lastViewedTime) {
+    if (hasUnreadPending) {
       let existingDot = verifyBtn.querySelector('.notification-badge-dot');
       if (!existingDot) {
         existingDot = document.createElement('span');
@@ -2883,39 +2904,34 @@ window.selectExistingTeamForSlot = function(slotIndex) {
   const tour = db.tournaments.find(t => t.id === activeRosterTournamentId);
   if (!tour) return;
 
+  if (!tour.registeredTeams) tour.registeredTeams = [];
+
+  // Exclusivity & player count limitations checks
   if (teamId) {
     const selectedTeam = db.teams.find(t => t.id === teamId);
     if (selectedTeam) {
-      let maxPlayers = 5;
-      const fmtMatch = tour.format.toLowerCase().split('x');
-      if (fmtMatch.length === 2 && !isNaN(parseInt(fmtMatch[0]))) {
-        maxPlayers = parseInt(fmtMatch[0]);
-      }
+      // 1. Check player count limit based on format
+      const maxAllowed = getMaxPlayersForFormat(tour.format);
       const playerLen = (selectedTeam.players || []).length;
-      if (playerLen > maxPlayers) {
-        showToast(`Помилка: Команда "${selectedTeam.name}" має ${playerLen} гравців, що перевищує ліміт (${maxPlayers}) для формату ${tour.format}!`, "error");
+      if (playerLen > maxAllowed) {
+        showToast(`Помилка: Команда "${selectedTeam.name}" має ${playerLen} гравців, що перевищує ліміт (${maxAllowed}) для формату ${tour.format}!`, "error");
         return;
       }
-    }
-  }
 
-  if (!tour.registeredTeams) tour.registeredTeams = [];
-
-  // Exclusivity validation: one player cannot be in two teams in the same tournament
-  if (teamId) {
-    const selectedTeam = db.teams.find(t => t.id === teamId);
-    if (selectedTeam && selectedTeam.players && selectedTeam.players.length > 0) {
-      const selectedPlayersLower = selectedTeam.players.map(p => p.toLowerCase());
-      for (let i = 0; i < tour.registeredTeams.length; i++) {
-        if (i === slotIndex) continue; // Skip the slot being overwritten
-        const otherTeamId = tour.registeredTeams[i];
-        if (!otherTeamId || otherTeamId === teamId) continue;
-        const otherTeam = db.teams.find(t => t.id === otherTeamId);
-        if (otherTeam && otherTeam.players) {
-          for (const p of otherTeam.players) {
-            if (selectedPlayersLower.includes(p.toLowerCase())) {
-              showToast(`Помилка: Гравець @${p.toUpperCase()} вже бере участь у цьому турнірі в складі команди "${otherTeam.name}"!`, "error");
-              return;
+      // 2. Exclusivity validation: one player cannot be in two teams in the same tournament
+      if (selectedTeam.players && selectedTeam.players.length > 0) {
+        const selectedPlayersLower = selectedTeam.players.map(p => p.toLowerCase());
+        for (let i = 0; i < tour.registeredTeams.length; i++) {
+          if (i === slotIndex) continue; // Skip the slot being overwritten
+          const otherTeamId = tour.registeredTeams[i];
+          if (!otherTeamId || otherTeamId === teamId) continue;
+          const otherTeam = db.teams.find(t => t.id === otherTeamId);
+          if (otherTeam && otherTeam.players) {
+            for (const p of otherTeam.players) {
+              if (selectedPlayersLower.includes(p.toLowerCase())) {
+                showToast(`Помилка: Гравець @${p.toUpperCase()} вже бере участь у цьому турнірі в складі команди "${otherTeam.name}"!`, "error");
+                return;
+              }
             }
           }
         }
@@ -3067,18 +3083,13 @@ window.addPlayerToSlotTeam = function(teamId, username) {
   if (!team.players) team.players = [];
   const userNickLower = username.toLowerCase();
 
+  // Format size limitation check
   const tour = db.tournaments.find(t => t.id === activeRosterTournamentId);
-  if (tour) {
-    let maxPlayers = 5;
-    const fmtMatch = tour.format.toLowerCase().split('x');
-    if (fmtMatch.length === 2 && !isNaN(parseInt(fmtMatch[0]))) {
-      maxPlayers = parseInt(fmtMatch[0]);
-    }
-    const currentCount = team.players.length;
-    if (currentCount >= maxPlayers) {
-      showToast(`У команді вже досягнуто ліміт гравців (${maxPlayers}) для формату ${tour.format}!`, "error");
-      return;
-    }
+  const format = tour ? tour.format : (team.format || '2x2');
+  const maxAllowed = getMaxPlayersForFormat(format);
+  if (team.players.length >= maxAllowed) {
+    showToast(`Помилка: Максимальна кількість учасників для формату ${format} становить ${maxAllowed}!`, "error");
+    return;
   }
 
   // Normalize all stored players to lowercase for reliable comparison

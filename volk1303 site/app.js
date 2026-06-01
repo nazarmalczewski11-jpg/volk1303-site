@@ -676,10 +676,23 @@ function renderPageContent() {
   
   // Render shared header values if present (pages: betting, tournament, profile, admin)
   const balanceVal = document.getElementById('header-balance-value');
-  if (balanceVal && db.currentUser) {
+  const withdrawBtn = document.getElementById('header-withdraw-btn');
+  if (db.currentUser) {
     const user = db.users.find(u => u.username === db.currentUser);
     if (user) {
-      balanceVal.innerText = user.balance;
+      if (balanceVal) {
+        balanceVal.innerText = user.balance;
+      }
+      if (withdrawBtn) {
+        withdrawBtn.style.background = '';
+        withdrawBtn.style.borderColor = '';
+        withdrawBtn.style.color = '';
+        if (user.balance >= 2000) {
+          withdrawBtn.classList.remove('btn-secondary');
+        } else {
+          withdrawBtn.classList.add('btn-secondary');
+        }
+      }
     }
   }
 
@@ -1358,7 +1371,8 @@ async function startDepositVerify(amount, method, references) {
       method: "MONOBANKA",
       reference: references, // sender name
       date: new Date().toLocaleString(),
-      status: "pending"
+      status: "pending",
+      isRead: false
     };
 
     db.pendingDeposits = db.pendingDeposits || [];
@@ -3142,4 +3156,9 @@ window.openRosterModalComparison = function(team1Name, team2Name) {
   container.appendChild(flexDiv);
 
   openModal('roster-modal');
+};
+
+// Show withdraw limit notification
+window.showWithdrawNotice = function() {
+  showToast('Мінімальна сума виводу від 2000 монет!', 'warning');
 };
