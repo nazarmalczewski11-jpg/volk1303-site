@@ -776,7 +776,7 @@ function renderDashboardOpsLog(db) {
 
   // Compile registrations
   db.users.forEach(u => {
-    if (u.username !== 'admin!') {
+    if (u && u.username && u.username !== 'admin!') {
       events.push({
         time: "2026-06-01 12:00", // Baseline date
         tag: "reg",
@@ -787,7 +787,7 @@ function renderDashboardOpsLog(db) {
 
   // Compile deposits
   db.users.forEach(u => {
-    if (u.depositHistory) {
+    if (u && u.username && u.depositHistory) {
       u.depositHistory.forEach(dep => {
         events.push({
           time: dep.date || "2026-06-01 12:00",
@@ -800,12 +800,12 @@ function renderDashboardOpsLog(db) {
 
   // Compile bets
   db.users.forEach(u => {
-    if (u.betHistory) {
+    if (u && u.username && u.betHistory) {
       u.betHistory.forEach(bet => {
         events.push({
           time: bet.date || "2026-06-01 12:00",
           tag: "bet",
-          text: `Користувач <strong>${u.username.toUpperCase()}</strong> зробив ставку <strong>${bet.amount} 🪙</strong> на <strong>${bet.selectedTeam}</strong> (кэф ${bet.odds.toFixed(2)})`
+          text: `Користувач <strong>${u.username.toUpperCase()}</strong> зробив ставку <strong>${bet.amount} 🪙</strong> на <strong>${bet.selectedTeam}</strong> (кэф ${(bet.odds || 0).toFixed(2)})`
         });
       });
     }
@@ -1978,7 +1978,7 @@ function renderInspectorBetsList(user) {
     div.innerHTML = `
       <div style="flex:1;">
         <div style="font-weight:800; color:white;">${bet.matchDisplay || 'Дуель'}</div>
-        <div style="font-size:10px; color:var(--text-secondary); margin-top:2px;">Ставка: ${bet.amount} 🪙 на ${bet.selectedTeam} (кэф ${bet.odds.toFixed(2)})</div>
+        <div style="font-size:10px; color:var(--text-secondary); margin-top:2px;">Ставка: ${bet.amount} 🪙 на ${bet.selectedTeam} (кэф ${(bet.odds || 0).toFixed(2)})</div>
         <div style="font-size:10px; color:var(--text-secondary); margin-top:1px;">${bet.date}</div>
       </div>
       <div style="color:${color}; font-weight:800; font-size:10px; text-transform:uppercase;">
@@ -2104,7 +2104,11 @@ function startBracketSimulation() {
     if (!brackets || !brackets.rounds) return;
 
     // Safety check: ensure bracket structure matches the standard 4-team single elimination simulation layout
-    if (brackets.rounds.length !== 2 || brackets.rounds[0].matches.length !== 2) return;
+    if (brackets.rounds.length !== 2 || 
+        !brackets.rounds[0] || !brackets.rounds[0].matches || brackets.rounds[0].matches.length !== 2 ||
+        !brackets.rounds[1] || !brackets.rounds[1].matches || brackets.rounds[1].matches.length !== 1) {
+      return;
+    }
 
     // Fill empty slots in Round 0 (Півфінали) with mock teams if they are empty
     const round0 = brackets.rounds[0];
@@ -2152,7 +2156,8 @@ function startBracketSimulation() {
     } else {
       // Round 0 matches are both completed. Check Round 1 (Фінал)
       const round1 = brackets.rounds[1];
-      const finalMatch = round1.matches[0];
+      const finalMatch = round1.matches ? round1.matches[0] : null;
+      if (!finalMatch) return;
 
       // Populate final match teams from round 0 winners if not already set
       if ((finalMatch.team1 === "Очікується" || finalMatch.team1 === "") && round0.matches[0].winner) {

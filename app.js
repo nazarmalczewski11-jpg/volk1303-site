@@ -1340,13 +1340,15 @@ function renderChallengermodeTeamPanel() {
     creationForm.style.display = 'none';
     infoDisplay.style.display = 'block';
 
-    // Verify if signed in the bracket round 0 slots
+    // Verify if signed in the bracket round 0 slots with safety check
     let isEnrolled = false;
-    db.brackets.rounds[0].matches.forEach(m => {
-      if (m.team1 === team.name || m.team2 === team.name) {
-        isEnrolled = true;
-      }
-    });
+    if (db.brackets && db.brackets.rounds && db.brackets.rounds[0] && db.brackets.rounds[0].matches) {
+      db.brackets.rounds[0].matches.forEach(m => {
+        if (m && (m.team1 === team.name || m.team2 === team.name)) {
+          isEnrolled = true;
+        }
+      });
+    }
 
     infoDisplay.innerHTML = `
       <div style="background-color: var(--bg-input); border:1px solid var(--border-color); padding:20px; border-radius:10px;">
@@ -1526,6 +1528,15 @@ function renderBracketsTree(brackets) {
     node.className = "bracket-match-node";
     node.style.cursor = "pointer";
     
+    if (!match) {
+      node.style.opacity = "0.5";
+      node.innerHTML = `
+        <div class="bracket-node-team"><span>Очікується</span><span>0</span></div>
+        <div class="bracket-node-team"><span>Очікується</span><span>0</span></div>
+      `;
+      return node;
+    }
+    
     const t1 = match.team1 || 'Очікується';
     const t2 = match.team2 || 'Очікується';
     
@@ -1559,13 +1570,13 @@ function renderBracketsTree(brackets) {
     container.style.flexDirection = "column";
     container.style.gap = "25px";
     
-    // Locate match slots from rounds
-    const ub_1 = brackets.rounds[0].matches[0];
-    const ub_2 = brackets.rounds[0].matches[1];
-    const ub_3 = brackets.rounds[1].matches[0];
-    const lb_1 = brackets.rounds[2].matches[0];
-    const lb_2 = brackets.rounds[3].matches[0];
-    const gf_1 = brackets.rounds[4].matches[0];
+    // Locate match slots from rounds with safety guards
+    const ub_1 = brackets.rounds[0] && brackets.rounds[0].matches ? brackets.rounds[0].matches[0] : null;
+    const ub_2 = brackets.rounds[0] && brackets.rounds[0].matches ? brackets.rounds[0].matches[1] : null;
+    const ub_3 = brackets.rounds[1] && brackets.rounds[1].matches ? brackets.rounds[1].matches[0] : null;
+    const lb_1 = brackets.rounds[2] && brackets.rounds[2].matches ? brackets.rounds[2].matches[0] : null;
+    const lb_2 = brackets.rounds[3] && brackets.rounds[3].matches ? brackets.rounds[3].matches[0] : null;
+    const gf_1 = brackets.rounds[4] && brackets.rounds[4].matches ? brackets.rounds[4].matches[0] : null;
     
     // Upper Bracket Wrapper
     const ubSection = document.createElement('div');
@@ -2648,7 +2659,11 @@ function startBracketSimulation() {
     if (!brackets || !brackets.rounds) return;
 
     // Safety check: ensure bracket structure matches the standard 4-team single elimination simulation layout
-    if (brackets.rounds.length !== 2 || brackets.rounds[0].matches.length !== 2) return;
+    if (brackets.rounds.length !== 2 || 
+        !brackets.rounds[0] || !brackets.rounds[0].matches || brackets.rounds[0].matches.length !== 2 ||
+        !brackets.rounds[1] || !brackets.rounds[1].matches || brackets.rounds[1].matches.length !== 1) {
+      return;
+    }
 
     // Fill empty slots in Round 0 (Півфінали) with mock teams if they are empty
     const round0 = brackets.rounds[0];
@@ -2696,7 +2711,8 @@ function startBracketSimulation() {
     } else {
       // Round 0 matches are both completed. Check Round 1 (Фінал)
       const round1 = brackets.rounds[1];
-      const finalMatch = round1.matches[0];
+      const finalMatch = round1.matches ? round1.matches[0] : null;
+      if (!finalMatch) return;
 
       // Populate final match teams from round 0 winners if not already set
       if ((finalMatch.team1 === "Очікується" || finalMatch.team1 === "") && round0.matches[0].winner) {

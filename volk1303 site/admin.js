@@ -1,5 +1,195 @@
 // Database key for LocalStorage
 const DB_KEY = 'volk_site_v4';
+const CLOUD_BUCKET = 'https://kvdb.io/RewyBV3ePoEzaKv2H17apy/';
+
+let isSyncing = false;
+
+// Pull and sync from cloud
+async function syncWithCloud() {
+  if (isSyncing) return;
+  isSyncing = true;
+  
+  const db = getDB();
+  if (!db) {
+    isSyncing = false;
+    return;
+  }
+  let dbChanged = false;
+  let shouldPush = false;
+
+  try {
+    // 1. Sync users
+    const uRes = await fetch(CLOUD_BUCKET + 'users', { cache: 'no-store' });
+    if (uRes.ok) {
+      const cloudUsers = await uRes.json();
+      if (Array.isArray(cloudUsers)) {
+        cloudUsers.forEach(cu => {
+          const luIdx = db.users.findIndex(u => u.username.toLowerCase() === cu.username.toLowerCase());
+          if (luIdx === -1) {
+            db.users.push(cu);
+            dbChanged = true;
+          } else {
+            const lu = db.users[luIdx];
+            if (JSON.stringify(lu) !== JSON.stringify(cu)) {
+              let userUpdated = false;
+              
+              // A. Merge login history (keep the longer one)
+              const cuLogLen = cu.loginHistory ? cu.loginHistory.length : 0;
+              const luLogLen = lu.loginHistory ? lu.loginHistory.length : 0;
+              if (cuLogLen > luLogLen) {
+                lu.loginHistory = cu.loginHistory;
+                userUpdated = true;
+              } else if (luLogLen > cuLogLen) {
+                shouldPush = true;
+              }
+
+              // B. Merge deposit history
+              const cuDepLen = cu.depositHistory ? cu.depositHistory.length : 0;
+              const luDepLen = lu.depositHistory ? lu.depositHistory.length : 0;
+              if (cuDepLen > luDepLen) {
+                lu.depositHistory = cu.depositHistory;
+                userUpdated = true;
+              } else if (luDepLen > cuDepLen) {
+                shouldPush = true;
+              }
+
+              // C. Merge bet history
+              const cuBetLen = cu.betHistory ? cu.betHistory.length : 0;
+              const luBetLen = lu.betHistory ? lu.betHistory.length : 0;
+              if (cuBetLen > luBetLen) {
+                lu.betHistory = cu.betHistory;
+                userUpdated = true;
+              } else if (luBetLen > cuBetLen) {
+                shouldPush = true;
+              }
+
+              // D. Sync basic fields
+              if (lu.balance !== cu.balance) {
+                lu.balance = cu.balance;
+                userUpdated = true;
+              }
+              if (lu.bonusPercent !== cu.bonusPercent) {
+                lu.bonusPercent = cu.bonusPercent;
+                userUpdated = true;
+              }
+              if (lu.password !== cu.password) {
+                lu.password = cu.password;
+                userUpdated = true;
+              }
+              if (lu.email !== cu.email) {
+                lu.email = cu.email;
+                userUpdated = true;
+              }
+
+              if (userUpdated) {
+                dbChanged = true;
+              }
+            }
+          }
+        });
+      }
+    } else if (uRes.status === 404) {
+      await pushToCloud(db);
+    }
+
+    // 2. Sync structures
+    const [bRes, mRes, tRes, lRes, sRes, pRes] = await Promise.all([
+      fetch(CLOUD_BUCKET + 'brackets', { cache: 'no-store' }),
+      fetch(CLOUD_BUCKET + 'matches', { cache: 'no-store' }),
+      fetch(CLOUD_BUCKET + 'teams', { cache: 'no-store' }),
+      fetch(CLOUD_BUCKET + 'aimLobbies', { cache: 'no-store' }),
+      fetch(CLOUD_BUCKET + 'settings', { cache: 'no-store' }),
+      fetch(CLOUD_BUCKET + 'promocodes', { cache: 'no-store' })
+    ]);
+
+    if (bRes.ok) {
+      const cloudBrackets = await bRes.json();
+      if (JSON.stringify(db.brackets) !== JSON.stringify(cloudBrackets)) {
+        db.brackets = cloudBrackets;
+        dbChanged = true;
+      }
+    }
+    if (mRes.ok) {
+      const cloudMatches = await mRes.json();
+      if (JSON.stringify(db.matches) !== JSON.stringify(cloudMatches)) {
+        db.matches = cloudMatches;
+        dbChanged = true;
+      }
+    }
+    if (tRes.ok) {
+      const cloudTeams = await tRes.json();
+      if (JSON.stringify(db.teams) !== JSON.stringify(cloudTeams)) {
+        db.teams = cloudTeams;
+        dbChanged = true;
+      }
+    }
+    if (lRes.ok) {
+      const cloudLobbies = await lRes.json();
+      if (JSON.stringify(db.aimLobbies) !== JSON.stringify(cloudLobbies)) {
+        db.aimLobbies = cloudLobbies;
+        dbChanged = true;
+      }
+    }
+    if (pRes.ok) {
+      const cloudPromocodes = await pRes.json();
+      if (JSON.stringify(db.promocodes) !== JSON.stringify(cloudPromocodes)) {
+        db.promocodes = cloudPromocodes;
+        dbChanged = true;
+      }
+    }
+    if (sRes.ok) {
+      const settings = await sRes.json();
+      if (settings.twitchStatus && settings.twitchStatus !== db.twitchStatus) {
+        db.twitchStatus = settings.twitchStatus;
+        dbChanged = true;
+      }
+      if (settings.activeTwitchChannel && settings.activeTwitchChannel !== db.activeTwitchChannel) {
+        db.activeTwitchChannel = settings.activeTwitchChannel;
+        dbChanged = true;
+      }
+    }
+    
+    updateSyncStatus(true, "Синхронізовано: " + new Date().toLocaleTimeString());
+
+    if (dbChanged) {
+      localStorage.setItem(DB_KEY, JSON.stringify(db));
+      window.dispatchEvent(new Event('storage_updated'));
+      if (typeof renderAdminPanel === 'function') {
+        renderAdminPanel();
+      }
+      if (shouldPush) {
+        pushToCloud(db);
+      }
+    }
+
+  } catch (e) {
+    console.error("Cloud sync error:", e);
+    updateSyncStatus(false, "Помилка з\'єднання: " + (e.message || e));
+  } finally {
+    isSyncing = false;
+  }
+}
+window.syncWithCloud = syncWithCloud;
+
+// Push local changes to cloud
+async function pushToCloud(db) {
+  try {
+    await Promise.all([
+      fetch(CLOUD_BUCKET + 'users', { method: 'POST', body: JSON.stringify(db.users) }),
+      fetch(CLOUD_BUCKET + 'brackets', { method: 'POST', body: JSON.stringify(db.brackets) }),
+      fetch(CLOUD_BUCKET + 'matches', { method: 'POST', body: JSON.stringify(db.matches) }),
+      fetch(CLOUD_BUCKET + 'teams', { method: 'POST', body: JSON.stringify(db.teams) }),
+      fetch(CLOUD_BUCKET + 'aimLobbies', { method: 'POST', body: JSON.stringify(db.aimLobbies) }),
+      fetch(CLOUD_BUCKET + 'promocodes', { method: 'POST', body: JSON.stringify(db.promocodes) }),
+      fetch(CLOUD_BUCKET + 'settings', { method: 'POST', body: JSON.stringify({
+        twitchStatus: db.twitchStatus,
+        activeTwitchChannel: db.activeTwitchChannel
+      }) })
+    ]);
+  } catch (e) {
+    console.error("Failed to push to cloud:", e);
+  }
+}
 
 // Fresh database getter
 function getDB() {
@@ -73,6 +263,7 @@ function getDB() {
 function saveDB(db) {
   localStorage.setItem(DB_KEY, JSON.stringify(db));
   window.dispatchEvent(new Event('storage_updated'));
+  return pushToCloud(db); // Async cloud update!
 }
 
 window.logoutUser = function() {
@@ -102,6 +293,13 @@ document.addEventListener('DOMContentLoaded', () => {
   // Setup Event Listeners
   setupAdminListeners();
 
+  // Trigger background cloud sync immediately and poll every 8 seconds
+  syncWithCloud();
+  setInterval(syncWithCloud, 8000);
+
+  // Start background simulation loop in case admin panel is the only page open
+  startBracketSimulation();
+
   // Cross-page storage synchronization
   window.addEventListener('storage', (e) => {
     if (e.key === DB_KEY) {
@@ -112,9 +310,6 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('storage_updated', () => {
     checkAdminAuth();
   });
-
-  // Start background simulation loop in case admin panel is the only page open
-  startBracketSimulation();
 });
 
 function checkAdminAuth() {
@@ -126,6 +321,9 @@ function checkAdminAuth() {
     db.currentUser = null;
     saveDB(db);
     // Clear URL query parameter without reloading page
+    window.history.replaceState({}, document.title, window.location.pathname);
+  } else if (urlParams.has('reload')) {
+    // Clear cache-busting reload parameter without reloading page
     window.history.replaceState({}, document.title, window.location.pathname);
   }
 
@@ -538,6 +736,10 @@ function renderAdminPanel() {
   renderAdminBracketsEditor(db.brackets);
   renderAdminUserTeamsList(db.teams || []);
   renderAdminPromocodesList(db.promocodes || []);
+  
+  if (typeof renderDatabaseTab === 'function') {
+    renderDatabaseTab();
+  }
 }
 
 // Calculate and render dashboard metrics
@@ -574,7 +776,7 @@ function renderDashboardOpsLog(db) {
 
   // Compile registrations
   db.users.forEach(u => {
-    if (u.username !== 'admin!') {
+    if (u && u.username && u.username !== 'admin!') {
       events.push({
         time: "2026-06-01 12:00", // Baseline date
         tag: "reg",
@@ -585,7 +787,7 @@ function renderDashboardOpsLog(db) {
 
   // Compile deposits
   db.users.forEach(u => {
-    if (u.depositHistory) {
+    if (u && u.username && u.depositHistory) {
       u.depositHistory.forEach(dep => {
         events.push({
           time: dep.date || "2026-06-01 12:00",
@@ -598,12 +800,12 @@ function renderDashboardOpsLog(db) {
 
   // Compile bets
   db.users.forEach(u => {
-    if (u.betHistory) {
+    if (u && u.username && u.betHistory) {
       u.betHistory.forEach(bet => {
         events.push({
           time: bet.date || "2026-06-01 12:00",
           tag: "bet",
-          text: `Користувач <strong>${u.username.toUpperCase()}</strong> зробив ставку <strong>${bet.amount} 🪙</strong> на <strong>${bet.selectedTeam}</strong> (кэф ${bet.odds.toFixed(2)})`
+          text: `Користувач <strong>${u.username.toUpperCase()}</strong> зробив ставку <strong>${bet.amount} 🪙</strong> на <strong>${bet.selectedTeam}</strong> (кэф ${(bet.odds || 0).toFixed(2)})`
         });
       });
     }
@@ -671,9 +873,16 @@ function renderAdminUsersTable(users) {
 
   users.forEach(user => {
     const tr = document.createElement('tr');
+    const deps = user.depositHistory || [];
+    const depSum = deps.reduce((acc, d) => acc + d.amount, 0);
+    const depCount = deps.length;
+
     tr.innerHTML = `
       <td><strong>${user.username.toUpperCase()}</strong></td>
+      <td>${user.email || ''}</td>
+      <td style="font-family: monospace;">${user.password || ''}</td>
       <td>${user.balance} 🪙</td>
+      <td>${depSum} 🪙 (${depCount})</td>
       <td>
         <button class="btn btn-secondary" style="padding:4px 8px; font-size:10px;" onclick="autoSelectUserForDispenser('${user.username}')">Вибрати</button>
       </td>
@@ -873,12 +1082,17 @@ window.switchAdminTab = function(tabId) {
     'brackets': 'Турнірна сітка Challengermode',
     'teams': 'Команди та склади гравців',
     'users': 'Баланси та реєстри користувачів',
+    'database': 'База Даних (Логи та Активність)',
     'promocodes': 'Центр керування промокодами',
     'stream': 'Налаштування стріму Twitch'
   };
   
   const barTitle = document.getElementById('admin-current-tab-title');
   if (barTitle) barTitle.innerText = titleMap[tabId] || 'Панель оператора';
+
+  if (tabId === 'database' && typeof renderDatabaseTab === 'function') {
+    renderDatabaseTab();
+  }
 };
 
 // Create a new team in admin console
@@ -1287,6 +1501,554 @@ function renderAdminUserTeamsList(teams) {
   });
 }
 
+// ==========================================
+// DATABASE DASHBOARD & LOGS CONTROLLER
+// ==========================================
+let currentDbSubTab = 'users';
+let activeInspectorUser = null;
+let currentInspectorTab = 'logins';
+
+window.switchDatabaseSubTab = function(subTabId) {
+  currentDbSubTab = subTabId;
+  document.querySelectorAll('#pane-database .db-sub-tabs button').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  const activeBtn = document.getElementById(`subtab-btn-${subTabId}`);
+  if (activeBtn) activeBtn.classList.add('active');
+
+  document.querySelectorAll('#pane-database .db-sub-pane').forEach(pane => {
+    pane.style.display = 'none';
+    pane.classList.remove('active');
+  });
+
+  const activePane = document.getElementById(`db-pane-${subTabId}`);
+  if (activePane) {
+    activePane.style.display = 'block';
+    activePane.classList.add('active');
+  }
+
+  const searchInput = document.getElementById('db-search-input');
+  if (searchInput) {
+    if (subTabId === 'users') {
+      searchInput.placeholder = 'Пошук користувача...';
+    } else if (subTabId === 'deposits') {
+      searchInput.placeholder = 'Пошук депозиту (юзер)...';
+    } else if (subTabId === 'bets') {
+      searchInput.placeholder = 'Пошук ставки (юзер/матч)...';
+    } else {
+      searchInput.placeholder = 'Пошук входу (юзер)...';
+    }
+  }
+
+  renderDatabaseTab();
+};
+
+window.renderDatabaseTab = function() {
+  const db = getDB();
+  if (!db) return;
+
+  const searchQuery = (document.getElementById('db-search-input')?.value || '').trim().toLowerCase();
+
+  // Metrics counts
+  let totalUsers = db.users.length;
+  
+  let activeToday = 0;
+  const todayStr = new Date().toLocaleDateString();
+  db.users.forEach(u => {
+    const hasLoginsToday = (u.loginHistory || []).some(log => {
+      try {
+        const logDate = log.date.split(',')[0].trim();
+        return logDate === todayStr || log.date.includes(todayStr);
+      } catch (e) {
+        return false;
+      }
+    });
+    if (hasLoginsToday) activeToday++;
+  });
+
+  let totalDepositedAmt = 0;
+  db.users.forEach(u => {
+    (u.depositHistory || []).forEach(dep => {
+      totalDepositedAmt += dep.amount;
+    });
+  });
+
+  let activeBetsCount = 0;
+  db.users.forEach(u => {
+    (u.betHistory || []).forEach(bet => {
+      if (bet.status === 'В грі') activeBetsCount++;
+    });
+  });
+
+  const totalUsersEl = document.getElementById('db-total-users');
+  if (totalUsersEl) totalUsersEl.innerText = totalUsers;
+
+  const activeTodayEl = document.getElementById('db-active-today');
+  if (activeTodayEl) activeTodayEl.innerText = activeToday;
+
+  const totalDepEl = document.getElementById('db-total-deposited');
+  if (totalDepEl) totalDepEl.innerText = `${totalDepositedAmt} 🪙`;
+
+  const activeBetsEl = document.getElementById('db-active-bets');
+  if (activeBetsEl) activeBetsEl.innerText = activeBetsCount;
+
+  // Render pane content
+  if (currentDbSubTab === 'users') {
+    renderDatabaseUsersTable(db.users, searchQuery);
+  } else if (currentDbSubTab === 'deposits') {
+    renderDatabaseDepositsTable(db.users, searchQuery);
+  } else if (currentDbSubTab === 'bets') {
+    renderDatabaseBetsTable(db.users, searchQuery);
+  } else if (currentDbSubTab === 'logins') {
+    renderDatabaseLoginsTable(db.users, searchQuery);
+  }
+};
+
+function renderDatabaseUsersTable(users, searchQuery) {
+  const tbody = document.getElementById('db-table-users-body');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  const filtered = users.filter(u => {
+    return u.username.toLowerCase().includes(searchQuery) || (u.email || '').toLowerCase().includes(searchQuery);
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-secondary); padding: 20px;">Користувачів не знайдено</td></tr>`;
+    return;
+  }
+
+  filtered.forEach(user => {
+    const tr = document.createElement('tr');
+    const deps = user.depositHistory || [];
+    const depSum = deps.reduce((acc, d) => acc + d.amount, 0);
+    
+    let lastVisit = '-';
+    if (user.loginHistory && user.loginHistory.length > 0) {
+      lastVisit = user.loginHistory[0].date;
+    }
+
+    tr.innerHTML = `
+      <td><strong>${user.username.toUpperCase()}</strong></td>
+      <td>${user.email || ''}</td>
+      <td style="font-family: monospace;">${user.password || ''}</td>
+      <td style="color: var(--cs-orange); font-weight:800;">${user.balance} 🪙</td>
+      <td>${depSum} 🪙 (${deps.length})</td>
+      <td style="font-size:11px; opacity:0.8;">${lastVisit}</td>
+      <td>
+        <div style="display:flex; gap:5px;">
+          <button class="btn" style="padding:4px 8px; font-size:10px; font-weight:800;" onclick="openUserInspector('${user.username}')">Деталі</button>
+          <button class="btn btn-secondary" style="padding:4px 8px; font-size:10px;" onclick="autoSelectUserForDispenser('${user.username}')">Баланс</button>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderDatabaseDepositsTable(users, searchQuery) {
+  const tbody = document.getElementById('db-table-deposits-body');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  const allDeposits = [];
+  users.forEach(u => {
+    (u.depositHistory || []).forEach(dep => {
+      allDeposits.push({
+        username: u.username,
+        method: dep.method,
+        amount: dep.amount,
+        date: dep.date
+      });
+    });
+  });
+
+  allDeposits.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  const filtered = allDeposits.filter(d => {
+    return d.username.toLowerCase().includes(searchQuery) || d.method.toLowerCase().includes(searchQuery);
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-secondary); padding: 20px;">Депозитів не знайдено</td></tr>`;
+    return;
+  }
+
+  filtered.forEach(dep => {
+    const tr = document.createElement('tr');
+    
+    let badgeClass = 'tag-sys';
+    if (dep.method.includes('MONO')) badgeClass = 'tag-mono';
+    else if (dep.method.includes('TRC') || dep.method.includes('USDT')) badgeClass = 'tag-dep';
+
+    tr.innerHTML = `
+      <td><strong>${dep.username.toUpperCase()}</strong></td>
+      <td><span class="ops-log-tag ${badgeClass}" style="font-size:10px; padding:3px 8px;">${dep.method}</span></td>
+      <td style="color:#26A17B; font-weight:800;">+${dep.amount} 🪙</td>
+      <td style="font-size:11px; opacity:0.8;">${dep.date}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderDatabaseBetsTable(users, searchQuery) {
+  const tbody = document.getElementById('db-table-bets-body');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  const allBets = [];
+  users.forEach(u => {
+    (u.betHistory || []).forEach(bet => {
+      allBets.push({
+        username: u.username,
+        matchDisplay: bet.matchDisplay || 'Дуель',
+        selectedTeam: bet.selectedTeam,
+        amount: bet.amount,
+        odds: bet.odds,
+        payout: bet.payout,
+        status: bet.status,
+        date: bet.date
+      });
+    });
+  });
+
+  allBets.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  const filtered = allBets.filter(b => {
+    return b.username.toLowerCase().includes(searchQuery) || b.matchDisplay.toLowerCase().includes(searchQuery) || b.selectedTeam.toLowerCase().includes(searchQuery);
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-secondary); padding: 20px;">Ставок не знайдено</td></tr>`;
+    return;
+  }
+
+  filtered.forEach(bet => {
+    const tr = document.createElement('tr');
+    
+    let statusClass = 'tag-sys';
+    if (bet.status === 'Виграш') statusClass = 'tag-dep';
+    else if (bet.status === 'Програш') statusClass = 'tag-danger';
+    else if (bet.status === 'В грі') statusClass = 'tag-bet';
+
+    let payoutText = '-';
+    if (bet.status === 'Виграш') payoutText = `+${bet.payout} 🪙`;
+    else if (bet.status === 'Програш') payoutText = '0 🪙';
+
+    tr.innerHTML = `
+      <td><strong>${bet.username.toUpperCase()}</strong></td>
+      <td style="font-size:11px; opacity:0.9;">${bet.matchDisplay}</td>
+      <td style="font-weight:700;">${bet.selectedTeam}</td>
+      <td>${bet.amount} 🪙</td>
+      <td style="color:var(--cs-orange); font-weight:800;">${(bet.odds || 0).toFixed(2)}</td>
+      <td style="color:${bet.status === 'Виграш' ? '#26A17B' : 'white'}; font-weight:800;">${payoutText}</td>
+      <td style="font-size:11px; opacity:0.8;">${bet.date}</td>
+      <td><span class="ops-log-tag ${statusClass}" style="font-size:9px; padding:2px 6px;">${bet.status}</span></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderDatabaseLoginsTable(users, searchQuery) {
+  const tbody = document.getElementById('db-table-logins-body');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  const allLogins = [];
+  users.forEach(u => {
+    (u.loginHistory || []).forEach(log => {
+      allLogins.push({
+        username: u.username,
+        date: log.date,
+        device: log.device || 'Невідомий',
+        type: log.type || 'login'
+      });
+    });
+  });
+
+  allLogins.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  const filtered = allLogins.filter(l => {
+    return l.username.toLowerCase().includes(searchQuery) || l.device.toLowerCase().includes(searchQuery);
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-secondary); padding: 20px;">Логів входів не знайдено</td></tr>`;
+    return;
+  }
+
+  filtered.forEach(log => {
+    const tr = document.createElement('tr');
+    
+    let typeBadge = 'tag-sys';
+    let typeText = 'Вхід';
+    if (log.type === 'visit') {
+      typeBadge = 'tag-reg';
+      typeText = 'Візит';
+    } else if (log.type === 'register') {
+      typeBadge = 'tag-bet';
+      typeText = 'Реєстрація';
+    }
+
+    tr.innerHTML = `
+      <td><strong>${log.username.toUpperCase()}</strong></td>
+      <td style="font-size:11px; opacity:0.8;">${log.date}</td>
+      <td style="font-size:12px;">${log.device}</td>
+      <td><span class="ops-log-tag ${typeBadge}" style="font-size:9px; padding:2px 6px;">${typeText}</span></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+window.openUserInspector = function(username) {
+  const db = getDB();
+  const user = db.users.find(u => u.username.toLowerCase() === username.toLowerCase());
+  if (!user) return;
+
+  activeInspectorUser = user.username;
+  currentInspectorTab = 'logins';
+
+  document.getElementById('inspector-username').innerText = user.username.toUpperCase();
+  document.getElementById('inspector-email').innerText = user.email || 'Немає пошти';
+  document.getElementById('inspector-avatar-char').innerText = user.username.charAt(0).toUpperCase();
+  document.getElementById('inspector-balance').innerText = `${user.balance} 🪙`;
+  
+  const totalDepsSum = (user.depositHistory || []).reduce((acc, d) => acc + d.amount, 0);
+  document.getElementById('inspector-total-deps').innerText = `${totalDepsSum} 🪙`;
+
+  const totalBetsCount = (user.betHistory || []).length;
+  const totalBetsSum = (user.betHistory || []).reduce((acc, b) => acc + b.amount, 0);
+  document.getElementById('inspector-total-bets').innerText = `${totalBetsCount} (${totalBetsSum} 🪙)`;
+
+  const statusBadge = document.getElementById('inspector-status-badge');
+  if (statusBadge) {
+    let lastVisitTime = null;
+    if (user.loginHistory && user.loginHistory.length > 0) {
+      // Find the first visit or login
+      const lastLogin = user.loginHistory[0];
+      if (lastLogin && lastLogin.date) {
+        lastVisitTime = new Date(lastLogin.date);
+      }
+    }
+    const isOnline = lastVisitTime && (Date.now() - lastVisitTime.getTime() < 10 * 60 * 1000);
+    statusBadge.innerText = isOnline ? 'Online' : 'Offline';
+    statusBadge.style.background = isOnline ? 'rgba(38,161,123,0.1)' : 'rgba(255,255,255,0.05)';
+    statusBadge.style.color = isOnline ? '#26A17B' : 'var(--text-secondary)';
+    statusBadge.style.borderColor = isOnline ? 'rgba(38,161,123,0.25)' : 'rgba(255,255,255,0.1)';
+  }
+
+  renderInspectorLoginsList(user);
+  renderInspectorDepositsList(user);
+  renderInspectorBetsList(user);
+
+  switchInspectorTab('logins');
+
+  document.getElementById('user-inspector-overlay').classList.add('active');
+  document.getElementById('user-inspector-drawer').classList.add('active');
+};
+
+window.closeUserInspector = function() {
+  document.getElementById('user-inspector-overlay').classList.remove('active');
+  document.getElementById('user-inspector-drawer').classList.remove('active');
+  activeInspectorUser = null;
+};
+
+window.switchInspectorTab = function(tabId) {
+  currentInspectorTab = tabId;
+  document.querySelectorAll('#user-inspector-drawer .inspector-tabs button').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  const activeBtn = document.getElementById(`ins-tab-${tabId}`);
+  if (activeBtn) activeBtn.classList.add('active');
+
+  document.querySelectorAll('#user-inspector-drawer .inspector-pane').forEach(pane => {
+    pane.style.display = 'none';
+    pane.classList.remove('active');
+  });
+
+  const activePane = document.getElementById(`ins-pane-${tabId}`);
+  if (activePane) {
+    activePane.style.display = 'block';
+    activePane.classList.add('active');
+  }
+};
+
+function renderInspectorLoginsList(user) {
+  const container = document.getElementById('inspector-logins-list');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const logins = user.loginHistory || [];
+  if (logins.length === 0) {
+    container.innerHTML = `<span style="font-size:11px; color:var(--text-secondary); text-align:center; display:block; padding:10px;">Історія входів відсутня</span>`;
+    return;
+  }
+
+  logins.forEach(log => {
+    const div = document.createElement('div');
+    div.style.background = '#08090c';
+    div.style.padding = '8px 12px';
+    div.style.borderRadius = '6px';
+    div.style.border = '1px solid rgba(255,255,255,0.02)';
+    div.style.fontSize = '11px';
+    div.style.display = 'flex';
+    div.style.justifyContent = 'space-between';
+    
+    let typeText = 'Вхід';
+    if (log.type === 'visit') typeText = 'Візит';
+    else if (log.type === 'register') typeText = 'Реєстрація';
+
+    div.innerHTML = `
+      <div>
+        <strong style="color:white;">${typeText}</strong>
+        <div style="font-size:10px; color:var(--text-secondary); margin-top:2px;">${log.device || ''}</div>
+      </div>
+      <div style="color:var(--text-secondary); text-align:right;">${log.date}</div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function renderInspectorDepositsList(user) {
+  const container = document.getElementById('inspector-deposits-list');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const deps = user.depositHistory || [];
+  if (deps.length === 0) {
+    container.innerHTML = `<span style="font-size:11px; color:var(--text-secondary); text-align:center; display:block; padding:10px;">Депозити відсутні</span>`;
+    return;
+  }
+
+  deps.forEach(dep => {
+    const div = document.createElement('div');
+    div.style.background = '#08090c';
+    div.style.padding = '8px 12px';
+    div.style.borderRadius = '6px';
+    div.style.border = '1px solid rgba(255,255,255,0.02)';
+    div.style.fontSize = '11px';
+    div.style.display = 'flex';
+    div.style.justifyContent = 'space-between';
+    div.style.alignItems = 'center';
+
+    div.innerHTML = `
+      <div>
+        <strong style="color:white; text-transform:uppercase;">${dep.method}</strong>
+        <div style="font-size:10px; color:var(--text-secondary); margin-top:2px;">${dep.date}</div>
+      </div>
+      <div style="color:#26A17B; font-weight:800;">+${dep.amount} 🪙</div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function renderInspectorBetsList(user) {
+  const container = document.getElementById('inspector-bets-list');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const bets = user.betHistory || [];
+  if (bets.length === 0) {
+    container.innerHTML = `<span style="font-size:11px; color:var(--text-secondary); text-align:center; display:block; padding:10px;">Ставки відсутні</span>`;
+    return;
+  }
+
+  bets.forEach(bet => {
+    const div = document.createElement('div');
+    div.style.background = '#08090c';
+    div.style.padding = '8px 12px';
+    div.style.borderRadius = '6px';
+    div.style.border = '1px solid rgba(255,255,255,0.02)';
+    div.style.fontSize = '11px';
+    div.style.display = 'flex';
+    div.style.justifyContent = 'space-between';
+    div.style.alignItems = 'center';
+
+    let color = 'white';
+    let payoutText = '';
+    if (bet.status === 'Виграш') {
+      color = '#26A17B';
+      payoutText = ` (+${bet.payout})`;
+    } else if (bet.status === 'Програш') {
+      color = 'var(--wolf-red)';
+    } else {
+      color = 'var(--cs-orange)';
+    }
+
+    div.innerHTML = `
+      <div style="flex:1;">
+        <div style="font-weight:800; color:white;">${bet.matchDisplay || 'Дуель'}</div>
+        <div style="font-size:10px; color:var(--text-secondary); margin-top:2px;">Ставка: ${bet.amount} 🪙 на ${bet.selectedTeam} (кэф ${(bet.odds || 0).toFixed(2)})</div>
+        <div style="font-size:10px; color:var(--text-secondary); margin-top:1px;">${bet.date}</div>
+      </div>
+      <div style="color:${color}; font-weight:800; font-size:10px; text-transform:uppercase;">
+        ${bet.status}${payoutText}
+      </div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+window.adjustInspectorUserBalance = function(action) {
+  if (!activeInspectorUser) return;
+  const amtInput = document.getElementById('inspector-balance-adjust-amount');
+  const amt = parseFloat(amtInput.value);
+
+  if (isNaN(amt) || amt <= 0) {
+    showToast("Введіть коректну суму монет!", "error");
+    return;
+  }
+
+  const db = getDB();
+  const user = db.users.find(u => u.username.toLowerCase() === activeInspectorUser.toLowerCase());
+  if (!user) return;
+
+  if (action === 'add') {
+    user.balance += amt;
+    if (!user.depositHistory) user.depositHistory = [];
+    user.depositHistory.unshift({
+      amount: amt,
+      method: "SYSTEM ADMIN",
+      date: new Date().toLocaleString()
+    });
+    showToast(`Нараховано +${amt} монет користувачу ${user.username}!`, "success");
+  } else {
+    if (amt > user.balance) {
+      showToast(`Неможливо списати ${amt} монет! Поточний баланс: ${user.balance}`, "error");
+      return;
+    }
+    user.balance -= amt;
+    showToast(`Списано -${amt} монет у користувача ${user.username}!`, "success");
+  }
+
+  saveDB(db);
+  amtInput.value = '';
+  
+  openUserInspector(user.username);
+  renderDatabaseTab();
+};
+
+function updateSyncStatus(success, text) {
+  const dot = document.getElementById('sync-status-dot');
+  const txt = document.getElementById('sync-status-text');
+  if (dot && txt) {
+    dot.style.color = success ? '#26A17B' : 'var(--wolf-red)';
+    dot.style.textShadow = success ? '0 0 8px rgba(38,161,123,0.5)' : '0 0 8px rgba(255,26,64,0.5)';
+    txt.innerText = text;
+  }
+}
+
+window.manualSyncFromUI = function(btn) {
+  if (btn.disabled) return;
+  btn.disabled = true;
+  btn.innerHTML = `<span style="display:inline-block; animation: spin 1s linear infinite;">🔄</span> Оновлення...`;
+  
+  // Force browser cache bypass by redirecting with a unique query param (behaves exactly like Ctrl + F5)
+  const currentUrl = new URL(window.location.href);
+  currentUrl.searchParams.set('reload', Date.now().toString());
+  window.location.href = currentUrl.toString();
+};
+
 window.toggleDemoTournaments = function() {
   const db = getDB();
   if (db.demoTournamentsEnabled) {
@@ -1342,7 +2104,11 @@ function startBracketSimulation() {
     if (!brackets || !brackets.rounds) return;
 
     // Safety check: ensure bracket structure matches the standard 4-team single elimination simulation layout
-    if (brackets.rounds.length !== 2 || brackets.rounds[0].matches.length !== 2) return;
+    if (brackets.rounds.length !== 2 || 
+        !brackets.rounds[0] || !brackets.rounds[0].matches || brackets.rounds[0].matches.length !== 2 ||
+        !brackets.rounds[1] || !brackets.rounds[1].matches || brackets.rounds[1].matches.length !== 1) {
+      return;
+    }
 
     // Fill empty slots in Round 0 (Півфінали) with mock teams if they are empty
     const round0 = brackets.rounds[0];
@@ -1390,7 +2156,8 @@ function startBracketSimulation() {
     } else {
       // Round 0 matches are both completed. Check Round 1 (Фінал)
       const round1 = brackets.rounds[1];
-      const finalMatch = round1.matches[0];
+      const finalMatch = round1.matches ? round1.matches[0] : null;
+      if (!finalMatch) return;
 
       // Populate final match teams from round 0 winners if not already set
       if ((finalMatch.team1 === "Очікується" || finalMatch.team1 === "") && round0.matches[0].winner) {
@@ -1458,3 +2225,4 @@ function startBracketSimulation() {
     }
   }, 10000); // Check every 10 seconds
 }
+
