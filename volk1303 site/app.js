@@ -1710,9 +1710,9 @@ function renderProfileDashboard() {
 
       item.innerHTML = `
         <div>
-          <div style="font-weight: 800;">${bet.matchDisplay}</div>
+          <div style="font-weight: 800;">${bet.matchDisplay || bet.selectedTeam || 'Ставка'}</div>
           <div style="font-size: 11px; color:var(--text-secondary); margin-top:2px;">
-            Ставка на: ${bet.selectedTeam} (кэф ${bet.odds.toFixed(2)}) • ${bet.date}
+            Ставка на: ${bet.selectedTeam} (кэф ${(bet.odds || 0).toFixed(2)}) • ${bet.date}
           </div>
         </div>
         <div style="text-align:right;">
@@ -2525,9 +2525,9 @@ function renderMyBetsPage() {
       </div>
       
       <div class="bet-match-row">
-        <div class="bet-team-name">${bet.matchDisplay.split(' vs ')[0] || bet.matchDisplay}</div>
-        <div class="bet-vs-box">VS</div>
-        <div class="bet-team-name">${bet.matchDisplay.split(' vs ')[1] || ''}</div>
+        <div class="bet-team-name">${(bet.matchDisplay || '').split(' vs ')[0] || (bet.matchDisplay || 'Матч')}</div>
+        <div class="bet-vs-box">${(bet.matchDisplay || '').includes(' vs ') ? 'VS' : '🏆'}</div>
+        <div class="bet-team-name">${(bet.matchDisplay || '').split(' vs ')[1] || ''}</div>
       </div>
       
       <div class="bet-details-grid">
@@ -2975,11 +2975,13 @@ window.submitBetModalForm = function(event) {
 
   user.balance -= amount;
   if (!user.betHistory) user.betHistory = [];
+  const tourName = tour.name || 'Турнір';
   user.betHistory.push({
     id: 'tb_' + Date.now(),
     type: 'tournament',
     tourId,
     teamId,
+    matchDisplay: `🏆 ${tourName}`,
     selectedTeam: teamName,
     odds,
     amount,
