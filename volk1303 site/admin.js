@@ -201,6 +201,11 @@ async function syncWithCloud() {
     updateSyncStatus(true, "Синхронізовано: " + new Date().toLocaleTimeString());
 
     if (dbChanged) {
+      // Abort overwriting if a local push has started in the meantime to avoid race conditions!
+      if (activePushes > 0) {
+        console.log("[SYNC] Aborted overwriting local changes due to active push.");
+        return;
+      }
       localStorage.setItem(DB_KEY, JSON.stringify(db));
       window.dispatchEvent(new Event('storage_updated'));
       if (typeof renderAdminPanel === 'function') {
@@ -2166,7 +2171,7 @@ function adjustConductingSystems(maxTeamsVal) {
   const sysSelect = document.getElementById('tour-system');
   if (!opt || !sysSelect) return;
 
-  if (maxTeamsVal === "4") {
+  if (maxTeamsVal && maxTeamsVal.toString() === "4") {
     opt.disabled = false;
     opt.style.display = "block";
   } else {
@@ -2556,19 +2561,19 @@ window.openRosterModal = function(tourId) {
       // FILLED SLOT
       const players = team.players || [];
       const playersListHtml = players.map(p => `
-        <span class="player-tag-badge" style="display:inline-flex; align-items:center; background:#1e293b; color:white; border:1px solid rgba(255,255,255,0.08); padding:5px 12px; border-radius:6px; font-size:12px; gap:6px; font-weight:bold; transition: all 0.2s;" onmouseover="this.style.background='rgba(255,90,0,0.1)'; this.style.borderColor='var(--cs-orange)';" onmouseout="this.style.background='#1e293b'; this.style.borderColor='rgba(255,255,255,0.08)';">
-          @${p.toUpperCase()}
-          <span style="color:var(--wolf-red); cursor:pointer; font-weight:900; font-size:15px; padding-left:4px; display:inline-block; transition: transform 0.1s;" onmouseover="this.style.transform='scale(1.2)';" onmouseout="this.style.transform='scale(1)';" onclick="removePlayerFromSlotTeam('${team.id}', '${p}')">&times;</span>
+        <span class="player-tag-badge" style="display:inline-flex; align-items:center; background:#1e293b; color:white; border:1px solid rgba(255,255,255,0.08); padding:5px 12px; border-radius:6px; font-size:12px; gap:6px; font-weight:bold; transition: all 0.2s; max-width: 100%; box-sizing: border-box; overflow: hidden;" onmouseover="this.style.background='rgba(255,90,0,0.1)'; this.style.borderColor='var(--cs-orange)';" onmouseout="this.style.background='#1e293b'; this.style.borderColor='rgba(255,255,255,0.08)';">
+          <span style="text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 140px; display: inline-block;">@${p.toUpperCase()}</span>
+          <span style="color:var(--wolf-red); cursor:pointer; font-weight:900; font-size:15px; padding-left:4px; display:inline-block; transition: transform 0.1s; flex-shrink: 0;" onmouseover="this.style.transform='scale(1.2)';" onmouseout="this.style.transform='scale(1)';" onclick="removePlayerFromSlotTeam('${team.id}', '${p}')">&times;</span>
         </span>
       `).join(" ");
 
       slotCard.innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <div>
-            <strong style="color:white; font-size:15px; font-weight:800;">🛡️ Команда ${i + 1}: ${team.name} [${team.tag}]</strong>
+        <div style="display:flex; justify-content:space-between; align-items:center; gap: 8px;">
+          <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; padding-right: 5px;">
+            <strong style="color:white; font-size:15px; font-weight:800; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="🛡️ Команда ${i + 1}: ${team.name} [${team.tag}]">🛡️ Команда ${i + 1}: ${team.name} [${team.tag}]</strong>
             <div style="font-size:11px; color:var(--text-secondary); margin-top:2px;">Формат: <span style="color:var(--cs-orange); font-weight:bold;">${team.format}</span></div>
           </div>
-          <div style="display:flex; gap:8px;">
+          <div style="display:flex; gap:8px; flex-shrink: 0;">
             <button class="btn btn-secondary" style="padding: 6px 12px; font-size:11px; margin-bottom:0; font-weight:bold;" onclick="showRenameTeamSlotForm(${i}, '${team.id}', '${team.name}')">📝 Назва</button>
             <button class="btn btn-danger" style="padding: 6px 12px; font-size:11px; margin-bottom:0; font-weight:bold;" onclick="unregisterTeamSlot(${i})">❌</button>
           </div>
@@ -2576,9 +2581,9 @@ window.openRosterModal = function(tourId) {
         <div id="slot-rename-container-${i}" style="display:none; margin-top:8px; padding-bottom:8px;"></div>
         
         <div style="background:#0c0d12; border-radius:8px; padding:12px; border:1px solid rgba(255,255,255,0.02); margin-top:8px; box-shadow: inset 0 2px 8px rgba(0,0,0,0.4);">
-          <div style="font-size:11px; font-weight:800; color:var(--text-secondary); text-transform:uppercase; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; letter-spacing: 0.5px;">
+          <div style="font-size:11px; font-weight:800; color:var(--text-secondary); text-transform:uppercase; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; letter-spacing: 0.5px; gap: 8px;">
             <span>👥 Учасники (${players.length}):</span>
-            <a href="#" onclick="showAddPlayerToSlotForm(${i}, '${team.id}'); return false;" style="color:var(--cs-orange); text-decoration:none; font-weight:800; font-size:11px; background:rgba(255,90,0,0.1); padding:4px 8px; border-radius:4px; border:1px solid rgba(255,90,0,0.2); transition: all 0.2s;" onmouseover="this.style.background='var(--cs-orange)'; this.style.color='white';" onmouseout="this.style.background='rgba(255,90,0,0.1)'; this.style.color='var(--cs-orange)';">➕ Додати учасника</a>
+            <a href="#" onclick="showAddPlayerToSlotForm(${i}, '${team.id}'); return false;" style="color:var(--cs-orange); text-decoration:none; font-weight:800; font-size:11px; background:rgba(255,90,0,0.1); padding:4px 8px; border-radius:4px; border:1px solid rgba(255,90,0,0.2); transition: all 0.2s; flex-shrink: 0;" onmouseover="this.style.background='var(--cs-orange)'; this.style.color='white';" onmouseout="this.style.background='rgba(255,90,0,0.1)'; this.style.color='var(--cs-orange)';">➕ Додати учасника</a>
           </div>
           <div style="display:flex; flex-wrap:wrap; gap:6px; min-height: 28px; align-items:center;">
             ${players.length === 0 ? '<span style="font-size:11px; color:var(--text-secondary); font-style:italic;">Немає гравців</span>' : playersListHtml}
@@ -2602,7 +2607,7 @@ window.showAddTeamSlotForm = function(slotIndex) {
   container.style.display = "block";
   container.innerHTML = `
     <div style="display:flex; gap:8px; align-items:center;">
-      <input type="text" id="slot-team-name-input-${slotIndex}" class="form-input" placeholder="Назва команди..." style="margin-bottom:0; font-size:13px; padding:10px 14px; flex:1;">
+      <input type="text" id="slot-team-name-input-${slotIndex}" class="form-input" placeholder="Назва команди..." style="margin-bottom:0; font-size:13px; padding:10px 14px; flex:1;" onkeyup="if(event.key === 'Enter') createNewTeamForSlot(${slotIndex})">
       <button class="btn" style="padding:10px 18px; font-size:12px; margin-bottom:0; font-weight:bold;" onclick="createNewTeamForSlot(${slotIndex})">Зберегти</button>
       <button class="btn btn-secondary" style="padding:10px 14px; font-size:12px; margin-bottom:0; font-weight:bold;" onclick="hideSlotForm(${slotIndex})">Скасувати</button>
     </div>
@@ -2659,7 +2664,10 @@ window.createNewTeamForSlot = function(slotIndex) {
 
   const db = getDB();
   const tour = db.tournaments.find(t => t.id === activeRosterTournamentId);
-  if (!tour) return;
+  if (!tour) {
+    showToast("Помилка: Активний турнір не знайдено! Будь ласка, відкрийте вікно реєстрації знову.", "error");
+    return;
+  }
 
   if (db.teams.some(t => t.name.toLowerCase() === nameVal.toLowerCase())) {
     showToast("Команда з такою назвою вже існує!", "error");
@@ -2737,7 +2745,7 @@ window.showRenameTeamSlotForm = function(slotIndex, teamId, oldName) {
   container.style.display = "block";
   container.innerHTML = `
     <div style="display:flex; gap:8px; align-items:center; margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.05);">
-      <input type="text" id="slot-rename-input-${slotIndex}" class="form-input" value="${oldName}" style="margin-bottom:0; font-size:13px; padding:10px 14px; flex:1;">
+      <input type="text" id="slot-rename-input-${slotIndex}" class="form-input" value="${oldName}" style="margin-bottom:0; font-size:13px; padding:10px 14px; flex:1;" onkeyup="if(event.key === 'Enter') renameTeamSlot(${slotIndex}, '${teamId}')">
       <button class="btn" style="padding:10px 18px; font-size:12px; margin-bottom:0; font-weight:bold;" onclick="renameTeamSlot(${slotIndex}, '${teamId}')">Оновити</button>
       <button class="btn btn-secondary" style="padding:10px 14px; font-size:12px; margin-bottom:0; font-weight:bold;" onclick="hideRenameForm(${slotIndex})">Скасувати</button>
     </div>
@@ -2848,9 +2856,9 @@ window.searchUsersForTeamSlot = function(slotIndex, teamId) {
   }
 
   resultsContainer.innerHTML = matchingUsers.map(user => `
-    <div onclick="addPlayerToSlotTeam('${teamId}', '${user.username}')" style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:#181a26; border-radius:6px; border:1px solid rgba(255,255,255,0.05); cursor:pointer; transition: all 0.2s ease; margin-bottom:4px;" onmouseover="this.style.background='var(--cs-orange)'; this.style.borderColor='var(--cs-orange)';" onmouseout="this.style.background='#181a26'; this.style.borderColor='rgba(255,255,255,0.05)'">
-      <span style="font-size:13px; font-weight:800; color:white;">@${user.username.toUpperCase()}</span>
-      <span style="font-size:11px; color:rgba(255,255,255,0.7); display:flex; align-items:center; gap:4px; font-weight:bold;">➕ Швидке додавання</span>
+    <div onclick="addPlayerToSlotTeam('${teamId}', '${user.username}')" style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:#181a26; border-radius:6px; border:1px solid rgba(255,255,255,0.05); cursor:pointer; transition: all 0.2s ease; margin-bottom:4px; gap:8px;" onmouseover="this.style.background='var(--cs-orange)'; this.style.borderColor='var(--cs-orange)';" onmouseout="this.style.background='#181a26'; this.style.borderColor='rgba(255,255,255,0.05)'">
+      <span style="font-size:13px; font-weight:800; color:white; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;">@${user.username.toUpperCase()}</span>
+      <span style="font-size:11px; color:rgba(255,255,255,0.7); display:flex; align-items:center; gap:4px; font-weight:bold; flex-shrink:0;">➕ Швидке додавання</span>
     </div>
   `).join("");
 };
