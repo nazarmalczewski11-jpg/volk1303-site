@@ -757,14 +757,22 @@ async function handleRegisterSubmit() {
 
   const db = getDB();
   
-  // Merge any missing users to ensure local DB matches cloud
+  // Merge cloud users into local database to keep them synced
   if (Array.isArray(latestUsers)) {
     let dbChanged = false;
     latestUsers.forEach(cu => {
-      const exists = db.users.some(u => u.username.toLowerCase() === cu.username.toLowerCase());
-      if (!exists) {
+      const luIdx = db.users.findIndex(u => u.username.toLowerCase() === cu.username.toLowerCase());
+      if (luIdx === -1) {
         db.users.push(cu);
         dbChanged = true;
+      } else {
+        const lu = db.users[luIdx];
+        if (lu.email !== cu.email || lu.password !== cu.password || lu.balance !== cu.balance) {
+          lu.email = cu.email;
+          lu.password = cu.password;
+          lu.balance = cu.balance;
+          dbChanged = true;
+        }
       }
     });
     if (dbChanged) {
@@ -772,8 +780,10 @@ async function handleRegisterSubmit() {
     }
   }
 
+  const checkUsers = (Array.isArray(latestUsers) && latestUsers.length > 0) ? latestUsers : db.users;
+
   // Check duplicate username
-  const duplicate = db.users.find(u => u.username === username);
+  const duplicate = checkUsers.find(u => u.username === username);
   if (duplicate) {
     showToast("Цей нікнейм вже зайнятий!", "error");
     submitBtn.disabled = false;
@@ -782,7 +792,7 @@ async function handleRegisterSubmit() {
   }
 
   // Check duplicate email
-  const dupEmail = db.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+  const dupEmail = checkUsers.find(u => u.email && u.email.toLowerCase() === email.toLowerCase());
   if (dupEmail) {
     showToast("Ця пошта вже зареєстрована!", "error");
     submitBtn.disabled = false;
