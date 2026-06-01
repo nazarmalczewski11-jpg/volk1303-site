@@ -1474,6 +1474,7 @@ window.deleteTeamAdmin = function(id) {
 
 // Render registered User Teams list card
 function renderAdminUserTeamsList(teams) {
+  const db = getDB();
   const container = document.getElementById('admin-user-teams-list');
   if (!container) return;
   container.innerHTML = "";
