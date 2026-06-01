@@ -378,7 +378,7 @@
 
       <!-- Tournament Roster Management Modal -->
       <div id="tournament-roster-modal" class="modal-overlay">
-        <div class="modal-content" style="max-width: 600px; border-color: var(--cs-orange);">
+        <div class="modal-content" style="max-width: 760px; border-color: var(--cs-orange);">
           <button class="modal-close" onclick="closeModal('tournament-roster-modal')">&times;</button>
           <div class="modal-title">🛡️ Керування слотами та учасниками</div>
           <div style="font-size:12px; color:var(--text-secondary); margin-bottom:15px;" id="roster-modal-desc">
@@ -386,7 +386,7 @@
           </div>
 
           <!-- Slots Container -->
-          <div id="roster-slots-container" style="display:flex; flex-direction:column; gap:15px; max-height:500px; overflow-y:auto; padding-right:5px; padding-bottom:5px;">
+          <div id="roster-slots-container" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap:12px; max-height:560px; overflow-y:auto; padding-right:5px; padding-bottom:5px;">
             <!-- Filled dynamically by JS -->
           </div>
         </div>
