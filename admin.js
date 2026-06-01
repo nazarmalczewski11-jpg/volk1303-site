@@ -297,6 +297,9 @@ document.addEventListener('DOMContentLoaded', () => {
   syncWithCloud();
   setInterval(syncWithCloud, 8000);
 
+  // Start background simulation loop in case admin panel is the only page open
+  startBracketSimulation();
+
   // Cross-page storage synchronization
   window.addEventListener('storage', (e) => {
     if (e.key === DB_KEY) {
@@ -1258,6 +1261,34 @@ window.generateNewBracket = function() {
 
 // Render Bracket editor panels with select dropdowns
 function renderAdminBracketsEditor(brackets) {
+  // Update demo tournament controls display status
+  const db = getDB();
+  const statusBadge = document.getElementById('admin-demo-status-badge');
+  const toggleBtn = document.getElementById('admin-demo-toggle-btn');
+  if (statusBadge && toggleBtn && db) {
+    if (db.demoTournamentsEnabled) {
+      statusBadge.innerText = "АКТИВНО 🟢";
+      statusBadge.style.background = "rgba(0, 255, 102, 0.1)";
+      statusBadge.style.color = "#00ff66";
+      statusBadge.style.borderColor = "rgba(0, 255, 102, 0.3)";
+      
+      toggleBtn.innerText = "🛑 ЗУПИНИТИ СИМУЛЯЦІЮ";
+      toggleBtn.style.background = "rgba(255, 26, 64, 0.15)";
+      toggleBtn.style.color = "#ff1a40";
+      toggleBtn.style.borderColor = "rgba(255, 26, 64, 0.3)";
+    } else {
+      statusBadge.innerText = "ВИМКНЕНО 🔴";
+      statusBadge.style.background = "rgba(255, 26, 64, 0.1)";
+      statusBadge.style.color = "#ff1a40";
+      statusBadge.style.borderColor = "rgba(255, 26, 64, 0.3)";
+      
+      toggleBtn.innerText = "🚀 ЗАПУСТИТИ ДЕМО-ТУРНІР";
+      toggleBtn.style.background = "";
+      toggleBtn.style.color = "";
+      toggleBtn.style.borderColor = "";
+    }
+  }
+
   const container = document.getElementById('admin-brackets-editor-list');
   if (!container) return;
   container.innerHTML = "";
@@ -2017,4 +2048,176 @@ window.manualSyncFromUI = function(btn) {
   currentUrl.searchParams.set('reload', Date.now().toString());
   window.location.href = currentUrl.toString();
 };
+
+window.toggleDemoTournaments = function() {
+  const db = getDB();
+  if (db.demoTournamentsEnabled) {
+    db.demoTournamentsEnabled = false;
+    saveDB(db);
+    showToast("Симуляцію демо-турнірів зупинено.", "warning");
+  } else {
+    db.demoTournamentsEnabled = true;
+    
+    // Auto reset to a clean 4-team single elimination bracket ready for simulation
+    db.brackets = {
+      type: "single",
+      format: "1x1",
+      rounds: [
+        {
+          name: "Півфінали",
+          matches: [
+            { id: "b_1", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null },
+            { id: "b_2", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null }
+          ]
+        },
+        {
+          name: "Фінал",
+          matches: [
+            { id: "b_3", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null }
+          ]
+        }
+      ]
+    };
+    db.bracketResetCounter = 0;
+    db.lastSimTime = 0; // Force immediate simulation step
+    
+    saveDB(db);
+    showToast("Симуляцію демо-турнірів успішно активовано! Турнір стартує за кілька секунд.", "success");
+  }
+  renderAdminPanel();
+};
+
+function startBracketSimulation() {
+  setInterval(() => {
+    const db = getDB();
+    if (!db || !db.demoTournamentsEnabled) {
+      return; // Run only when enabled
+    }
+    const now = Date.now();
+    if (db.lastSimTime && (now - db.lastSimTime < 9500)) {
+      return; // Run at most once every 10s across all tabs
+    }
+    db.lastSimTime = now;
+    
+    let dbUpdated = false;
+    const brackets = db.brackets;
+    if (!brackets || !brackets.rounds) return;
+
+    // Safety check: ensure bracket structure matches the standard 4-team single elimination simulation layout
+    if (brackets.rounds.length !== 2 || brackets.rounds[0].matches.length !== 2) return;
+
+    // Fill empty slots in Round 0 (Півфінали) with mock teams if they are empty
+    const round0 = brackets.rounds[0];
+    const mockPool = ["Astralis", "MOUZ", "Heroic", "Team Liquid", "Virtus.pro", "Team Spirit", "Complexity", "Falcons"];
+    
+    round0.matches.forEach((m, idx) => {
+      const otherMatch = round0.matches[1 - idx] || {};
+      if (!m.team1 || m.team1 === "Очікується" || m.team1 === "") {
+        const used = [m.team2, otherMatch.team1, otherMatch.team2].filter(Boolean);
+        const available = mockPool.filter(t => !used.includes(t));
+        m.team1 = available[Math.floor(Math.random() * available.length)] || "Astralis";
+        m.score1 = 0;
+        m.score2 = 0;
+        m.winner = null;
+        dbUpdated = true;
+      }
+      if (!m.team2 || m.team2 === "Очікується" || m.team2 === "") {
+        const used = [m.team1, otherMatch.team1, otherMatch.team2].filter(Boolean);
+        const available = mockPool.filter(t => !used.includes(t));
+        m.team2 = available[Math.floor(Math.random() * available.length)] || "Heroic";
+        m.score2 = 0;
+        m.score1 = 0;
+        m.winner = null;
+        dbUpdated = true;
+      }
+    });
+
+    // Simulate active match
+    let activeMatch = round0.matches.find(m => m.winner === null);
+    
+    if (activeMatch) {
+      if (Math.random() > 0.5) {
+        activeMatch.score1++;
+      } else {
+        activeMatch.score2++;
+      }
+      dbUpdated = true;
+
+      // Check if match is finished (first to 13)
+      if (activeMatch.score1 >= 13 || activeMatch.score2 >= 13) {
+        const winner = activeMatch.score1 >= 13 ? activeMatch.team1 : activeMatch.team2;
+        activeMatch.winner = winner;
+        showToast(`🏆 Півфінал: ${activeMatch.team1} vs ${activeMatch.team2} завершено! Переможець: ${winner} (${activeMatch.score1}:${activeMatch.score2})`, "success");
+      }
+    } else {
+      // Round 0 matches are both completed. Check Round 1 (Фінал)
+      const round1 = brackets.rounds[1];
+      const finalMatch = round1.matches[0];
+
+      // Populate final match teams from round 0 winners if not already set
+      if ((finalMatch.team1 === "Очікується" || finalMatch.team1 === "") && round0.matches[0].winner) {
+        finalMatch.team1 = round0.matches[0].winner;
+        finalMatch.score1 = 0;
+        dbUpdated = true;
+      }
+      if ((finalMatch.team2 === "Очікується" || finalMatch.team2 === "") && round0.matches[1].winner) {
+        finalMatch.team2 = round0.matches[1].winner;
+        finalMatch.score2 = 0;
+        dbUpdated = true;
+      }
+
+      // If final match has teams and is not finished, simulate it
+      if (finalMatch.team1 && finalMatch.team2 && finalMatch.team1 !== "Очікується" && finalMatch.team2 !== "Очікується" && finalMatch.winner === null) {
+        if (Math.random() > 0.5) {
+          finalMatch.score1++;
+        } else {
+          finalMatch.score2++;
+        }
+        dbUpdated = true;
+
+        if (finalMatch.score1 >= 13 || finalMatch.score2 >= 13) {
+          const winner = finalMatch.score1 >= 13 ? finalMatch.team1 : finalMatch.team2;
+          finalMatch.winner = winner;
+          showToast(`👑 Фінал турніру: ${finalMatch.team1} vs ${finalMatch.team2} завершено! ЧЕМПІОН: ${winner} (${finalMatch.score1}:${finalMatch.score2})`, "success");
+        }
+      } else if (finalMatch.winner !== null) {
+        // Tournament is finished. Reset tournament bracket after a delay
+        if (!db.bracketResetCounter) {
+          db.bracketResetCounter = 1;
+          dbUpdated = true;
+        } else {
+          db.bracketResetCounter++;
+          dbUpdated = true;
+          if (db.bracketResetCounter >= 4) { // ~40 seconds of display
+            db.brackets = {
+              type: "single",
+              rounds: [
+                {
+                  name: "Півфінали",
+                  matches: [
+                    { id: "b_1", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null },
+                    { id: "b_2", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null }
+                  ]
+                },
+                {
+                  name: "Фінал",
+                  matches: [
+                    { id: "b_3", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null }
+                  ]
+                }
+              ]
+            };
+            db.bracketResetCounter = 0;
+            showToast("🚀 Розпочався новий турнір Challengermode! Реєструйте свої команди!", "success");
+          }
+        }
+      }
+    }
+
+    if (dbUpdated) {
+      saveDB(db);
+      renderAdminPanel();
+    }
+  }, 10000); // Check every 10 seconds
+}
 

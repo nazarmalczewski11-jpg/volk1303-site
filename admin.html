@@ -206,6 +206,20 @@
             Оберіть тип сітки (Single/Double Elimination) та формат поєдинку, згенеруйте нову сітку, а потім призначте створені команди та внесіть рахунки матчів.
           </p>
 
+          <!-- Demo Tournament Controls Card -->
+          <div style="background: rgba(255, 90, 0, 0.03); border: 1.5px solid rgba(255, 90, 0, 0.15); padding: 20px; border-radius: 12px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; gap: 20px; box-shadow: inset 0 0 10px rgba(255, 90, 0, 0.02);">
+            <div>
+              <strong style="color: white; font-size: 13px; display: flex; align-items: center; gap: 8px;">🤖 СИМУЛЯЦІЯ ДЕМО-ТУРНІРІВ</strong>
+              <p style="font-size: 11px; color: var(--text-secondary); margin: 5px 0 0 0; line-height: 1.5;">
+                При активації система автоматично заповнить сітку випадковими командами та почне симулювати матчі в реальному часі кожні 10 секунд (перший до 13 раундів).
+              </p>
+            </div>
+            <div style="display: flex; align-items: center; gap: 15px; flex-shrink: 0;">
+              <span id="admin-demo-status-badge" class="rank-badge-inline" style="background: rgba(255, 26, 64, 0.1); color: #ff1a40; border: 1px solid rgba(255, 26, 64, 0.3); font-size: 11px; font-weight: 800; padding: 6px 12px;">ВИМКНЕНО 🔴</span>
+              <button id="admin-demo-toggle-btn" class="btn" style="padding: 10px 20px; font-weight: 800; font-size: 11px; letter-spacing: 0.5px;" onclick="toggleDemoTournaments()">🚀 ЗАПУСТИТИ ДЕМО-ТУРНІР</button>
+            </div>
+          </div>
+
           <!-- Dynamic Bracket Reset/Generator Tool -->
           <div style="background: var(--bg-input); border: 1px solid var(--border-color); padding: 20px; border-radius: 12px; margin-bottom: 25px; display: grid; grid-template-columns: 1fr 1fr auto; gap: 15px; align-items: flex-end;">
             <div class="form-group" style="margin-bottom:0;">

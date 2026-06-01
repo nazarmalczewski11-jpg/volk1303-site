@@ -428,6 +428,9 @@ document.addEventListener('DOMContentLoaded', () => {
   syncWithCloud();
   setInterval(syncWithCloud, 8000);
 
+  // Start background tournament brackets simulation (only runs when enabled)
+  startBracketSimulation();
+
   // Handle parameters from other pages redirecting to place a bet
   const urlParams = new URLSearchParams(window.location.search);
   if (currentPage === 'betting.html' && urlParams.has('selectMatch')) {
@@ -2631,6 +2634,9 @@ function renderLiveMatchStats(db) {
 function startBracketSimulation() {
   setInterval(() => {
     const db = getDB();
+    if (!db || !db.demoTournamentsEnabled) {
+      return; // Run only when enabled by admin
+    }
     const now = Date.now();
     if (db.lastSimTime && (now - db.lastSimTime < 9500)) {
       return; // Run at most once every 10s across all tabs
@@ -2640,6 +2646,9 @@ function startBracketSimulation() {
     let dbUpdated = false;
     const brackets = db.brackets;
     if (!brackets || !brackets.rounds) return;
+
+    // Safety check: ensure bracket structure matches the standard 4-team single elimination simulation layout
+    if (brackets.rounds.length !== 2 || brackets.rounds[0].matches.length !== 2) return;
 
     // Fill empty slots in Round 0 (Півфінали) with mock teams if they are empty
     const round0 = brackets.rounds[0];
