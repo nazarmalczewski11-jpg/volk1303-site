@@ -805,6 +805,9 @@ function renderAdminPanel() {
   if (typeof renderDatabaseTab === 'function') {
     renderDatabaseTab();
   }
+
+  // Update notification badges
+  updateAdminNotificationBadges();
 }
 
 // Calculate and render dashboard metrics
@@ -1179,6 +1182,9 @@ window.switchAdminTab = function(tabId) {
   if (tabId === 'database' && typeof renderDatabaseTab === 'function') {
     renderDatabaseTab();
   }
+
+  // Update notification badges on tab switch
+  updateAdminNotificationBadges();
 };
 
 // Create a new team in admin console
@@ -2402,4 +2408,55 @@ window.rejectDepositAdmin = async function(depositId) {
   showToast("Запит відхилено!", "success");
   renderAdminPanel();
 };
+
+// Check for unviewed pending deposits and update the orange notification dot
+function updateAdminNotificationBadges() {
+  const db = getDB();
+  if (!db) return;
+
+  const verifyBtn = Array.from(document.querySelectorAll('.admin-tab-item')).find(btn => 
+    btn.getAttribute('onclick') && btn.getAttribute('onclick').includes("'deposits-verify'")
+  );
+  if (!verifyBtn) return;
+
+  const isCurrentlyOnVerifyTab = verifyBtn.classList.contains('active');
+  const pending = (db.pendingDeposits || []).filter(d => d.status === "pending");
+
+  if (pending.length === 0) {
+    const existingDot = verifyBtn.querySelector('.notification-badge-dot');
+    if (existingDot) existingDot.remove();
+    return;
+  }
+
+  // Find the latest pending deposit timestamp based on id (dep_1234567890)
+  let latestPendingTime = 0;
+  pending.forEach(d => {
+    const tsStr = d.id.replace('dep_', '');
+    const ts = parseInt(tsStr, 10);
+    if (!isNaN(ts) && ts > latestPendingTime) {
+      latestPendingTime = ts;
+    }
+  });
+
+  if (isCurrentlyOnVerifyTab) {
+    localStorage.setItem('admin_last_viewed_deposit_time', latestPendingTime.toString());
+    const existingDot = verifyBtn.querySelector('.notification-badge-dot');
+    if (existingDot) existingDot.remove();
+  } else {
+    const lastViewedTimeStr = localStorage.getItem('admin_last_viewed_deposit_time') || "0";
+    const lastViewedTime = parseInt(lastViewedTimeStr, 10) || 0;
+
+    if (latestPendingTime > lastViewedTime) {
+      let existingDot = verifyBtn.querySelector('.notification-badge-dot');
+      if (!existingDot) {
+        existingDot = document.createElement('span');
+        existingDot.className = 'notification-badge-dot';
+        verifyBtn.appendChild(existingDot);
+      }
+    } else {
+      const existingDot = verifyBtn.querySelector('.notification-badge-dot');
+      if (existingDot) existingDot.remove();
+    }
+  }
+}
 

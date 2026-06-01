@@ -1867,6 +1867,36 @@ footer {
   cursor: pointer;
   transition: var(--transition);
   border-left: 3px solid transparent;
+  position: relative; /* Set relative position for absolute badge dot */
+}
+
+.notification-badge-dot {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  background-color: var(--cs-orange);
+  border-radius: 50%;
+  box-shadow: 0 0 10px var(--cs-orange);
+  animation: pulse-badge-glow 1.5s infinite;
+  pointer-events: none;
+}
+
+@keyframes pulse-badge-glow {
+  0% {
+    transform: translateY(-50%) scale(0.9);
+    box-shadow: 0 0 0 0 rgba(255, 90, 0, 0.8);
+  }
+  70% {
+    transform: translateY(-50%) scale(1.2);
+    box-shadow: 0 0 0 8px rgba(255, 90, 0, 0);
+  }
+  100% {
+    transform: translateY(-50%) scale(0.9);
+    box-shadow: 0 0 0 0 rgba(255, 90, 0, 0);
+  }
 }
 
 .admin-tab-item:hover {
