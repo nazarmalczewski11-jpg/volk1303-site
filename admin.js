@@ -2981,13 +2981,22 @@ window.openBracketEditorCard = function(tourId) {
 
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:12px;">
           <div class="form-group" style="margin-bottom:0;">
-            <label style="font-size:10px; margin-bottom:4px;">Рахунок ${match.team1}</label>
+            <label style="font-size:10px; margin-bottom:4px;">Рахунок Команди 1</label>
             <input type="number" id="m-score1-${rIndex}-${mIndex}" class="form-input" min="0" value="${match.score1}" style="padding:6px 10px;">
           </div>
           <div class="form-group" style="margin-bottom:0;">
-            <label style="font-size:10px; margin-bottom:4px;">Рахунок ${match.team2}</label>
+            <label style="font-size:10px; margin-bottom:4px;">Рахунок Команди 2</label>
             <input type="number" id="m-score2-${rIndex}-${mIndex}" class="form-input" min="0" value="${match.score2}" style="padding:6px 10px;">
           </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:12px;">
+          <label style="font-size:10px; margin-bottom:4px; display:block;">🏆 Переможець матчу (для завершених)</label>
+          <select id="m-winner-${rIndex}-${mIndex}" class="form-input" style="padding:6px; font-size:12px; background:#0c0d12;">
+            <option value="Очікується" ${!match.winner || match.winner === 'Очікується' ? 'selected' : ''}>Очікується (Автовибір за рахунком)</option>
+            <option value="team1" ${match.winner && match.winner === match.team1 && match.team1 !== 'Очікується' ? 'selected' : ''}>Команда 1 (ліворуч)</option>
+            <option value="team2" ${match.winner && match.winner === match.team2 && match.team2 !== 'Очікується' ? 'selected' : ''}>Команда 2 (праворуч)</option>
+          </select>
         </div>
 
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; align-items:flex-end;">
@@ -3041,11 +3050,19 @@ window.saveBracketMatchAdmin = function(rIndex, mIndex) {
 
   // Settle Winner if finished
   if (status === "finished") {
-    if (score1 === score2) {
-      showToast("Помилка: У матчі на виліт не може бути нічиєї!", "error");
-      return;
+    const winnerSelect = document.getElementById(`m-winner-${rIndex}-${mIndex}`).value;
+    if (winnerSelect === "team1") {
+      match.winner = team1;
+    } else if (winnerSelect === "team2") {
+      match.winner = team2;
+    } else {
+      // Fallback to scores if left as "Очікується"
+      if (score1 === score2) {
+        showToast("Помилка: У матчі на виліт не може бути нічиєї!", "error");
+        return;
+      }
+      match.winner = (score1 > score2) ? team1 : team2;
     }
-    match.winner = (score1 > score2) ? team1 : team2;
   } else {
     match.winner = null;
   }
@@ -3121,12 +3138,12 @@ function distributeTournamentPrizes(tour, db) {
 
   // Pay 1st place
   if (firstPlaceTeam && percentsInPool(tour.percents[1])) {
-    awardPrizeToTeamOwner(firstPlaceTeam, (prizePool * tour.percents[1]) / 100, "1 місце в турнірі " + tour.name, db);
+    awardPrizeToTeamPlayers(firstPlaceTeam, (prizePool * tour.percents[1]) / 100, "1 місце в турнірі " + tour.name, db);
   }
 
   // Pay 2nd place
   if (secondPlaceTeam && percentsInPool(tour.percents[2])) {
-    awardPrizeToTeamOwner(secondPlaceTeam, (prizePool * tour.percents[2]) / 100, "2 місце в турнірі " + tour.name, db);
+    awardPrizeToTeamPlayers(secondPlaceTeam, (prizePool * tour.percents[2]) / 100, "2 місце в турнірі " + tour.name, db);
   }
 
   // Pay 3rd place (split if multiple)
@@ -3134,7 +3151,7 @@ function distributeTournamentPrizes(tour, db) {
     const total3rdAmt = (prizePool * tour.percents[3]) / 100;
     const splitAmt = total3rdAmt / thirdPlaceTeams.length;
     thirdPlaceTeams.forEach(teamName => {
-      awardPrizeToTeamOwner(teamName, splitAmt, "3 місце в турнірі " + tour.name, db);
+      awardPrizeToTeamPlayers(teamName, splitAmt, "3 місце в турнірі " + tour.name, db);
     });
   }
 }
@@ -3143,28 +3160,47 @@ function percentsInPool(pctVal) {
   return pctVal !== undefined && pctVal > 0;
 }
 
-function awardPrizeToTeamOwner(teamName, amountCoins, reason, db) {
-  if (!teamName || teamName === "Очікується" || amountCoins <= 0) return;
+function awardPrizeToTeamPlayers(teamName, totalCoinsForPlace, reason, db) {
+  if (!teamName || teamName === "Очікується" || totalCoinsForPlace <= 0) return;
   
   const team = db.teams.find(t => t.name.toLowerCase() === teamName.toLowerCase());
   if (!team) return;
 
-  const ownerNick = team.owner.toLowerCase();
-  const ownerUser = db.users.find(u => u.username.toLowerCase() === ownerNick);
+  const players = team.players || [];
   
-  if (ownerUser) {
-    const amtRounded = Math.round(amountCoins);
-    ownerUser.balance = (ownerUser.balance || 0) + amtRounded;
+  if (players.length === 0) {
+    // Fallback: If no players are registered in the team roster, award the full amount to the team owner/captain
+    const ownerNick = team.owner.toLowerCase();
+    const ownerUser = db.users.find(u => u.username.toLowerCase() === ownerNick);
+    if (ownerUser) {
+      const amtRounded = Math.round(totalCoinsForPlace);
+      ownerUser.balance = (ownerUser.balance || 0) + amtRounded;
+      if (!ownerUser.depositHistory) ownerUser.depositHistory = [];
+      ownerUser.depositHistory.unshift({
+        amount: amtRounded,
+        method: "🏆 " + reason + " (Капітан)",
+        date: new Date().toLocaleString()
+      });
+      console.log(`[PRIZE] Awarded fallback ${amtRounded} coins to team owner ${ownerUser.username} for team ${team.name}`);
+    }
+  } else {
+    // Divide the coins equally among all registered players in the team!
+    const coinsPerPlayer = totalCoinsForPlace / players.length;
+    const amtRounded = Math.round(coinsPerPlayer); // round to nearest integer
     
-    // Log deposit event
-    if (!ownerUser.depositHistory) ownerUser.depositHistory = [];
-    ownerUser.depositHistory.unshift({
-      amount: amtRounded,
-      method: "🏆 " + reason,
-      date: new Date().toLocaleString()
+    players.forEach(pNick => {
+      const playerUser = db.users.find(u => u.username.toLowerCase() === pNick.toLowerCase());
+      if (playerUser) {
+        playerUser.balance = (playerUser.balance || 0) + amtRounded;
+        if (!playerUser.depositHistory) playerUser.depositHistory = [];
+        playerUser.depositHistory.unshift({
+          amount: amtRounded,
+          method: `🏆 ${reason} (Склад команди ${team.name})`,
+          date: new Date().toLocaleString()
+        });
+        console.log(`[PRIZE] Awarded ${amtRounded} coins to player ${playerUser.username} of team ${team.name}`);
+      }
     });
-
-    console.log(`[PRIZE] Awarded ${amtRounded} coins to user ${ownerUser.username} as captain of team ${team.name}`);
   }
 }
 
