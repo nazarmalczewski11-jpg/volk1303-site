@@ -15,7 +15,7 @@ async function syncWithCloud() {
 
   try {
     // 1. Sync users
-    const uRes = await fetch(CLOUD_BUCKET + 'users');
+    const uRes = await fetch(CLOUD_BUCKET + 'users', { cache: 'no-store' });
     if (uRes.ok) {
       const cloudUsers = await uRes.json();
       if (Array.isArray(cloudUsers)) {
@@ -90,12 +90,12 @@ async function syncWithCloud() {
 
     // 2. Sync structures
     const [bRes, mRes, tRes, lRes, sRes, pRes] = await Promise.all([
-      fetch(CLOUD_BUCKET + 'brackets'),
-      fetch(CLOUD_BUCKET + 'matches'),
-      fetch(CLOUD_BUCKET + 'teams'),
-      fetch(CLOUD_BUCKET + 'aimLobbies'),
-      fetch(CLOUD_BUCKET + 'settings'),
-      fetch(CLOUD_BUCKET + 'promocodes')
+      fetch(CLOUD_BUCKET + 'brackets', { cache: 'no-store' }),
+      fetch(CLOUD_BUCKET + 'matches', { cache: 'no-store' }),
+      fetch(CLOUD_BUCKET + 'teams', { cache: 'no-store' }),
+      fetch(CLOUD_BUCKET + 'aimLobbies', { cache: 'no-store' }),
+      fetch(CLOUD_BUCKET + 'settings', { cache: 'no-store' }),
+      fetch(CLOUD_BUCKET + 'promocodes', { cache: 'no-store' })
     ]);
 
     if (bRes.ok) {
