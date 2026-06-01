@@ -679,7 +679,7 @@ function createNewPromocodeAdmin() {
   });
 
   saveDB(db);
-  showToast(`Промокод ${code} (+${reward}%) створено!`, "success");
+  showToast(`Промокод ${code} (+${reward} 🪙) створено!`, "success");
 
   // Clear inputs
   codeInput.value = "";
@@ -851,7 +851,7 @@ function renderAdminPromocodesList(promocodes) {
         <button class="btn btn-danger" style="padding:4px 8px; font-size:10px;" onclick="deletePromocodeAdmin('${promo.code}')">Видалити</button>
       </div>
       <div class="promocode-card-details">
-        <div>Нагорода: <strong class="promocode-reward">+${promo.reward}%</strong> до депозиту</div>
+        <div>Нагорода: <strong class="promocode-reward">+${promo.reward} 🪙</strong> на баланс</div>
         <div style="font-size:10px; opacity:0.6; margin-top:5px;">Створено: ${promo.createdDate}</div>
       </div>
     `;

@@ -1186,6 +1186,10 @@ function handlePromoSubmit() {
 
   if (!code) return;
 
+  if (!user.usedPromos) {
+    user.usedPromos = [];
+  }
+
   if (user.usedPromos.includes(code)) {
     showToast("Цей промокод вже активовано!", "error");
     return;
@@ -1207,11 +1211,11 @@ function handlePromoSubmit() {
     }
   }
 
-  user.bonusPercent = (user.bonusPercent || 0) + reward;
+  user.balance = (user.balance || 0) + reward;
   user.usedPromos.push(code);
   saveDB(db);
 
-  showToast(`Промокод активовано! Нараховано +${reward}% до депозиту.`, "success");
+  showToast(`Промокод активовано! Нараховано +${reward} 🪙 на ваш баланс.`, "success");
   input.value = "";
   renderPageContent();
 }

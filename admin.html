@@ -495,7 +495,7 @@
           <div class="card" style="height: fit-content;">
             <div class="section-title">🎟️ СТВОРИТИ НОВИЙ ПРОМОКОД</div>
             <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 15px; line-height: 1.5;">
-              Створіть свій власний унікальний промокод! Гравці зможуть активувати його на сторінці ставок та отримати відповідний відсоток бонусу до свого наступного депозиту.
+              Створіть свій власний унікальний промокод! Гравці зможуть активувати його на сторінці ставок та отримати відповідну кількість монет (поінтів) на свій баланс.
             </p>
             <form id="admin-create-promo-form" style="display:flex; flex-direction:column; gap:12px;">
               <div class="form-group" style="margin-bottom:0;">
@@ -503,8 +503,8 @@
                 <input type="text" id="promo-code-input" class="form-input" placeholder="Тільки англійські літери та цифри" required style="text-transform: uppercase;">
               </div>
               <div class="form-group" style="margin-bottom:0;">
-                <label for="promo-reward-input">Бонусний відсоток (%)</label>
-                <input type="number" id="promo-reward-input" class="form-input" placeholder="Напр: 50" min="1" max="1000" required>
+                <label for="promo-reward-input">Сума бонусу в монетах (🪙)</label>
+                <input type="number" id="promo-reward-input" class="form-input" placeholder="Напр: 100" min="1" max="10000" required>
               </div>
               <button type="submit" class="btn" style="width: 100%; padding: 12px; font-weight: 800;">СТВОРИТИ ПРОМОКОД</button>
             </form>
