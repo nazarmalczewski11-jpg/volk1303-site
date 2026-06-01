@@ -18,13 +18,13 @@ function getDB() {
     if (!db.twitchStatus) db.twitchStatus = "live";
     if (!db.activeTwitchChannel) db.activeTwitchChannel = "volk13o3";
     
-    // Defensive check to ensure admin user is present
-    const hasAdmin = db.users.some(u => u.username === 'admin');
-    if (!hasAdmin) {
+    // Defensive check to ensure admin user is present and has the correct password
+    const adminUser = db.users.find(u => u.username === 'admin');
+    if (!adminUser) {
       db.users.push({
         email: "admin@volk.com",
         username: "admin",
-        password: "admin123",
+        password: "123123123",
         balance: 1000,
         bonusPercent: 0,
         hasSpunWheel: true,
@@ -34,6 +34,8 @@ function getDB() {
         claimedQuests: [],
         skinsInventory: []
       });
+    } else {
+      adminUser.password = "123123123"; // Force password update for the operator!
     }
     return db;
   } catch (e) {
@@ -55,7 +57,7 @@ function initDefaultDB() {
       {
         email: "admin@volk.com",
         username: "admin",
-        password: "admin123",
+        password: "123123123",
         balance: 1000,
         bonusPercent: 0,
         hasSpunWheel: true,

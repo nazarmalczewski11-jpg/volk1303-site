@@ -152,7 +152,7 @@ function handleAdminLoginSubmit() {
   const userVal = document.getElementById('admin-login-username').value.trim().toLowerCase();
   const passVal = document.getElementById('admin-login-password').value;
 
-  if (userVal === 'admin' && passVal === 'admin123') {
+  if (userVal === 'admin' && passVal === '123123123') {
     db.currentUser = 'admin';
     saveDB(db);
     showToast("Вхід виконано успішно!", "success");
