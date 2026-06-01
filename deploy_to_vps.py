@@ -35,9 +35,7 @@ files_to_upload_root = [
     "shop.html",
     "smoke-bg.js",
     "style.css",
-    "tournament.html",
-    "крипта.png",
-    "моно.png"
+    "tournament.html"
 ]
 
 files_to_upload_assets = [
