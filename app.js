@@ -2812,7 +2812,7 @@ function renderTournamentBettingPortal(tourId) {
   const teamObjects = regTeams.map(tid => db.teams.find(t => t.id === tid)).filter(Boolean);
   const teamOdds = tour.teamOdds || {};
 
-  const user = db.loggedInUser ? db.users.find(u => u.username === db.loggedInUser) : null;
+  const user = db.currentUser ? db.users.find(u => u.username === db.currentUser) : null;
   const frozen = isTournamentBettingFrozen(tour);
 
   if (teamObjects.length === 0) {
@@ -2841,12 +2841,17 @@ function renderTournamentBettingPortal(tourId) {
         
         let btnText = `🎰 ПОСТАВИТИ НА ${team.name.toUpperCase()}`;
         let btnDisabledAttr = '';
+        let btnStyle = `width:100%; border:none; color:white; border-radius:8px; padding:10px; font-size:12px; font-weight:900; letter-spacing:0.5px; transition:all 0.2s; text-transform:uppercase;`;
         
         if (frozen) {
           btnText = `❄️ ЗАМОРОЖЕНО`;
-          btnDisabledAttr = 'disabled title="Ставки заморожені через велику різницю в рахунку" style="background:#1e293b; color:var(--text-secondary); cursor:not-allowed;"';
+          btnDisabledAttr = 'disabled title="Ставки заморожені через велику різницю в рахунку"';
+          btnStyle += `background:#1e293b; color:var(--text-secondary); cursor:not-allowed;`;
         } else if (!user) {
           btnDisabledAttr = 'disabled title="Увійдіть для ставок"';
+          btnStyle += `background:#1e293b; color:var(--text-secondary); cursor:not-allowed;`;
+        } else {
+          btnStyle += `background:linear-gradient(135deg, rgba(255,90,0,0.9), rgba(255,60,0,0.9)); cursor:pointer;`;
         }
 
         return `
@@ -2886,7 +2891,7 @@ function renderTournamentBettingPortal(tourId) {
                 }).join('')}
                 ${players.length > 5 ? `<span style="background:#1e293b; color:var(--text-secondary); padding:3px 8px; border-radius:4px; font-size:10px;">+${players.length-5}</span>` : ''}
               </div>` : ''}
-            <button onclick="placeTournamentBet('${tourId}', '${team.id}', '${team.name}', ${odds})" style="width:100%; background:linear-gradient(135deg, rgba(255,90,0,0.9), rgba(255,60,0,0.9)); border:none; color:white; border-radius:8px; padding:10px; font-size:12px; font-weight:900; cursor:pointer; letter-spacing:0.5px; transition:all 0.2s; text-transform:uppercase;" onmouseover="if(!${frozen}) this.style.transform='scale(1.02)';" onmouseout="if(!${frozen}) this.style.transform='scale(1)';"
+            <button onclick="placeTournamentBet('${tourId}', '${team.id}', '${team.name}', ${odds})" style="${btnStyle}" onmouseover="if(!${frozen} && ${!!user}) this.style.transform='scale(1.02)';" onmouseout="if(!${frozen} && ${!!user}) this.style.transform='scale(1)';"
               ${btnDisabledAttr}>${btnText}</button>
           </div>
         `;
@@ -2909,7 +2914,7 @@ window.placeTournamentBet = function(tourId, teamId, teamName, odds) {
     return;
   }
 
-  const user = db.users.find(u => u.username === db.loggedInUser);
+  const user = db.users.find(u => u.username === db.currentUser);
   if (!user) {
     showToast('Увійдіть в акаунт для ставки!', 'error');
     return;
