@@ -6,6 +6,26 @@
   <title>VOLK 1303 | Панель Керування</title>
   <link rel="stylesheet" href="style.css">
   <script src="smoke-bg.js"></script>
+  <script>
+    window.onerror = function(message, source, lineno, colno, error) {
+      const errorDiv = document.createElement('div');
+      errorDiv.style.position = 'fixed';
+      errorDiv.style.top = '0';
+      errorDiv.style.left = '0';
+      errorDiv.style.width = '100%';
+      errorDiv.style.backgroundColor = '#ff1a40';
+      errorDiv.style.color = 'white';
+      errorDiv.style.padding = '15px';
+      errorDiv.style.zIndex = '99999';
+      errorDiv.style.fontWeight = 'bold';
+      errorDiv.style.fontFamily = 'monospace';
+      errorDiv.style.fontSize = '12px';
+      errorDiv.style.boxShadow = '0 4px 15px rgba(0,0,0,0.5)';
+      errorDiv.innerHTML = '⚠️ ПОМИЛКА: ' + message + ' у файлі ' + (source ? source.split('/').pop() : 'unknown') + ':' + lineno;
+      document.body.appendChild(errorDiv);
+      return false;
+    };
+  </script>
 </head>
 <body>
 
@@ -72,8 +92,9 @@
       
       <header class="admin-top-bar">
         <div class="admin-top-title" id="admin-current-tab-title">Дашборд</div>
-        <div class="admin-top-actions">
-          <span class="status-indicator">●</span> Connected Live (2026)
+        <div class="admin-top-actions" id="sync-status-container" style="display:flex; align-items:center; gap:8px; font-size:12px; font-weight:800;">
+          <span class="status-indicator" id="sync-status-dot" style="color: #4a5568; transition: color 0.3s ease;">●</span> 
+          <span id="sync-status-text">Ініціалізація...</span>
         </div>
       </header>
 

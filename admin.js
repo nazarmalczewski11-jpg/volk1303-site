@@ -148,6 +148,8 @@ async function syncWithCloud() {
         dbChanged = true;
       }
     }
+    
+    updateSyncStatus(true, "Синхронізовано: " + new Date().toLocaleTimeString());
 
     if (dbChanged) {
       localStorage.setItem(DB_KEY, JSON.stringify(db));
@@ -162,6 +164,7 @@ async function syncWithCloud() {
 
   } catch (e) {
     console.error("Cloud sync error:", e);
+    updateSyncStatus(false, "Помилка з\'єднання: " + (e.message || e));
   } finally {
     isSyncing = false;
   }
@@ -1702,7 +1705,7 @@ function renderDatabaseBetsTable(users, searchQuery) {
       <td style="font-size:11px; opacity:0.9;">${bet.matchDisplay}</td>
       <td style="font-weight:700;">${bet.selectedTeam}</td>
       <td>${bet.amount} 🪙</td>
-      <td style="color:var(--cs-orange); font-weight:800;">${bet.odds.toFixed(2)}</td>
+      <td style="color:var(--cs-orange); font-weight:800;">${(bet.odds || 0).toFixed(2)}</td>
       <td style="color:${bet.status === 'Виграш' ? '#26A17B' : 'white'}; font-weight:800;">${payoutText}</td>
       <td style="font-size:11px; opacity:0.8;">${bet.date}</td>
       <td><span class="ops-log-tag ${statusClass}" style="font-size:9px; padding:2px 6px;">${bet.status}</span></td>
@@ -1989,3 +1992,14 @@ window.adjustInspectorUserBalance = function(action) {
   openUserInspector(user.username);
   renderDatabaseTab();
 };
+
+function updateSyncStatus(success, text) {
+  const dot = document.getElementById('sync-status-dot');
+  const txt = document.getElementById('sync-status-text');
+  if (dot && txt) {
+    dot.style.color = success ? '#26A17B' : 'var(--wolf-red)';
+    dot.style.textShadow = success ? '0 0 8px rgba(38,161,123,0.5)' : '0 0 8px rgba(255,26,64,0.5)';
+    txt.innerText = text;
+  }
+}
+
