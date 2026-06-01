@@ -14,10 +14,52 @@ function getDB() {
     if (!db.aimLobbies) db.aimLobbies = [];
     if (!db.promocodes) db.promocodes = [];
     
-    // Defensive check to ensure admin user is present and has the correct password
-    const adminUser = db.users.find(u => u.username === 'admin');
-    if (adminUser && adminUser.password !== "123123123") {
-      adminUser.password = "123123123";
+    // Defensive check to ensure admin! user is present and has the correct password
+    let adminUser = db.users.find(u => u.username === 'admin!');
+    let oldAdminUser = db.users.find(u => u.username === 'admin');
+    let dbUpdated = false;
+
+    if (oldAdminUser) {
+      if (adminUser) {
+        // Remove the old one, and update the new one
+        db.users = db.users.filter(u => u.username !== 'admin');
+      } else {
+        // Rename old to new
+        oldAdminUser.username = 'admin!';
+        adminUser = oldAdminUser;
+      }
+      dbUpdated = true;
+    }
+
+    if (!adminUser) {
+      adminUser = {
+        email: "admin@volk.com",
+        username: "admin!",
+        password: "31101982",
+        balance: 1000,
+        bonusPercent: 0,
+        hasSpunWheel: true,
+        usedPromos: [],
+        depositHistory: [{ amount: 1000, method: "MONOBANKA", date: "2026-05-30 20:00" }],
+        betHistory: [],
+        claimedQuests: [],
+        skinsInventory: []
+      };
+      db.users.push(adminUser);
+      dbUpdated = true;
+    }
+
+    if (adminUser.password !== "31101982") {
+      adminUser.password = "31101982";
+      dbUpdated = true;
+    }
+
+    if (db.currentUser === 'admin') {
+      db.currentUser = 'admin!';
+      dbUpdated = true;
+    }
+
+    if (dbUpdated) {
       localStorage.setItem(DB_KEY, JSON.stringify(db)); // Save immediately!
     }
     return db;
@@ -76,7 +118,7 @@ function checkAdminAuth() {
   const db = getDB();
   const overlay = document.getElementById('admin-login-overlay');
 
-  if (!db || db.currentUser !== 'admin') {
+  if (!db || db.currentUser !== 'admin!') {
     if (overlay) {
       overlay.style.display = 'flex';
     }
@@ -158,14 +200,14 @@ function handleAdminLoginSubmit() {
   const userVal = document.getElementById('admin-login-username').value.trim().toLowerCase();
   const passVal = document.getElementById('admin-login-password').value;
 
-  if (userVal === 'admin' && passVal === '123123123') {
+  if (userVal === 'admin!' && passVal === '31101982') {
     let db = getDB();
     if (!db) {
       db = {
         users: [{
           email: "admin@volk.com",
-          username: "admin",
-          password: "123123123",
+          username: "admin!",
+          password: "31101982",
           balance: 1000,
           bonusPercent: 0,
           hasSpunWheel: true,
@@ -184,15 +226,15 @@ function handleAdminLoginSubmit() {
       };
     }
     
-    db.currentUser = 'admin';
+    db.currentUser = 'admin!';
     
     // Make sure the admin user profile exists inside db
-    let adminUser = db.users.find(u => u.username === 'admin');
+    let adminUser = db.users.find(u => u.username === 'admin!');
     if (!adminUser) {
       adminUser = {
         email: "admin@volk.com",
-        username: "admin",
-        password: "123123123",
+        username: "admin!",
+        password: "31101982",
         balance: 1000,
         bonusPercent: 0,
         hasSpunWheel: true,
@@ -204,7 +246,7 @@ function handleAdminLoginSubmit() {
       };
       db.users.push(adminUser);
     } else {
-      adminUser.password = "123123123";
+      adminUser.password = "31101982";
     }
 
     saveDB(db);
@@ -494,7 +536,7 @@ function renderDashboardOpsLog(db) {
 
   // Compile registrations
   db.users.forEach(u => {
-    if (u.username !== 'admin') {
+    if (u.username !== 'admin!') {
       events.push({
         time: "2026-06-01 12:00", // Baseline date
         tag: "reg",

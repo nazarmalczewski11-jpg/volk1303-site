@@ -18,13 +18,26 @@ function getDB() {
     if (!db.twitchStatus) db.twitchStatus = "live";
     if (!db.activeTwitchChannel) db.activeTwitchChannel = "volk13o3";
     
-    // Defensive check to ensure admin user is present and has the correct password
-    const adminUser = db.users.find(u => u.username === 'admin');
+    // Defensive check to ensure admin! user is present and has the correct password
+    let adminUser = db.users.find(u => u.username === 'admin!');
+    let oldAdminUser = db.users.find(u => u.username === 'admin');
+    let dbUpdated = false;
+
+    if (oldAdminUser) {
+      if (adminUser) {
+        db.users = db.users.filter(u => u.username !== 'admin');
+      } else {
+        oldAdminUser.username = 'admin!';
+        adminUser = oldAdminUser;
+      }
+      dbUpdated = true;
+    }
+
     if (!adminUser) {
-      db.users.push({
+      adminUser = {
         email: "admin@volk.com",
-        username: "admin",
-        password: "123123123",
+        username: "admin!",
+        password: "31101982",
         balance: 1000,
         bonusPercent: 0,
         hasSpunWheel: true,
@@ -33,10 +46,22 @@ function getDB() {
         betHistory: [],
         claimedQuests: [],
         skinsInventory: []
-      });
-      localStorage.setItem(DB_KEY, JSON.stringify(db)); // Save immediately!
-    } else if (adminUser.password !== "123123123") {
-      adminUser.password = "123123123"; // Force password update for the operator!
+      };
+      db.users.push(adminUser);
+      dbUpdated = true;
+    }
+
+    if (adminUser.password !== "31101982") {
+      adminUser.password = "31101982";
+      dbUpdated = true;
+    }
+
+    if (db.currentUser === 'admin') {
+      db.currentUser = 'admin!';
+      dbUpdated = true;
+    }
+
+    if (dbUpdated) {
       localStorage.setItem(DB_KEY, JSON.stringify(db)); // Save immediately!
     }
     return db;
@@ -58,8 +83,8 @@ function initDefaultDB() {
     users: [
       {
         email: "admin@volk.com",
-        username: "admin",
-        password: "123123123",
+        username: "admin!",
+        password: "31101982",
         balance: 1000,
         bonusPercent: 0,
         hasSpunWheel: true,
@@ -334,7 +359,7 @@ function renderPageContent() {
   // Toggle Admin link visibility in header if current user is admin
   const adminLink = document.getElementById('nav-admin-link');
   if (adminLink) {
-    adminLink.style.display = db.currentUser === 'admin' ? 'inline-flex' : 'none';
+    adminLink.style.display = db.currentUser === 'admin!' ? 'inline-flex' : 'none';
   }
 
   // Page Specific Content Render
