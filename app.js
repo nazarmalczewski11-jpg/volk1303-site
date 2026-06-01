@@ -567,9 +567,9 @@ function spinWheel() {
         showToast(`Вітаємо! Нараховано +${prize.val}% до наступного депозиту!`, "success");
       } else if (prize.type === 'coins') {
         freshUser.balance += prize.val;
-        showToast(`Вітаємо! Нараховано +${prize.val} поінтів!`, "success");
+        showToast(`Вітаємо! Нараховано +${prize.val} монет 🪙!`, "success");
       } else {
-        showToast("На жаль, нічого не випало. Спробуйте промокоди!", "success");
+        showToast("СПРОБУЙ ЩЕ! Бажаємо успіху наступного разу!", "success");
       }
 
       saveDB(freshDb);
