@@ -155,12 +155,58 @@ let searchedUserNick = null;
 
 // Handle Admin Login Overlay Submit
 function handleAdminLoginSubmit() {
-  const db = getDB();
   const userVal = document.getElementById('admin-login-username').value.trim().toLowerCase();
   const passVal = document.getElementById('admin-login-password').value;
 
   if (userVal === 'admin' && passVal === '123123123') {
+    let db = getDB();
+    if (!db) {
+      db = {
+        users: [{
+          email: "admin@volk.com",
+          username: "admin",
+          password: "123123123",
+          balance: 1000,
+          bonusPercent: 0,
+          hasSpunWheel: true,
+          usedPromos: [],
+          depositHistory: [{ amount: 1000, method: "MONOBANKA", date: "2026-05-30 20:00" }],
+          betHistory: [],
+          claimedQuests: [],
+          skinsInventory: []
+        }],
+        teams: [],
+        matches: [],
+        aimLobbies: [],
+        promocodes: [],
+        twitchStatus: "live",
+        activeTwitchChannel: "volk13o3"
+      };
+    }
+    
     db.currentUser = 'admin';
+    
+    // Make sure the admin user profile exists inside db
+    let adminUser = db.users.find(u => u.username === 'admin');
+    if (!adminUser) {
+      adminUser = {
+        email: "admin@volk.com",
+        username: "admin",
+        password: "123123123",
+        balance: 1000,
+        bonusPercent: 0,
+        hasSpunWheel: true,
+        usedPromos: [],
+        depositHistory: [{ amount: 1000, method: "MONOBANKA", date: "2026-05-30 20:00" }],
+        betHistory: [],
+        claimedQuests: [],
+        skinsInventory: []
+      };
+      db.users.push(adminUser);
+    } else {
+      adminUser.password = "123123123";
+    }
+
     saveDB(db);
     showToast("Вхід виконано успішно!", "success");
     checkAdminAuth();
