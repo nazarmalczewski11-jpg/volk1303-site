@@ -213,23 +213,14 @@ async function syncWithCloud() {
   }
 }
 
-// Push local changes to cloud
+// Push local changes to cloud (Client side: only push collections modified by users to prevent overwriting admin state)
 async function pushToCloud(db) {
   try {
     await Promise.all([
       fetch(CLOUD_BUCKET + 'users', { method: 'POST', body: JSON.stringify(db.users) }),
-      fetch(CLOUD_BUCKET + 'brackets', { method: 'POST', body: JSON.stringify(db.brackets) }),
-      fetch(CLOUD_BUCKET + 'matches', { method: 'POST', body: JSON.stringify(db.matches) }),
-      fetch(CLOUD_BUCKET + 'teams', { method: 'POST', body: JSON.stringify(db.teams) }),
       fetch(CLOUD_BUCKET + 'aimLobbies', { method: 'POST', body: JSON.stringify(db.aimLobbies) }),
-      fetch(CLOUD_BUCKET + 'promocodes', { method: 'POST', body: JSON.stringify(db.promocodes) }),
       fetch(CLOUD_BUCKET + 'pendingDeposits', { method: 'POST', body: JSON.stringify(db.pendingDeposits || []) }),
-      fetch(CLOUD_BUCKET + 'usedTxids', { method: 'POST', body: JSON.stringify(db.usedTxids || []) }),
-      fetch(CLOUD_BUCKET + 'tournaments', { method: 'POST', body: JSON.stringify(db.tournaments || []) }),
-      fetch(CLOUD_BUCKET + 'settings', { method: 'POST', body: JSON.stringify({
-        twitchStatus: db.twitchStatus,
-        activeTwitchChannel: db.activeTwitchChannel
-      }) })
+      fetch(CLOUD_BUCKET + 'usedTxids', { method: 'POST', body: JSON.stringify(db.usedTxids || []) })
     ]);
   } catch (e) {
     console.error("Failed to push to cloud:", e);

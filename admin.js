@@ -155,9 +155,19 @@ async function syncWithCloud() {
             db.tournaments.push(ct);
             toursChanged = true;
           } else {
-            if (JSON.stringify(db.tournaments[localIdx]) !== JSON.stringify(ct)) {
+            const localTour = db.tournaments[localIdx];
+            const cloudTime = ct.lastModified || 0;
+            const localTime = localTour.lastModified || 0;
+            if (cloudTime > localTime) {
               db.tournaments[localIdx] = ct;
               toursChanged = true;
+            } else if (localTime > cloudTime) {
+              shouldPush = true;
+            } else {
+              if (JSON.stringify(localTour) !== JSON.stringify(ct)) {
+                db.tournaments[localIdx] = ct;
+                toursChanged = true;
+              }
             }
           }
         });
@@ -2620,6 +2630,7 @@ window.saveTournamentAdmin = function() {
     tour.prizePlaces = prizePlaces;
     tour.percents = percents;
     tour.rules = rules;
+    tour.lastModified = Date.now();
 
     rebuildBracketTeamSlots(tour);
     showToast("Турнір успішно оновлено!", "success");
@@ -2639,7 +2650,8 @@ window.saveTournamentAdmin = function() {
       percents: percents,
       rules: rules,
       registeredTeams: [],
-      brackets: generateBracketStructure(maxTeams, system)
+      brackets: generateBracketStructure(maxTeams, system),
+      lastModified: Date.now()
     };
     
     db.tournaments.push(newTour);
@@ -2966,6 +2978,7 @@ window.selectExistingTeamForSlot = function(slotIndex) {
   }
 
   tour.registeredTeams[slotIndex] = teamId;
+  tour.lastModified = Date.now();
 
   rebuildBracketTeamSlots(tour);
   saveDB(db);
@@ -3014,6 +3027,7 @@ window.renameTeamSlot = function(slotIndex, teamId) {
 
   const tour = db.tournaments.find(t => t.id === activeRosterTournamentId);
   if (tour) {
+    tour.lastModified = Date.now();
     rebuildBracketTeamSlots(tour);
   }
 
@@ -3033,6 +3047,7 @@ window.unregisterTeamSlot = function(slotIndex) {
 
   if (tour.registeredTeams) {
     tour.registeredTeams.splice(slotIndex, 1);
+    tour.lastModified = Date.now();
     rebuildBracketTeamSlots(tour);
     saveDB(db);
   }
@@ -3143,6 +3158,9 @@ window.addPlayerToSlotTeam = function(teamId, username) {
   }
 
   team.players.push(userNickLower);
+  if (tour) {
+    tour.lastModified = Date.now();
+  }
   saveDB(db);
 
   showToast(`Гравець @${username.toUpperCase()} доданий до команди ${team.name}!`, "success");
@@ -3165,6 +3183,10 @@ window.removePlayerFromSlotTeam = function(teamId, username) {
     return;
   }
 
+  const tour = db.tournaments.find(t => t.id === activeRosterTournamentId);
+  if (tour) {
+    tour.lastModified = Date.now();
+  }
   saveDB(db);
   showToast(`Гравця @${username.toUpperCase()} вилучено з команди!`, "success");
   // Re-open roster modal to refresh the UI
@@ -3349,6 +3371,7 @@ window.saveBracketMatchAdmin = function(rIndex, mIndex) {
     showToast(`🏆 Турнір завершено! Переможець: ${finalMatch.winner.toUpperCase()}! Кошти зараховано капітанам!`, "success");
   }
 
+  tour.lastModified = Date.now();
   saveDB(db);
   showToast(`Матч ${match.id} успішно оновлено!`, "success");
   openBracketEditorCard(activeEditorTournamentId); // Refresh editor list
