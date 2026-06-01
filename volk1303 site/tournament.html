@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>VOLK 1303 | Турніри Challengermode</title>
-  <link rel="stylesheet" href="style.css?v=1.5">
+  <link rel="stylesheet" href="style.css?v=1.6">
   <script src="smoke-bg.js"></script>
 </head>
 <body>
@@ -24,6 +24,7 @@
     <nav>
       <a href="betting.html" class="nav-link">Ставки</a>
       <a href="tournament.html" class="nav-link active">Турніри</a>
+      <a href="my-bets.html" class="nav-link">Мої ставки</a>
       <a href="profile.html" class="nav-link">Профіль</a>
     </nav>
 
@@ -56,37 +57,7 @@
         </div>
       </div>
 
-      <!-- Cyber Lobbies & Duels (Full Width) -->
-      <div class="card" style="width: 100%;">
-        <div class="section-title">⚔️ КІБЕРСПОРТИВНІ ЛОБІ ТА ДУЕЛІ</div>
-        <p style="font-size:12px; color:var(--text-secondary); margin-bottom:15px; line-height:1.6;">
-          Створюйте власні дуелі або приєднуйтесь до командних боїв. Виберіть формат від дуелі 1v1 до повномасштабного матчу 5v5!
-        </p>
 
-        <!-- Format Select Tabs -->
-        <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; background: rgba(11, 14, 20, 0.4); padding: 15px; border-radius: 10px; border: 1px solid var(--border-color);">
-          <div style="font-size: 11px; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 2px; letter-spacing: 0.5px;">Оберіть формат бою:</div>
-          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
-            <button class="btn format-select-btn active" id="btn-format-1v1" onclick="selectLobbyFormat('1v1')" style="padding: 8px 4px; font-size: 11px; font-weight: 800;">1 vs 1</button>
-            <button class="btn btn-secondary format-select-btn" id="btn-format-2v2" onclick="selectLobbyFormat('2v2')" style="padding: 8px 4px; font-size: 11px; font-weight: 800;">2 vs 2</button>
-            <button class="btn btn-secondary format-select-btn" id="btn-format-3v3" onclick="selectLobbyFormat('3v3')" style="padding: 8px 4px; font-size: 11px; font-weight: 800;">3 vs 3</button>
-            <button class="btn btn-secondary format-select-btn" id="btn-format-5v5" onclick="selectLobbyFormat('5v5')" style="padding: 8px 4px; font-size: 11px; font-weight: 800;">5 vs 5</button>
-          </div>
-          
-          <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; margin-top: 4px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.03);">
-            <span style="color:var(--text-secondary);">Вартість: <strong id="lbl-format-fee" style="color:white; font-weight:800;">50 🪙</strong></span>
-            <span style="color:var(--text-secondary);">Виграш: <strong id="lbl-format-prize" style="color:var(--cs-orange); font-weight:800;">95 🪙</strong></span>
-          </div>
-        </div>
-
-        <div class="lobby-grid" id="aim-lobbies-container">
-          <!-- Filled dynamically by JS -->
-        </div>
-
-        <div style="display:flex; justify-content:center; margin-top:20px;">
-          <button class="btn" id="btn-create-lobby" onclick="handleCreateLobby()" style="padding:12px 24px; font-size:13px; font-weight:800; width:100%;">⚔️ СТВОРИТИ ЛОБІ (50 🪙)</button>
-        </div>
-      </div>
 
     </div>
   </main>
@@ -242,6 +213,6 @@
     </div>
   </footer>
 
-  <script src="app.js?v=1.5"></script>
+  <script src="app.js?v=1.6"></script>
 </body>
 </html>

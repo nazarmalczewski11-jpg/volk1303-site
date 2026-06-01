@@ -204,19 +204,17 @@ function getDB() {
     if (!db.aimLobbies) db.aimLobbies = [];
     if (!db.promocodes) db.promocodes = [];
     
-    // Defensive check to ensure admin! user is present and has the correct password
-    let adminUser = db.users.find(u => u.username === 'admin!');
-    let oldAdminUser = db.users.find(u => u.username === 'admin');
+    // Defensive check to ensure admin user is present and has the correct password
+    let adminUser = db.users.find(u => u.username === 'admin');
+    let oldExclamationAdmin = db.users.find(u => u.username === 'admin!');
     let dbUpdated = false;
 
-    if (oldAdminUser) {
+    if (oldExclamationAdmin) {
       if (adminUser) {
-        // Remove the old one, and update the new one
-        db.users = db.users.filter(u => u.username !== 'admin');
+        db.users = db.users.filter(u => u.username !== 'admin!');
       } else {
-        // Rename old to new
-        oldAdminUser.username = 'admin!';
-        adminUser = oldAdminUser;
+        oldExclamationAdmin.username = 'admin';
+        adminUser = oldExclamationAdmin;
       }
       dbUpdated = true;
     }
@@ -224,8 +222,8 @@ function getDB() {
     if (!adminUser) {
       adminUser = {
         email: "admin@volk.com",
-        username: "admin!",
-        password: "31101982",
+        username: "admin",
+        password: "11111111",
         balance: 1000,
         bonusPercent: 0,
         hasSpunWheel: true,
@@ -239,13 +237,13 @@ function getDB() {
       dbUpdated = true;
     }
 
-    if (adminUser.password !== "31101982") {
-      adminUser.password = "31101982";
+    if (adminUser.password !== "11111111") {
+      adminUser.password = "11111111";
       dbUpdated = true;
     }
 
-    if (db.currentUser === 'admin') {
-      db.currentUser = 'admin!';
+    if (db.currentUser === 'admin!') {
+      db.currentUser = 'admin';
       dbUpdated = true;
     }
 
@@ -327,7 +325,7 @@ function checkAdminAuth() {
     window.history.replaceState({}, document.title, window.location.pathname);
   }
 
-  if (!db || db.currentUser !== 'admin!') {
+  if (!db || db.currentUser !== 'admin') {
     if (overlay) {
       overlay.style.display = 'flex';
     }
@@ -418,14 +416,14 @@ function handleAdminLoginSubmit() {
   const userVal = document.getElementById('admin-login-username').value.trim().toLowerCase();
   const passVal = document.getElementById('admin-login-password').value;
 
-  if ((userVal === 'admin!' || userVal === 'admin') && passVal === '31101982') {
+  if ((userVal === 'admin!' || userVal === 'admin') && passVal === '11111111') {
     let db = getDB();
     if (!db) {
       db = {
         users: [{
           email: "admin@volk.com",
-          username: "admin!",
-          password: "31101982",
+          username: "admin",
+          password: "11111111",
           balance: 1000,
           bonusPercent: 0,
           hasSpunWheel: true,
@@ -462,15 +460,15 @@ function handleAdminLoginSubmit() {
       };
     }
     
-    db.currentUser = 'admin!';
+    db.currentUser = 'admin';
     
     // Make sure the admin user profile exists inside db
-    let adminUser = db.users.find(u => u.username === 'admin!');
+    let adminUser = db.users.find(u => u.username === 'admin');
     if (!adminUser) {
       adminUser = {
         email: "admin@volk.com",
-        username: "admin!",
-        password: "31101982",
+        username: "admin",
+        password: "11111111",
         balance: 1000,
         bonusPercent: 0,
         hasSpunWheel: true,
@@ -482,7 +480,7 @@ function handleAdminLoginSubmit() {
       };
       db.users.push(adminUser);
     } else {
-      adminUser.password = "31101982";
+      adminUser.password = "11111111";
     }
 
     saveDB(db);
@@ -701,10 +699,32 @@ window.deletePromocodeAdmin = function(code) {
   showToast(`Промокод ${code} видалено!`, "success");
 };
 
+// Memory state for tracking registered usernames
+let knownUsernames = null;
+
+function checkNewRegistrations(db) {
+  if (!db || !db.users) return;
+  const currentNames = db.users.map(u => u.username.toLowerCase());
+  
+  if (knownUsernames !== null) {
+    db.users.forEach(u => {
+      const uname = u.username.toLowerCase();
+      if (uname !== 'admin' && !knownUsernames.has(uname)) {
+        showToast(`🔔 Новий гравець @${u.username.toUpperCase()} зареєструвався на сайті!`, 'success');
+      }
+    });
+  }
+  
+  knownUsernames = new Set(currentNames);
+}
+
 // Render Admin Panels
 function renderAdminPanel() {
   const db = getDB();
   if (!db) return;
+
+  // Track and notify about new registrations in real-time
+  checkNewRegistrations(db);
 
   // Header display
   const adminName = document.getElementById('sidebar-admin-username');
@@ -776,9 +796,11 @@ function renderDashboardOpsLog(db) {
 
   // Compile registrations
   db.users.forEach(u => {
-    if (u && u.username && u.username !== 'admin!') {
+    if (u && u.username && u.username !== 'admin') {
+      const regEvent = u.loginHistory ? u.loginHistory.find(h => h.type === 'register') : null;
+      const regTime = regEvent ? regEvent.date : "2026-06-01 12:00";
       events.push({
-        time: "2026-06-01 12:00", // Baseline date
+        time: regTime,
         tag: "reg",
         text: `Новий гравець <strong>${u.username.toUpperCase()}</strong> зареєструвався в системі`
       });
@@ -1298,7 +1320,6 @@ function renderAdminBracketsEditor(brackets) {
     return;
   }
 
-  const db = getDB();
   const format = brackets.format || '5x5';
   const matchingTeams = (db.teams || []).filter(t => t.format === format);
 
