@@ -2501,7 +2501,7 @@ function renderAdminTournamentsList(tournaments) {
 // Global state for roster modal selection
 let activeRosterTournamentId = null;
 
-// Open roster manager modal
+// Open roster manager modal with a slot-based layout
 window.openRosterModal = function(tourId) {
   const db = getDB();
   const tour = db.tournaments.find(t => t.id === tourId);
@@ -2509,100 +2509,356 @@ window.openRosterModal = function(tourId) {
 
   activeRosterTournamentId = tourId;
   
-  const regCount = tour.registeredTeams ? tour.registeredTeams.length : 0;
-  document.getElementById('roster-count-val').innerText = `${regCount} / ${tour.maxTeams}`;
+  const maxTeams = tour.maxTeams || 4;
+  const registeredTeams = tour.registeredTeams || [];
+
+  const slotsContainer = document.getElementById('roster-slots-container');
+  if (!slotsContainer) return;
+  slotsContainer.innerHTML = "";
+
+  document.getElementById('roster-count-val').innerText = `${registeredTeams.length} / ${maxTeams}`;
   document.getElementById('roster-format-val').innerText = tour.format;
 
-  // Render Registered Teams
-  const regContainer = document.getElementById('roster-registered-list');
-  regContainer.innerHTML = "";
-  if (regCount === 0) {
-    regContainer.innerHTML = `<span style="font-size:11px; color:var(--text-secondary); text-align:center; padding:10px; display:block;">Немає зареєстрованих команд</span>`;
-  } else {
-    tour.registeredTeams.forEach(teamId => {
-      const team = db.teams.find(t => t.id === teamId);
-      if (team) {
-        const item = document.createElement('div');
-        item.style.background = "#181a26";
-        item.style.padding = "8px 12px";
-        item.style.borderRadius = "6px";
-        item.style.display = "flex";
-        item.style.justifyContent = "space-between";
-        item.style.alignItems = "center";
-        item.style.fontSize = "12px";
+  // Render maxTeams slots!
+  for (let i = 0; i < maxTeams; i++) {
+    const slotCard = document.createElement('div');
+    slotCard.className = "roster-slot-card";
+    slotCard.style.background = "#13151f";
+    slotCard.style.border = "1px solid rgba(255,255,255,0.05)";
+    slotCard.style.borderRadius = "8px";
+    slotCard.style.padding = "12px";
+    slotCard.style.display = "flex";
+    slotCard.style.flexDirection = "column";
+    slotCard.style.gap = "8px";
 
-        item.innerHTML = `
-          <strong>${team.name} [${team.tag}]</strong>
-          <button class="btn btn-danger" style="padding:2px 6px; font-size:9px;" onclick="unregisterTeamFromTournament('${tourId}', '${team.id}')">Видалити</button>
-        `;
-        regContainer.appendChild(item);
-      }
-    });
-  }
+    const teamId = registeredTeams[i];
+    const team = teamId ? db.teams.find(t => t.id === teamId) : null;
 
-  // Render Available Teams matching format
-  const availContainer = document.getElementById('roster-available-list');
-  availContainer.innerHTML = "";
-  
-  const availableTeams = db.teams.filter(t => t.format === tour.format && !(tour.registeredTeams || []).includes(t.id));
-  if (availableTeams.length === 0) {
-    availContainer.innerHTML = `<span style="font-size:11px; color:var(--text-secondary); text-align:center; padding:10px; display:block;">Відповідних вільних команд немає</span>`;
-  } else {
-    availableTeams.forEach(team => {
-      const item = document.createElement('div');
-      item.style.background = "#181a26";
-      item.style.padding = "8px 12px";
-      item.style.borderRadius = "6px";
-      item.style.display = "flex";
-      item.style.justifyContent = "space-between";
-      item.style.alignItems = "center";
-      item.style.fontSize = "12px";
-
-      item.innerHTML = `
-        <strong>${team.name} [${team.tag}]</strong>
-        <button class="btn" style="padding:2px 6px; font-size:9px;" onclick="registerTeamToTournament('${tourId}', '${team.id}')">➕ Зареєструвати</button>
+    if (!team) {
+      // EMPTY SLOT
+      slotCard.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <strong style="color:var(--text-secondary); font-size:12px;">🛡️ Слот Команди ${i + 1} (Вільний)</strong>
+          <span style="font-size: 8px; color: var(--text-secondary); text-transform: uppercase; font-weight:800; background: rgba(255,255,255,0.02); padding: 3px 6px; border-radius: 4px;">Вільний</span>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:3px;">
+          <button class="btn" style="padding: 6px 12px; font-size:10px; font-weight:800; margin-bottom:0;" onclick="showAddTeamSlotForm(${i})">➕ Створити команду</button>
+          <button class="btn btn-secondary" style="padding: 6px 12px; font-size:10px; font-weight:800; margin-bottom:0;" onclick="showSelectExistingTeamForm(${i})">🔌 Вибрати існуючу</button>
+        </div>
+        <div id="slot-form-container-${i}" style="display:none; margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.03);"></div>
       `;
-      availContainer.appendChild(item);
-    });
+    } else {
+      // FILLED SLOT
+      const players = team.players || [];
+      const playersListHtml = players.map(p => `
+        <span class="player-tag-badge" style="display:inline-flex; align-items:center; background:#1e293b; color:white; border:1px solid rgba(255,255,255,0.08); padding:2px 6px; border-radius:4px; font-size:10px; gap:4px;">
+          @${p.toUpperCase()}
+          <span style="color:var(--wolf-red); cursor:pointer; font-weight:900; font-size:12px; padding-left:2px;" onclick="removePlayerFromSlotTeam('${team.id}', '${p}')">&times;</span>
+        </span>
+      `).join(" ");
+
+      slotCard.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <strong style="color:white; font-size:13px;">🛡️ Команда ${i + 1}: ${team.name} [${team.tag}]</strong>
+            <div style="font-size:9px; color:var(--text-secondary); margin-top:1px;">Формат: ${team.format}</div>
+          </div>
+          <div style="display:flex; gap:5px;">
+            <button class="btn btn-secondary" style="padding: 4px 8px; font-size:9px; margin-bottom:0;" onclick="showRenameTeamSlotForm(${i}, '${team.id}', '${team.name}')">📝 Назва</button>
+            <button class="btn btn-danger" style="padding: 4px 8px; font-size:9px; margin-bottom:0;" onclick="unregisterTeamSlot(${i})">❌</button>
+          </div>
+        </div>
+        <div id="slot-rename-container-${i}" style="display:none; margin-top:5px; padding-bottom:5px;"></div>
+        
+        <div style="background:#0c0d12; border-radius:6px; padding:8px; border:1px solid rgba(255,255,255,0.01); margin-top:3px;">
+          <div style="font-size:9px; font-weight:800; color:var(--text-secondary); text-transform:uppercase; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
+            <span>👥 Учасники (${players.length}):</span>
+            <a href="#" onclick="showAddPlayerToSlotForm(${i}, '${team.id}'); return false;" style="color:var(--cs-orange); text-decoration:none; font-weight:800; font-size:9px;">➕ Додати учасника</a>
+          </div>
+          <div style="display:flex; flex-wrap:wrap; gap:4px;">
+            ${players.length === 0 ? '<span style="font-size:9px; color:var(--text-secondary); font-style:italic;">Немає гравців</span>' : playersListHtml}
+          </div>
+        </div>
+        
+        <div id="slot-add-player-container-${i}" style="display:none; margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.03);"></div>
+      `;
+    }
+
+    slotsContainer.appendChild(slotCard);
   }
 
   document.getElementById('tournament-roster-modal').classList.add('active');
 };
 
-// Register team to tournament
-window.registerTeamToTournament = function(tourId, teamId) {
+// Form helpers for slot manager
+window.showAddTeamSlotForm = function(slotIndex) {
+  const container = document.getElementById(`slot-form-container-${slotIndex}`);
+  if (!container) return;
+  container.style.display = "block";
+  container.innerHTML = `
+    <div style="display:flex; gap:6px; align-items:center;">
+      <input type="text" id="slot-team-name-input-${slotIndex}" class="form-input" placeholder="Назва команди..." style="margin-bottom:0; font-size:11px; padding:6px 10px; flex:1;">
+      <button class="btn" style="padding:6px 12px; font-size:10px; margin-bottom:0;" onclick="createNewTeamForSlot(${slotIndex})">Зберегти</button>
+      <button class="btn btn-secondary" style="padding:6px 10px; font-size:10px; margin-bottom:0;" onclick="hideSlotForm(${slotIndex})">Скасувати</button>
+    </div>
+  `;
+};
+
+window.showSelectExistingTeamForm = function(slotIndex) {
   const db = getDB();
-  const tour = db.tournaments.find(t => t.id === tourId);
+  const tour = db.tournaments.find(t => t.id === activeRosterTournamentId);
   if (!tour) return;
 
-  if (!tour.registeredTeams) tour.registeredTeams = [];
-  if (tour.registeredTeams.length >= tour.maxTeams) {
-    showToast(`Помилка: Досягнуто максимальний ліміт учасників (${tour.maxTeams})!`, "error");
+  const container = document.getElementById(`slot-form-container-${slotIndex}`);
+  if (!container) return;
+  container.style.display = "block";
+
+  const format = tour.format;
+  const registered = tour.registeredTeams || [];
+  const matchingTeams = db.teams.filter(t => t.format === format && !registered.includes(t.id));
+
+  if (matchingTeams.length === 0) {
+    container.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; font-size:10px;">
+        <span style="color:var(--text-secondary);">Немає вільних команд формату ${format}</span>
+        <button class="btn btn-secondary" style="padding:2px 6px; font-size:9px; margin-bottom:0;" onclick="hideSlotForm(${slotIndex})">Закрити</button>
+      </div>
+    `;
     return;
   }
 
-  tour.registeredTeams.push(teamId);
+  const optionsHtml = matchingTeams.map(t => `<option value="${t.id}">${t.name} [${t.tag}]</option>`).join("");
+
+  container.innerHTML = `
+    <div style="display:flex; gap:6px; align-items:center;">
+      <select id="slot-team-select-${slotIndex}" class="form-input" style="margin-bottom:0; font-size:11px; padding:6px 10px; flex:1; background:#0c0d12;">
+        ${optionsHtml}
+      </select>
+      <button class="btn" style="padding:6px 12px; font-size:10px; margin-bottom:0;" onclick="selectExistingTeamForSlot(${slotIndex})">Вибрати</button>
+      <button class="btn btn-secondary" style="padding:6px 10px; font-size:10px; margin-bottom:0;" onclick="hideSlotForm(${slotIndex})">Скасувати</button>
+    </div>
+  `;
+};
+
+window.hideSlotForm = function(slotIndex) {
+  const container = document.getElementById(`slot-form-container-${slotIndex}`);
+  if (container) container.style.display = "none";
+};
+
+window.createNewTeamForSlot = function(slotIndex) {
+  const nameVal = document.getElementById(`slot-team-name-input-${slotIndex}`).value.trim();
+  if (!nameVal) {
+    showToast("Введіть назву команди!", "error");
+    return;
+  }
+
+  const db = getDB();
+  const tour = db.tournaments.find(t => t.id === activeRosterTournamentId);
+  if (!tour) return;
+
+  if (db.teams.some(t => t.name.toLowerCase() === nameVal.toLowerCase())) {
+    showToast("Команда з такою назвою вже існує!", "error");
+    return;
+  }
+
+  const teamId = `team_${Date.now()}_${slotIndex}`;
+  const newTeam = {
+    id: teamId,
+    name: nameVal,
+    tag: nameVal.substring(0, 4).toUpperCase().replace(/[^A-Z0-9]/g, 'T'),
+    format: tour.format,
+    players: [],
+    owner: "ADMIN"
+  };
+
+  db.teams.push(newTeam);
+  if (!tour.registeredTeams) tour.registeredTeams = [];
+  tour.registeredTeams[slotIndex] = teamId;
+
   rebuildBracketTeamSlots(tour);
   saveDB(db);
 
-  showToast("Команду успішно зареєстровано на турнір!", "success");
-  openRosterModal(tourId); // Refresh modal view
+  showToast(`Команду ${nameVal} створено для Слоту ${slotIndex + 1}!`, "success");
+  openRosterModal(activeRosterTournamentId);
   renderAdminPanel();
 };
 
-// Unregister team from tournament
-window.unregisterTeamFromTournament = function(tourId, teamId) {
+window.selectExistingTeamForSlot = function(slotIndex) {
+  const selectEl = document.getElementById(`slot-team-select-${slotIndex}`);
+  if (!selectEl) return;
+  const teamId = selectEl.value;
+
   const db = getDB();
-  const tour = db.tournaments.find(t => t.id === tourId);
+  const tour = db.tournaments.find(t => t.id === activeRosterTournamentId);
   if (!tour) return;
 
-  tour.registeredTeams = (tour.registeredTeams || []).filter(id => id !== teamId);
+  if (!tour.registeredTeams) tour.registeredTeams = [];
+  tour.registeredTeams[slotIndex] = teamId;
+
   rebuildBracketTeamSlots(tour);
   saveDB(db);
 
-  showToast("Команду вилучено з турніру!", "success");
-  openRosterModal(tourId); // Refresh modal
+  showToast("Команду успішно додано до слоту!", "success");
+  openRosterModal(activeRosterTournamentId);
   renderAdminPanel();
+};
+
+window.showRenameTeamSlotForm = function(slotIndex, teamId, oldName) {
+  const container = document.getElementById(`slot-rename-container-${slotIndex}`);
+  if (!container) return;
+  container.style.display = "block";
+  container.innerHTML = `
+    <div style="display:flex; gap:6px; align-items:center; margin-top:5px;">
+      <input type="text" id="slot-rename-input-${slotIndex}" class="form-input" value="${oldName}" style="margin-bottom:0; font-size:11px; padding:6px 10px; flex:1;">
+      <button class="btn" style="padding:6px 12px; font-size:10px; margin-bottom:0;" onclick="renameTeamSlot(${slotIndex}, '${teamId}')">Оновити</button>
+      <button class="btn btn-secondary" style="padding:6px 10px; font-size:10px; margin-bottom:0;" onclick="hideRenameForm(${slotIndex})">Скасувати</button>
+    </div>
+  `;
+};
+
+window.hideRenameForm = function(slotIndex) {
+  const container = document.getElementById(`slot-rename-container-${slotIndex}`);
+  if (container) container.style.display = "none";
+};
+
+window.renameTeamSlot = function(slotIndex, teamId) {
+  const nameVal = document.getElementById(`slot-rename-input-${slotIndex}`).value.trim();
+  if (!nameVal) {
+    showToast("Введіть назву команди!", "error");
+    return;
+  }
+
+  const db = getDB();
+  const team = db.teams.find(t => t.id === teamId);
+  if (!team) return;
+
+  if (db.teams.some(t => t.id !== teamId && t.name.toLowerCase() === nameVal.toLowerCase())) {
+    showToast("Команда з такою назвою вже існує!", "error");
+    return;
+  }
+
+  team.name = nameVal;
+  team.tag = nameVal.substring(0, 4).toUpperCase().replace(/[^A-Z0-9]/g, 'T');
+
+  const tour = db.tournaments.find(t => t.id === activeRosterTournamentId);
+  if (tour) {
+    rebuildBracketTeamSlots(tour);
+  }
+
+  saveDB(db);
+
+  showToast(`Назву команди змінено на ${nameVal}!`, "success");
+  openRosterModal(activeRosterTournamentId);
+  renderAdminPanel();
+};
+
+window.unregisterTeamSlot = function(slotIndex) {
+  if (!confirm("Ви впевнені, що хочете звільнити цей слот? Команда буде вилучена з турніру.")) return;
+
+  const db = getDB();
+  const tour = db.tournaments.find(t => t.id === activeRosterTournamentId);
+  if (!tour) return;
+
+  if (tour.registeredTeams) {
+    tour.registeredTeams.splice(slotIndex, 1);
+    rebuildBracketTeamSlots(tour);
+    saveDB(db);
+  }
+
+  showToast("Слот успішно звільнено!", "success");
+  openRosterModal(activeRosterTournamentId);
+  renderAdminPanel();
+};
+
+window.showAddPlayerToSlotForm = function(slotIndex, teamId) {
+  const container = document.getElementById(`slot-add-player-container-${slotIndex}`);
+  if (!container) return;
+  container.style.display = "block";
+  container.innerHTML = `
+    <div style="display:flex; flex-direction:column; gap:6px;">
+      <div style="display:flex; gap:6px;">
+        <input type="text" id="slot-player-search-input-${slotIndex}" class="form-input" placeholder="🔍 Введіть юзернейм гравця..." style="margin-bottom:0; font-size:11px; padding:6px 10px; flex:1;" oninput="searchUsersForTeamSlot(${slotIndex}, '${teamId}')">
+        <button class="btn btn-secondary" style="padding:6px 10px; font-size:10px; margin-bottom:0;" onclick="hideAddPlayerForm(${slotIndex})">Закрити</button>
+      </div>
+      <div id="slot-player-search-results-${slotIndex}" style="display:flex; flex-direction:column; gap:4px; max-height:120px; overflow-y:auto; background:#0c0d12; border-radius:6px; padding:4px; border:1px solid rgba(255,255,255,0.05);">
+        <span style="font-size:10px; color:var(--text-secondary); padding:4px;">Почніть вводити юзернейм для пошуку...</span>
+      </div>
+    </div>
+  `;
+};
+
+window.hideAddPlayerForm = function(slotIndex) {
+  const container = document.getElementById(`slot-add-player-container-${slotIndex}`);
+  if (container) container.style.display = "none";
+};
+
+window.searchUsersForTeamSlot = function(slotIndex, teamId) {
+  const query = document.getElementById(`slot-player-search-input-${slotIndex}`).value.trim().toLowerCase();
+  const resultsContainer = document.getElementById(`slot-player-search-results-${slotIndex}`);
+  if (!resultsContainer) return;
+
+  if (!query) {
+    resultsContainer.innerHTML = `<span style="font-size:10px; color:var(--text-secondary); padding:4px;">Почніть вводити юзернейм для пошуку...</span>`;
+    return;
+  }
+
+  const db = getDB();
+  const team = db.teams.find(t => t.id === teamId);
+  if (!team) return;
+
+  const teamPlayers = team.players || [];
+
+  const matchingUsers = db.users.filter(u => 
+    u.username.toLowerCase() !== 'admin' && 
+    u.username.toLowerCase().includes(query) && 
+    !teamPlayers.includes(u.username.toLowerCase())
+  );
+
+  if (matchingUsers.length === 0) {
+    resultsContainer.innerHTML = `<span style="font-size:10px; color:var(--text-secondary); padding:4px;">Гравців не знайдено</span>`;
+    return;
+  }
+
+  resultsContainer.innerHTML = matchingUsers.map(user => `
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:4px 6px; background:#181a26; border-radius:4px; border:1px solid rgba(255,255,255,0.02);">
+      <span style="font-size:10px; font-weight:800; color:white;">@${user.username.toUpperCase()}</span>
+      <button class="btn" style="padding:2px 6px; font-size:8px; margin-bottom:0;" onclick="addPlayerToSlotTeam('${teamId}', '${user.username}')">➕ Додати</button>
+    </div>
+  `).join("");
+};
+
+window.addPlayerToSlotTeam = function(teamId, username) {
+  const db = getDB();
+  const team = db.teams.find(t => t.id === teamId);
+  if (!team) return;
+
+  if (!team.players) team.players = [];
+  const userNickLower = username.toLowerCase();
+
+  if (team.players.includes(userNickLower)) {
+    showToast("Цей гравець вже є у команді!", "error");
+    return;
+  }
+
+  team.players.push(userNickLower);
+  saveDB(db);
+
+  showToast(`Гравець @${username.toUpperCase()} доданий до команди ${team.name}!`, "success");
+  openRosterModal(activeRosterTournamentId);
+};
+
+window.removePlayerFromSlotTeam = function(teamId, username) {
+  if (!confirm(`Ви впевнені, що хочете вилучити гравця @${username.toUpperCase()} з команди?`)) return;
+
+  const db = getDB();
+  const team = db.teams.find(t => t.id === teamId);
+  if (!team) return;
+
+  team.players = (team.players || []).filter(p => p.toLowerCase() !== username.toLowerCase());
+  saveDB(db);
+
+  showToast(`Гравця @${username.toUpperCase()} вилучено з команди!`, "success");
+  openRosterModal(activeRosterTournamentId);
 };
 
 // Global state for bracket editor selection

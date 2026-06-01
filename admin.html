@@ -378,25 +378,16 @@
 
       <!-- Tournament Roster Management Modal -->
       <div id="tournament-roster-modal" class="modal-overlay">
-        <div class="modal-content" style="max-width: 500px; border-color: var(--cs-orange);">
+        <div class="modal-content" style="max-width: 600px; border-color: var(--cs-orange);">
           <button class="modal-close" onclick="closeModal('tournament-roster-modal')">&times;</button>
-          <div class="modal-title">🛡️ Керування учасниками турніру</div>
+          <div class="modal-title">🛡️ Керування слотами та учасниками</div>
           <div style="font-size:12px; color:var(--text-secondary); margin-bottom:15px;" id="roster-modal-desc">
-            Зареєструйте команди на цей турнір. Кількість учасників не повинна перевищувати ліміт.
+            Формат: <strong style="color:white;" id="roster-format-val">5x5</strong> | Заповнено слотів: <strong style="color:var(--cs-orange);" id="roster-count-val">0/4</strong>. Керуйте командами та складами гравців безпосередньо у слотах нижче.
           </div>
 
-          <div class="card" style="background:var(--bg-input); padding:15px; margin-bottom:15px;">
-            <div style="font-size:11px; font-weight:800; text-transform:uppercase; color:white; margin-bottom:10px;">Зареєстровані команди (<span id="roster-count-val">0/4</span>)</div>
-            <div id="roster-registered-list" style="display:flex; flex-direction:column; gap:8px; max-height:160px; overflow-y:auto; padding-right:5px;">
-              <!-- Filled by JS -->
-            </div>
-          </div>
-
-          <div class="card" style="background:var(--bg-input); padding:15px; margin-bottom:0;">
-            <div style="font-size:11px; font-weight:800; text-transform:uppercase; color:white; margin-bottom:10px;">Доступні команди (Формат <span id="roster-format-val">5x5</span>)</div>
-            <div id="roster-available-list" style="display:flex; flex-direction:column; gap:8px; max-height:180px; overflow-y:auto; padding-right:5px;">
-              <!-- Filled by JS -->
-            </div>
+          <!-- Slots Container -->
+          <div id="roster-slots-container" style="display:flex; flex-direction:column; gap:15px; max-height:500px; overflow-y:auto; padding-right:5px; padding-bottom:5px;">
+            <!-- Filled dynamically by JS -->
           </div>
         </div>
       </div>

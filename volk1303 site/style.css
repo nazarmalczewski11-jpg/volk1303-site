@@ -1244,6 +1244,8 @@ nav {
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
   transform: translateY(-20px);
   transition: transform 0.3s ease;
+  max-height: 90vh;
+  overflow-y: auto;
 }
 
 .modal-overlay.active .modal-content {
