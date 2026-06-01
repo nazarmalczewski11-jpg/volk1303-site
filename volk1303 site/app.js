@@ -2874,7 +2874,25 @@ function renderTournamentBettingPortal(tourId) {
             </div>
             ${players.length > 0 ? `
               <div style="display:flex; flex-wrap:wrap; gap:4px;">
-                ${players.slice(0,5).map(p => `<span style="background:#1e293b; color:white; padding:3px 8px; border-radius:4px; font-size:10px; font-weight:700;">@${p.toUpperCase()}</span>`).join('')}
+                ${players.slice(0,5).map(p => {
+                  const userRecord = db.users.find(u => u.username.toLowerCase() === p.toLowerCase());
+                  let isOnline = false;
+                  if (userRecord && userRecord.loginHistory && userRecord.loginHistory.length > 0) {
+                    const lastLogin = userRecord.loginHistory[0];
+                    if (lastLogin && lastLogin.date) {
+                      const lastVisitTime = new Date(lastLogin.date);
+                      isOnline = lastVisitTime && (Date.now() - lastVisitTime.getTime() < 10 * 60 * 1000);
+                    }
+                  }
+                  const dotColor = isOnline ? '#26A17B' : '#718096';
+                  const dotGlow = isOnline ? 'box-shadow: 0 0 6px #26A17B;' : '';
+                  return `
+                    <span style="background:#1e293b; color:white; padding:3px 8px; border-radius:4px; font-size:10px; font-weight:700; display:inline-flex; align-items:center; gap:5px;">
+                      @${p.toUpperCase()}
+                      <span style="width:5px; height:5px; border-radius:50%; background:${dotColor}; ${dotGlow}" title="${isOnline ? 'Online' : 'Offline'}"></span>
+                    </span>
+                  `;
+                }).join('')}
                 ${players.length > 5 ? `<span style="background:#1e293b; color:var(--text-secondary); padding:3px 8px; border-radius:4px; font-size:10px;">+${players.length-5}</span>` : ''}
               </div>` : ''}
             <button onclick="placeTournamentBet('${tourId}', '${team.id}', '${team.name}', ${odds})" style="width:100%; background:linear-gradient(135deg, rgba(255,90,0,0.9), rgba(255,60,0,0.9)); border:none; color:white; border-radius:8px; padding:10px; font-size:12px; font-weight:900; cursor:pointer; letter-spacing:0.5px; transition:all 0.2s; text-transform:uppercase;" onmouseover="if(!${frozen}) this.style.transform='scale(1.02)';" onmouseout="if(!${frozen}) this.style.transform='scale(1)';"
@@ -3119,9 +3137,24 @@ window.openRosterModalComparison = function(team1Name, team2Name) {
   
   if (team1 && team1.players && team1.players.length > 0) {
     team1.players.forEach(p => {
+      const userRecord = db.users.find(u => u.username.toLowerCase() === p.toLowerCase());
+      let statusText = 'Offline';
+      let statusColor = '#718096';
+      if (userRecord && userRecord.loginHistory && userRecord.loginHistory.length > 0) {
+        const lastLogin = userRecord.loginHistory[0];
+        if (lastLogin && lastLogin.date) {
+          const lastVisitTime = new Date(lastLogin.date);
+          const isOnline = lastVisitTime && (Date.now() - lastVisitTime.getTime() < 10 * 60 * 1000);
+          if (isOnline) {
+            statusText = 'Online';
+            statusColor = '#26A17B';
+          }
+        }
+      }
       list1.innerHTML += `
-        <div class="roster-player-line" style="display:flex; justify-content:center;">
-          <span class="roster-player-name">${p}</span>
+        <div class="roster-player-line" style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.02); padding:6px 12px; border-radius:6px; border:1px solid rgba(255,255,255,0.05); margin-bottom:4px; gap: 8px;">
+          <span class="roster-player-name" style="font-weight:700; color:white;">@${p.toUpperCase()}</span>
+          <span style="font-size:9px; font-weight:800; color:${statusColor}; background:rgba(${statusText === 'Online' ? '38,161,123' : '113,128,150'}, 0.1); border:1px solid rgba(${statusText === 'Online' ? '38,161,123' : '113,128,150'}, 0.2); padding:2px 6px; border-radius:4px; text-transform:uppercase;">${statusText}</span>
         </div>
       `;
     });
@@ -3140,9 +3173,24 @@ window.openRosterModalComparison = function(team1Name, team2Name) {
 
   if (team2 && team2.players && team2.players.length > 0) {
     team2.players.forEach(p => {
+      const userRecord = db.users.find(u => u.username.toLowerCase() === p.toLowerCase());
+      let statusText = 'Offline';
+      let statusColor = '#718096';
+      if (userRecord && userRecord.loginHistory && userRecord.loginHistory.length > 0) {
+        const lastLogin = userRecord.loginHistory[0];
+        if (lastLogin && lastLogin.date) {
+          const lastVisitTime = new Date(lastLogin.date);
+          const isOnline = lastVisitTime && (Date.now() - lastVisitTime.getTime() < 10 * 60 * 1000);
+          if (isOnline) {
+            statusText = 'Online';
+            statusColor = '#26A17B';
+          }
+        }
+      }
       list2.innerHTML += `
-        <div class="roster-player-line" style="display:flex; justify-content:center;">
-          <span class="roster-player-name">${p}</span>
+        <div class="roster-player-line" style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.02); padding:6px 12px; border-radius:6px; border:1px solid rgba(255,255,255,0.05); margin-bottom:4px; gap: 8px;">
+          <span class="roster-player-name" style="font-weight:700; color:white;">@${p.toUpperCase()}</span>
+          <span style="font-size:9px; font-weight:800; color:${statusColor}; background:rgba(${statusText === 'Online' ? '38,161,123' : '113,128,150'}, 0.1); border:1px solid rgba(${statusText === 'Online' ? '38,161,123' : '113,128,150'}, 0.2); padding:2px 6px; border-radius:4px; text-transform:uppercase;">${statusText}</span>
         </div>
       `;
     });

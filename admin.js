@@ -1497,7 +1497,19 @@ function renderAdminUserTeamsList(teams) {
         </div>
       </div>
       <div style="color:white; font-size:11px; font-family:monospace; opacity:0.8; margin-bottom:5px;">
-        Склад: ${team.players.join(', ')}
+        Склад: ${team.players.map(p => {
+          const userObj = db.users.find(u => u.username.toLowerCase() === p.toLowerCase());
+          let isOnline = false;
+          if (userObj && userObj.loginHistory && userObj.loginHistory.length > 0) {
+            const lastLogin = userObj.loginHistory[0];
+            if (lastLogin && lastLogin.date) {
+              const lastVisitTime = new Date(lastLogin.date);
+              isOnline = lastVisitTime && (Date.now() - lastVisitTime.getTime() < 10 * 60 * 1000);
+            }
+          }
+          const color = isOnline ? '#26A17B' : 'rgba(255,255,255,0.6)';
+          return `<span style="color:${color}; font-weight:${isOnline ? 'bold' : 'normal'};">@${p.toUpperCase()}${isOnline ? ' (online)' : ' (offline)'}</span>`;
+        }).join(', ') || '<span style="color:var(--text-secondary); font-style:italic;">Немає гравців</span>'}
       </div>
       <div style="font-size:10px; color:var(--text-secondary);">
         Власник: ${team.owner.toUpperCase()}
@@ -2759,12 +2771,26 @@ window.openRosterModal = function(tourId) {
     } else {
       // FILLED SLOT
       const players = team.players || [];
-      const playersListHtml = players.map(p => `
-        <span class="player-tag-badge" style="display:inline-flex; align-items:center; background:#1e293b; color:white; border:1px solid rgba(255,255,255,0.08); padding:5px 12px; border-radius:6px; font-size:12px; gap:6px; font-weight:bold; transition: all 0.2s; max-width: 100%; box-sizing: border-box; overflow: hidden;" onmouseover="this.style.background='rgba(255,90,0,0.1)'; this.style.borderColor='var(--cs-orange)';" onmouseout="this.style.background='#1e293b'; this.style.borderColor='rgba(255,255,255,0.08)';">
-          <span style="text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 140px; display: inline-block;">@${p.toUpperCase()}</span>
-          <button type="button" style="color:var(--wolf-red); cursor:pointer; font-weight:900; font-size:17px; padding:0 4px; display:inline-flex; align-items:center; justify-content:center; background:transparent; border:none; transition: transform 0.1s; flex-shrink: 0; line-height:1;" onmouseover="this.style.transform='scale(1.3)';" onmouseout="this.style.transform='scale(1)';" onclick="event.stopPropagation(); removePlayerFromSlotTeam('${team.id}', '${p}')" title="Видалити гравця">&times;</button>
-        </span>
-      `).join(" ");
+      const playersListHtml = players.map(p => {
+        const userObj = db.users.find(u => u.username.toLowerCase() === p.toLowerCase());
+        let isOnline = false;
+        if (userObj && userObj.loginHistory && userObj.loginHistory.length > 0) {
+          const lastLogin = userObj.loginHistory[0];
+          if (lastLogin && lastLogin.date) {
+            const lastVisitTime = new Date(lastLogin.date);
+            isOnline = lastVisitTime && (Date.now() - lastVisitTime.getTime() < 10 * 60 * 1000);
+          }
+        }
+        const dotColor = isOnline ? '#26A17B' : '#718096';
+        const dotGlow = isOnline ? 'box-shadow: 0 0 6px #26A17B;' : '';
+        return `
+          <span class="player-tag-badge" style="display:inline-flex; align-items:center; background:#1e293b; color:white; border:1px solid rgba(255,255,255,0.08); padding:5px 12px; border-radius:6px; font-size:12px; gap:8px; font-weight:bold; transition: all 0.2s; max-width: 100%; box-sizing: border-box; overflow: hidden;" onmouseover="this.style.background='rgba(255,90,0,0.1)'; this.style.borderColor='var(--cs-orange)';" onmouseout="this.style.background='#1e293b'; this.style.borderColor='rgba(255,255,255,0.08)';">
+            <span style="text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 140px; display: inline-block;">@${p.toUpperCase()}</span>
+            <span style="width:6px; height:6px; border-radius:50%; background:${dotColor}; ${dotGlow}" title="${isOnline ? 'Online' : 'Offline'}"></span>
+            <button type="button" style="color:var(--wolf-red); cursor:pointer; font-weight:900; font-size:17px; padding:0 4px; display:inline-flex; align-items:center; justify-content:center; background:transparent; border:none; transition: transform 0.1s; flex-shrink: 0; line-height:1;" onmouseover="this.style.transform='scale(1.3)';" onmouseout="this.style.transform='scale(1)';" onclick="event.stopPropagation(); removePlayerFromSlotTeam('${team.id}', '${p}')" title="Видалити гравця">&times;</button>
+          </span>
+        `;
+      }).join(" ");
 
       slotCard.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center; gap: 8px;">
