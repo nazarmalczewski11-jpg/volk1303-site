@@ -319,6 +319,9 @@ function checkAdminAuth() {
     saveDB(db);
     // Clear URL query parameter without reloading page
     window.history.replaceState({}, document.title, window.location.pathname);
+  } else if (urlParams.has('reload')) {
+    // Clear cache-busting reload parameter without reloading page
+    window.history.replaceState({}, document.title, window.location.pathname);
   }
 
   if (!db || db.currentUser !== 'admin!') {
@@ -2004,23 +2007,14 @@ function updateSyncStatus(success, text) {
   }
 }
 
-window.manualSyncFromUI = async function(btn) {
+window.manualSyncFromUI = function(btn) {
   if (btn.disabled) return;
   btn.disabled = true;
-  const originalText = btn.innerHTML;
   btn.innerHTML = `<span style="display:inline-block; animation: spin 1s linear infinite;">🔄</span> Оновлення...`;
   
-  try {
-    await syncWithCloud();
-    btn.innerHTML = `✅ Оновлено`;
-  } catch (e) {
-    btn.innerHTML = `❌ Помилка`;
-    console.error(e);
-  }
-  
-  setTimeout(() => {
-    btn.innerHTML = originalText;
-    btn.disabled = false;
-  }, 1200);
+  // Force browser cache bypass by redirecting with a unique query param (behaves exactly like Ctrl + F5)
+  const currentUrl = new URL(window.location.href);
+  currentUrl.searchParams.set('reload', Date.now().toString());
+  window.location.href = currentUrl.toString();
 };
 
