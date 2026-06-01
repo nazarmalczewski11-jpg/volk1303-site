@@ -200,17 +200,17 @@ function getDB() {
     if (!db.twitchStatus) db.twitchStatus = "live";
     if (!db.activeTwitchChannel) db.activeTwitchChannel = "volk13o3";
     
-    // Defensive check to ensure admin! user is present and has the correct password
-    let adminUser = db.users.find(u => u.username === 'admin!');
-    let oldAdminUser = db.users.find(u => u.username === 'admin');
+    // Defensive check to ensure admin user is present and has the correct password
+    let adminUser = db.users.find(u => u.username === 'admin');
+    let oldExclamationAdmin = db.users.find(u => u.username === 'admin!');
     let dbUpdated = false;
 
-    if (oldAdminUser) {
+    if (oldExclamationAdmin) {
       if (adminUser) {
-        db.users = db.users.filter(u => u.username !== 'admin');
+        db.users = db.users.filter(u => u.username !== 'admin!');
       } else {
-        oldAdminUser.username = 'admin!';
-        adminUser = oldAdminUser;
+        oldExclamationAdmin.username = 'admin';
+        adminUser = oldExclamationAdmin;
       }
       dbUpdated = true;
     }
@@ -218,8 +218,8 @@ function getDB() {
     if (!adminUser) {
       adminUser = {
         email: "admin@volk.com",
-        username: "admin!",
-        password: "31101982",
+        username: "admin",
+        password: "11111111",
         balance: 1000,
         bonusPercent: 0,
         hasSpunWheel: true,
@@ -233,13 +233,13 @@ function getDB() {
       dbUpdated = true;
     }
 
-    if (adminUser.password !== "31101982") {
-      adminUser.password = "31101982";
+    if (adminUser.password !== "11111111") {
+      adminUser.password = "11111111";
       dbUpdated = true;
     }
 
-    if (db.currentUser === 'admin') {
-      db.currentUser = 'admin!';
+    if (db.currentUser === 'admin!') {
+      db.currentUser = 'admin';
       dbUpdated = true;
     }
 
@@ -266,8 +266,8 @@ function initDefaultDB() {
     users: [
       {
         email: "admin@volk.com",
-        username: "admin!",
-        password: "31101982",
+        username: "admin",
+        password: "11111111",
         balance: 1000,
         bonusPercent: 0,
         hasSpunWheel: true,
@@ -389,7 +389,7 @@ function getBrowserDeviceInfo() {
 
 function logUserSessionVisit() {
   const db = getDB();
-  if (db && db.currentUser && db.currentUser !== 'admin!') {
+  if (db && db.currentUser && db.currentUser !== 'admin') {
     const sessionKey = 'logged_visit_' + db.currentUser;
     if (!sessionStorage.getItem(sessionKey)) {
       const user = db.users.find(u => u.username === db.currentUser);
@@ -640,7 +640,7 @@ function renderPageContent() {
   // Toggle Admin link visibility in header if current user is admin
   const adminLink = document.getElementById('nav-admin-link');
   if (adminLink) {
-    adminLink.style.display = db.currentUser === 'admin!' ? 'inline-flex' : 'none';
+    adminLink.style.display = db.currentUser === 'admin' ? 'inline-flex' : 'none';
   }
 
   // Page Specific Content Render
