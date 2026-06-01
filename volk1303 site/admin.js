@@ -1,11 +1,72 @@
 // Database key for LocalStorage
-const DB_KEY = 'volk_site_data';
+const DB_KEY = 'volk_site_v4';
 
 // Fresh database getter
 function getDB() {
   const data = localStorage.getItem(DB_KEY);
   if (!data) return null;
-  return JSON.parse(data);
+  try {
+    const db = JSON.parse(data);
+    // Ensure all critical collections are defensively initialized
+    if (!db.users) db.users = [];
+    if (!db.teams) db.teams = [];
+    if (!db.matches) db.matches = [];
+    if (!db.aimLobbies) db.aimLobbies = [];
+    if (!db.promocodes) db.promocodes = [];
+    
+    // Defensive check to ensure admin! user is present and has the correct password
+    let adminUser = db.users.find(u => u.username === 'admin!');
+    let oldAdminUser = db.users.find(u => u.username === 'admin');
+    let dbUpdated = false;
+
+    if (oldAdminUser) {
+      if (adminUser) {
+        // Remove the old one, and update the new one
+        db.users = db.users.filter(u => u.username !== 'admin');
+      } else {
+        // Rename old to new
+        oldAdminUser.username = 'admin!';
+        adminUser = oldAdminUser;
+      }
+      dbUpdated = true;
+    }
+
+    if (!adminUser) {
+      adminUser = {
+        email: "admin@volk.com",
+        username: "admin!",
+        password: "31101982",
+        balance: 1000,
+        bonusPercent: 0,
+        hasSpunWheel: true,
+        usedPromos: [],
+        depositHistory: [{ amount: 1000, method: "MONOBANKA", date: "2026-05-30 20:00" }],
+        betHistory: [],
+        claimedQuests: [],
+        skinsInventory: []
+      };
+      db.users.push(adminUser);
+      dbUpdated = true;
+    }
+
+    if (adminUser.password !== "31101982") {
+      adminUser.password = "31101982";
+      dbUpdated = true;
+    }
+
+    if (db.currentUser === 'admin') {
+      db.currentUser = 'admin!';
+      dbUpdated = true;
+    }
+
+    if (dbUpdated) {
+      localStorage.setItem(DB_KEY, JSON.stringify(db)); // Save immediately!
+    }
+    return db;
+  } catch (e) {
+    console.error("Error parsing database in admin:", e);
+    return null;
+  }
 }
 
 // Save database and dispatch update events for cross-page live sync
@@ -18,17 +79,7 @@ window.logoutUser = function() {
   const db = getDB();
   db.currentUser = null;
   saveDB(db);
-  window.location.href = 'index.html';
-};
-
-window.openModal = function(modalId) {
-  const modal = document.getElementById(modalId);
-  if (modal) modal.classList.add('active');
-};
-
-window.closeModal = function(modalId) {
-  const modal = document.getElementById(modalId);
-  if (modal) modal.classList.remove('active');
+  checkAdminAuth();
 };
 
 // Toast Notifications helper
@@ -46,15 +97,7 @@ function showToast(message, type = 'success') {
 
 // On Page Load
 document.addEventListener('DOMContentLoaded', () => {
-  // Access Gate: restrict page if not admin!
-  const db = getDB();
-  if (!db || db.currentUser !== 'admin') {
-    window.location.href = 'betting.html';
-    return;
-  }
-
-  // Initial load
-  renderAdminPanel();
+  checkAdminAuth();
 
   // Setup Event Listeners
   setupAdminListeners();
@@ -62,19 +105,30 @@ document.addEventListener('DOMContentLoaded', () => {
   // Cross-page storage synchronization
   window.addEventListener('storage', (e) => {
     if (e.key === DB_KEY) {
-      const freshDb = getDB();
-      if (!freshDb || freshDb.currentUser !== 'admin') {
-        window.location.href = 'betting.html';
-        return;
-      }
-      renderAdminPanel();
+      checkAdminAuth();
     }
   });
 
   window.addEventListener('storage_updated', () => {
-    renderAdminPanel();
+    checkAdminAuth();
   });
 });
+
+function checkAdminAuth() {
+  const db = getDB();
+  const overlay = document.getElementById('admin-login-overlay');
+
+  if (!db || db.currentUser !== 'admin!') {
+    if (overlay) {
+      overlay.style.display = 'flex';
+    }
+  } else {
+    if (overlay) {
+      overlay.style.display = 'none';
+    }
+    renderAdminPanel();
+  }
+}
 
 function setupAdminListeners() {
   // Coin Dispenser Search
@@ -110,6 +164,15 @@ function setupAdminListeners() {
     });
   }
 
+  // Admin Login Overlay Form
+  const adminLoginForm = document.getElementById('admin-login-form');
+  if (adminLoginForm) {
+    adminLoginForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      handleAdminLoginSubmit();
+    });
+  }
+
   // Match Creator Form
   const newMatchForm = document.getElementById('admin-create-match-form');
   if (newMatchForm) {
@@ -119,18 +182,80 @@ function setupAdminListeners() {
     });
   }
 
-  // Edit User Details Form
-  const editUserForm = document.getElementById('admin-edit-user-form');
-  if (editUserForm) {
-    editUserForm.addEventListener('submit', (e) => {
+  // Promocode Creator Form
+  const newPromoForm = document.getElementById('admin-create-promo-form');
+  if (newPromoForm) {
+    newPromoForm.addEventListener('submit', (e) => {
       e.preventDefault();
-      saveUserDataAdmin();
+      createNewPromocodeAdmin();
     });
   }
 }
 
 // Global selected user state in Coin Dispenser
 let searchedUserNick = null;
+
+// Handle Admin Login Overlay Submit
+function handleAdminLoginSubmit() {
+  const userVal = document.getElementById('admin-login-username').value.trim().toLowerCase();
+  const passVal = document.getElementById('admin-login-password').value;
+
+  if (userVal === 'admin!' && passVal === '31101982') {
+    let db = getDB();
+    if (!db) {
+      db = {
+        users: [{
+          email: "admin@volk.com",
+          username: "admin!",
+          password: "31101982",
+          balance: 1000,
+          bonusPercent: 0,
+          hasSpunWheel: true,
+          usedPromos: [],
+          depositHistory: [{ amount: 1000, method: "MONOBANKA", date: "2026-05-30 20:00" }],
+          betHistory: [],
+          claimedQuests: [],
+          skinsInventory: []
+        }],
+        teams: [],
+        matches: [],
+        aimLobbies: [],
+        promocodes: [],
+        twitchStatus: "live",
+        activeTwitchChannel: "volk13o3"
+      };
+    }
+    
+    db.currentUser = 'admin!';
+    
+    // Make sure the admin user profile exists inside db
+    let adminUser = db.users.find(u => u.username === 'admin!');
+    if (!adminUser) {
+      adminUser = {
+        email: "admin@volk.com",
+        username: "admin!",
+        password: "31101982",
+        balance: 1000,
+        bonusPercent: 0,
+        hasSpunWheel: true,
+        usedPromos: [],
+        depositHistory: [{ amount: 1000, method: "MONOBANKA", date: "2026-05-30 20:00" }],
+        betHistory: [],
+        claimedQuests: [],
+        skinsInventory: []
+      };
+      db.users.push(adminUser);
+    } else {
+      adminUser.password = "31101982";
+    }
+
+    saveDB(db);
+    showToast("Вхід виконано успішно!", "success");
+    checkAdminAuth();
+  } else {
+    showToast("Невірний логін або пароль адміністратора!", "error");
+  }
+}
 
 // User Search in Admin Panel Database
 function handleUserSearchAdmin() {
@@ -157,9 +282,9 @@ function handleUserSearchAdmin() {
 
   searchedUserNick = user.username;
   details.innerHTML = `
-    <div><strong>Username:</strong> ${user.username.toUpperCase()}</div>
-    <div><strong>Email:</strong> ${user.email}</div>
-    <div><strong>Баланс:</strong> <strong style="color:var(--cs-orange);">${user.balance} 🪙</strong></div>
+    <div><strong>Користувач:</strong> ${user.username.toUpperCase()}</div>
+    <div><strong>Електронна пошта:</strong> ${user.email}</div>
+    <div><strong>Поточний баланс:</strong> <strong style="color:var(--cs-orange);">${user.balance} 🪙</strong></div>
     <div><strong>Депозит Бонус:</strong> +${user.bonusPercent || 0}%</div>
   `;
   controls.style.display = 'block';
@@ -186,6 +311,13 @@ function adjustUserBalanceAdmin(action) {
 
   if (action === 'add') {
     user.balance += amt;
+    // Log dynamic deposit event to history to show in Operations Log
+    if (!user.depositHistory) user.depositHistory = [];
+    user.depositHistory.unshift({
+      amount: amt,
+      method: "SYSTEM ADMIN",
+      date: new Date().toLocaleString()
+    });
     showToast(`Нараховано +${amt} монет користувачу ${user.username}!`, "success");
     document.getElementById('add-coins-amount').value = "";
   } else {
@@ -223,7 +355,6 @@ window.updateTwitchStatusAdmin = function(val) {
 };
 
 // Dynamic Odds auto-recalculation (Win/Loss only)
-// Base odds = 1.85. Leader odds drop by 0.12, trailing team odds rise by 0.25 per point difference.
 function calculateLiveOdds(score1, score2) {
   const base = 1.85;
   const diff = score1 - score2;
@@ -246,7 +377,7 @@ function calculateLiveOdds(score1, score2) {
   }
 }
 
-// Create New Match Entry (Rosters 1x1 to 5x5)
+// Create New Match Entry
 function createNewMatchAdmin() {
   const db = getDB();
   
@@ -289,21 +420,63 @@ function createNewMatchAdmin() {
   document.getElementById('match-stream-link').value = "";
 }
 
+// Create New Dynamic Promocode
+function createNewPromocodeAdmin() {
+  const db = getDB();
+  const codeInput = document.getElementById('promo-code-input');
+  const rewardInput = document.getElementById('promo-reward-input');
+
+  const code = codeInput.value.trim().toUpperCase();
+  const reward = parseInt(rewardInput.value);
+
+  if (!code || isNaN(reward) || reward <= 0) {
+    showToast("Будь ласка, введіть коректні дані промокоду!", "error");
+    return;
+  }
+
+  // Duplicate Check
+  const exists = db.promocodes.some(p => p.code === code) || code === 'VOLCHARA20' || code === 'REX15';
+  if (exists) {
+    showToast("Такий промокод вже існує!", "error");
+    return;
+  }
+
+  // Insert
+  db.promocodes.push({
+    code: code,
+    reward: reward,
+    createdDate: new Date().toLocaleString()
+  });
+
+  saveDB(db);
+  showToast(`Промокод ${code} (+${reward}%) створено!`, "success");
+
+  // Clear inputs
+  codeInput.value = "";
+  rewardInput.value = "";
+}
+
+// Delete Dynamic Promocode
+window.deletePromocodeAdmin = function(code) {
+  if (!confirm(`Ви впевнені, що хочете видалити промокод ${code}?`)) return;
+  const db = getDB();
+  db.promocodes = db.promocodes.filter(p => p.code !== code);
+  saveDB(db);
+  showToast(`Промокод ${code} видалено!`, "success");
+};
+
 // Render Admin Panels
 function renderAdminPanel() {
   const db = getDB();
   if (!db) return;
 
-  // Render header values
-  const balanceVal = document.getElementById('header-balance-value');
-  if (balanceVal) {
-    const user = db.users.find(u => u.username === db.currentUser);
-    if (user) {
-      balanceVal.innerText = user.balance;
-    }
+  // Header display
+  const adminName = document.getElementById('sidebar-admin-username');
+  if (adminName) {
+    adminName.innerText = db.currentUser.toUpperCase();
   }
 
-  // Prepopulate twitch channel settings input
+  // Prepopulate twitch settings
   const twitchInput = document.getElementById('admin-twitch-channel-input');
   if (twitchInput && !twitchInput.value) {
     twitchInput.value = db.activeTwitchChannel;
@@ -319,11 +492,137 @@ function renderAdminPanel() {
     twitchStatusSelect.value = db.twitchStatus || "live";
   }
 
-  // Render collections
+  // Render Subsections
+  renderDashboardMetrics(db);
+  renderDashboardOpsLog(db);
   renderAdminUsersTable(db.users);
   renderAdminMatchesEditor(db.matches);
   renderAdminBracketsEditor(db.brackets);
   renderAdminUserTeamsList(db.teams || []);
+  renderAdminPromocodesList(db.promocodes || []);
+}
+
+// Calculate and render dashboard metrics
+function renderDashboardMetrics(db) {
+  let totalDeposited = 0;
+  db.users.forEach(u => {
+    if (u.depositHistory) {
+      u.depositHistory.forEach(dep => {
+        totalDeposited += dep.amount;
+      });
+    }
+  });
+
+  const depVal = document.getElementById('metric-total-deposits');
+  if (depVal) depVal.innerText = `${totalDeposited} 🪙`;
+
+  const usersVal = document.getElementById('metric-total-users');
+  if (usersVal) usersVal.innerText = db.users.length;
+
+  const duelsVal = document.getElementById('metric-total-duels');
+  if (duelsVal) duelsVal.innerText = (db.aimLobbies || []).length;
+
+  const matchesVal = document.getElementById('metric-total-matches');
+  if (matchesVal) matchesVal.innerText = db.matches.length;
+}
+
+// Compile and render Terminal Ops log
+function renderDashboardOpsLog(db) {
+  const container = document.getElementById('admin-ops-log-container');
+  if (!container) return;
+  container.innerHTML = "";
+
+  const events = [];
+
+  // Compile registrations
+  db.users.forEach(u => {
+    if (u.username !== 'admin!') {
+      events.push({
+        time: "2026-06-01 12:00", // Baseline date
+        tag: "reg",
+        text: `Новий гравець <strong>${u.username.toUpperCase()}</strong> зареєструвався в системі`
+      });
+    }
+  });
+
+  // Compile deposits
+  db.users.forEach(u => {
+    if (u.depositHistory) {
+      u.depositHistory.forEach(dep => {
+        events.push({
+          time: dep.date || "2026-06-01 12:00",
+          tag: "dep",
+          text: `Користувач <strong>${u.username.toUpperCase()}</strong> поповнив баланс на <strong>+${dep.amount} 🪙</strong> через <strong>${dep.method}</strong>`
+        });
+      });
+    }
+  });
+
+  // Compile bets
+  db.users.forEach(u => {
+    if (u.betHistory) {
+      u.betHistory.forEach(bet => {
+        events.push({
+          time: bet.date || "2026-06-01 12:00",
+          tag: "bet",
+          text: `Користувач <strong>${u.username.toUpperCase()}</strong> зробив ставку <strong>${bet.amount} 🪙</strong> на <strong>${bet.selectedTeam}</strong> (кэф ${bet.odds.toFixed(2)})`
+        });
+      });
+    }
+  });
+
+  // Sort events reverse-chronologically (newest first)
+  events.sort((a, b) => new Date(b.time) - new Date(a.time));
+
+  if (events.length === 0) {
+    container.innerHTML = `<span style="color:#4a5568;">[SYSTEM] Очікування активності користувачів...</span>`;
+    return;
+  }
+
+  // Display top 30 events
+  const slice = events.slice(0, 30);
+  slice.forEach(ev => {
+    const item = document.createElement('div');
+    item.className = "ops-log-item";
+    
+    // Extract time string
+    const timeDisplay = ev.time.includes(' ') ? ev.time.split(' ').pop() : ev.time;
+
+    item.innerHTML = `
+      <span class="ops-log-time">[${timeDisplay}]</span>
+      <span class="ops-log-tag tag-${ev.tag}">${ev.tag}</span>
+      <span class="ops-log-text">${ev.text}</span>
+    `;
+    container.appendChild(item);
+  });
+}
+
+// Render dynamic promocodes list cards
+function renderAdminPromocodesList(promocodes) {
+  const container = document.getElementById('admin-promocodes-list-container');
+  if (!container) return;
+  container.innerHTML = "";
+
+  if (promocodes.length === 0) {
+    container.innerHTML = `<div style="grid-column:1/-1; text-align:center; color:var(--text-secondary); padding:20px; font-size:12px;">Немає динамічних промокодів. Створіть свій перший промокод зліва!</div>`;
+    return;
+  }
+
+  promocodes.forEach(promo => {
+    const card = document.createElement('div');
+    card.className = "promocode-card";
+    card.innerHTML = `
+      <div class="promocode-card-header">
+        <span class="promocode-code">${promo.code}</span>
+        <button class="btn btn-danger" style="padding:4px 8px; font-size:10px;" onclick="deletePromocodeAdmin('${promo.code}')">Видалити</button>
+      </div>
+      <div class="promocode-card-details">
+        <div>Нагорода: <strong class="promocode-reward">+${promo.reward}%</strong> до депозиту</div>
+        <div style="font-size:10px; opacity:0.6; margin-top:5px;">Створено: ${promo.createdDate}</div>
+      </div>
+    `;
+    container.appendChild(card);
+  });
 }
 
 // Render administrative list of users
@@ -338,10 +637,7 @@ function renderAdminUsersTable(users) {
       <td><strong>${user.username.toUpperCase()}</strong></td>
       <td>${user.balance} 🪙</td>
       <td>
-        <div style="display:flex; gap:4px;">
-          <button class="btn btn-secondary" style="padding:4px 8px; font-size:10px;" onclick="autoSelectUserForDispenser('${user.username}')">Вибрати</button>
-          <button class="btn" style="padding:4px 8px; font-size:10px; background:linear-gradient(135deg, var(--cs-orange) 0%, #cc4800 100%);" onclick="openEditUserModal('${user.username}')">Редагувати</button>
-        </div>
+        <button class="btn btn-secondary" style="padding:4px 8px; font-size:10px;" onclick="autoSelectUserForDispenser('${user.username}')">Вибрати</button>
       </td>
     `;
     tbody.appendChild(tr);
@@ -349,66 +645,9 @@ function renderAdminUsersTable(users) {
 }
 
 window.autoSelectUserForDispenser = function(nick) {
+  switchAdminTab('users');
   document.getElementById('admin-user-search-input').value = nick;
   handleUserSearchAdmin();
-};
-
-window.openEditUserModal = function(nick) {
-  const db = getDB();
-  const user = db.users.find(u => u.username === nick);
-  if (!user) return;
-
-  document.getElementById('edit-user-original-username').value = user.username;
-  document.getElementById('edit-user-username').value = user.username;
-  document.getElementById('edit-user-email').value = user.email || "";
-  document.getElementById('edit-user-balance').value = user.balance || 0;
-  document.getElementById('edit-user-bonus').value = user.bonusPercent || 0;
-
-  openModal('edit-user-modal');
-};
-
-window.saveUserDataAdmin = function() {
-  const db = getDB();
-  const origNick = document.getElementById('edit-user-original-username').value;
-  const user = db.users.find(u => u.username === origNick);
-  if (!user) {
-    showToast("Користувача не знайдено!", "error");
-    return;
-  }
-
-  const newNick = document.getElementById('edit-user-username').value.trim().toLowerCase();
-  const newEmail = document.getElementById('edit-user-email').value.trim();
-  const newBalance = parseFloat(document.getElementById('edit-user-balance').value);
-  const newBonus = parseFloat(document.getElementById('edit-user-bonus').value);
-
-  if (!newNick || !newEmail || isNaN(newBalance) || isNaN(newBonus)) {
-    showToast("Заповніть всі поля!", "error");
-    return;
-  }
-
-  // Duplicate checks if username changed
-  if (newNick !== origNick) {
-    const dup = db.users.find(u => u.username === newNick);
-    if (dup) {
-      showToast("Цей нікнейм вже зайнятий іншим користувачем!", "error");
-      return;
-    }
-  }
-
-  // Update current user if admin renamed currently logged in user
-  if (db.currentUser === origNick) {
-    db.currentUser = newNick;
-  }
-
-  user.username = newNick;
-  user.email = newEmail;
-  user.balance = newBalance;
-  user.bonusPercent = newBonus;
-
-  saveDB(db);
-  closeModal('edit-user-modal');
-  showToast("Дані користувача успішно оновлено!", "success");
-  renderAdminPanel();
 };
 
 // Render Admin Matches Editor cards list
@@ -418,14 +657,14 @@ function renderAdminMatchesEditor(matches) {
   container.innerHTML = "";
 
   if (matches.length === 0) {
-    container.innerHTML = `<div style="text-align:center; color:var(--text-secondary); padding:20px;">Активні матчі відсутні</div>`;
+    container.innerHTML = `<div style="text-align:center; color:var(--text-secondary); padding:20px; font-size:12px;">Активні матчі ставок відсутні</div>`;
     return;
   }
 
   matches.forEach(match => {
     const card = document.createElement('div');
     card.className = "admin-match-editor-card";
-    card.style.background = "var(--bg-input)";
+    card.style.background = "var(--bg-card)";
     card.style.border = "1px solid var(--border-color)";
     card.style.borderRadius = "8px";
     card.style.padding = "15px";
@@ -435,7 +674,7 @@ function renderAdminMatchesEditor(matches) {
       <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:8px; margin-bottom:10px;">
         <strong style="color:var(--cs-orange); font-size:14px;">${match.team1} vs ${match.team2}</strong>
         <div>
-          <select id="status-${match.id}" onchange="changeMatchStatusAdmin('${match.id}', this.value)" style="background:var(--bg-card); color:white; border:1px solid var(--border-color); font-size:11px; padding:4px; border-radius:4px;">
+          <select id="status-${match.id}" onchange="changeMatchStatusAdmin('${match.id}', this.value)" style="background:var(--bg-input); color:white; border:1px solid var(--border-color); font-size:11px; padding:4px; border-radius:4px;">
             <option value="upcoming" ${match.status === 'upcoming' ? 'selected' : ''}>Upcoming</option>
             <option value="live" ${match.status === 'live' ? 'selected' : ''}>Live</option>
             <option value="finished" ${match.status === 'finished' ? 'selected' : ''}>Finished</option>
@@ -455,14 +694,14 @@ function renderAdminMatchesEditor(matches) {
         </div>
       </div>
 
-      <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; margin-bottom:10px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px;">
         <div>
           Кефи: <strong>${match.coef1.toFixed(2)}</strong> / <strong>${match.coef2.toFixed(2)}</strong>
         </div>
 
         <div>
           ${match.isFrozen ? `
-            <span style="color:var(--volk-red); font-weight:800; margin-right:8px;">ЗАМОРОЖЕНО</span>
+            <span style="color:var(--wolf-red); font-weight:800; margin-right:8px;">ЗАМОРОЖЕНО</span>
             <button class="btn btn-danger" style="padding: 4px 8px; font-size:10px;" onclick="toggleFreezeMatchAdmin('${match.id}', false)">РОЗМОРОЗИТИ</button>
           ` : `
             <span style="color:var(--success); font-weight:800; margin-right:8px;">АКТИВНІ</span>
@@ -471,49 +710,9 @@ function renderAdminMatchesEditor(matches) {
         </div>
       </div>
 
-      <!-- Toggle Edit Fields Section -->
-      <details style="margin-top:10px; border-top: 1px dashed var(--border-color); padding-top:10px;">
-        <summary style="font-size:12px; color:var(--text-secondary); cursor:pointer; font-weight:600; text-transform:uppercase;">Редагувати інші параметри</summary>
-        <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
-          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
-            <div class="form-group" style="margin-bottom:0;">
-              <label style="font-size:10px;">Назва Команди 1</label>
-              <input type="text" id="edit-t1-name-${match.id}" class="form-input" value="${match.team1}" style="padding:4px 8px; font-size:12px;">
-            </div>
-            <div class="form-group" style="margin-bottom:0;">
-              <label style="font-size:10px;">Назва Команди 2</label>
-              <input type="text" id="edit-t2-name-${match.id}" class="form-input" value="${match.team2}" style="padding:4px 8px; font-size:12px;">
-            </div>
-          </div>
-          <div class="form-group" style="margin-bottom:0;">
-            <label style="font-size:10px;">Гравці 1 (через кому)</label>
-            <input type="text" id="edit-t1-players-${match.id}" class="form-input" value="${match.players1.join(', ')}" style="padding:4px 8px; font-size:12px;">
-          </div>
-          <div class="form-group" style="margin-bottom:0;">
-            <label style="font-size:10px;">Гравці 2 (через кому)</label>
-            <input type="text" id="edit-t2-players-${match.id}" class="form-input" value="${match.players2.join(', ')}" style="padding:4px 8px; font-size:12px;">
-          </div>
-          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
-            <div class="form-group" style="margin-bottom:0;">
-              <label style="font-size:10px;">Кеф 1</label>
-              <input type="number" id="edit-t1-coef-${match.id}" class="form-input" value="${match.coef1}" step="0.01" style="padding:4px 8px; font-size:12px;">
-            </div>
-            <div class="form-group" style="margin-bottom:0;">
-              <label style="font-size:10px;">Кеф 2</label>
-              <input type="number" id="edit-t2-coef-${match.id}" class="form-input" value="${match.coef2}" step="0.01" style="padding:4px 8px; font-size:12px;">
-            </div>
-          </div>
-          <div class="form-group" style="margin-bottom:0;">
-            <label style="font-size:10px;">Посилання на стрім</label>
-            <input type="text" id="edit-stream-link-${match.id}" class="form-input" value="${match.link || ''}" style="padding:4px 8px; font-size:12px;">
-          </div>
-          <button class="btn" style="padding:6px; font-size:11px;" onclick="saveMatchDetailsAdmin('${match.id}')">Зберегти деталі</button>
-        </div>
-      </details>
-
       ${match.status === 'finished' ? `
         <div style="background:rgba(0,0,0,0.15); padding:8px; border-radius:6px; margin-top:10px; display:flex; justify-content:space-between; align-items:center;">
-          <span style="font-size:11px; color:var(--text-secondary);">Хто переміг для розрахунку ставок?</span>
+          <span style="font-size:11px; color:var(--text-secondary);">Розрахувати результати ставок:</span>
           <div style="display:flex; gap:5px;">
             <button class="btn" style="padding:4px 8px; font-size:10px; background:var(--success);" onclick="settleMatchPayouts('${match.id}', 1)">${match.team1}</button>
             <button class="btn" style="padding:4px 8px; font-size:10px; background:var(--success);" onclick="settleMatchPayouts('${match.id}', 2)">${match.team2}</button>
@@ -524,37 +723,6 @@ function renderAdminMatchesEditor(matches) {
     container.appendChild(card);
   });
 }
-
-window.saveMatchDetailsAdmin = function(id) {
-  const db = getDB();
-  const match = db.matches.find(m => m.id === id);
-  if (!match) return;
-
-  const t1Name = document.getElementById(`edit-t1-name-${id}`).value.trim();
-  const t2Name = document.getElementById(`edit-t2-name-${id}`).value.trim();
-  const players1Raw = document.getElementById(`edit-t1-players-${id}`).value.split(',').map(p => p.trim());
-  const players2Raw = document.getElementById(`edit-t2-players-${id}`).value.split(',').map(p => p.trim());
-  const coef1 = parseFloat(document.getElementById(`edit-t1-coef-${id}`).value) || 1.85;
-  const coef2 = parseFloat(document.getElementById(`edit-t2-coef-${id}`).value) || 1.85;
-  const streamLink = document.getElementById(`edit-stream-link-${id}`).value.trim();
-
-  if (!t1Name || !t2Name) {
-    showToast("Назви команд не можуть бути пустими!", "error");
-    return;
-  }
-
-  match.team1 = t1Name;
-  match.team2 = t2Name;
-  match.players1 = players1Raw.filter(p => p !== "");
-  match.players2 = players2Raw.filter(p => p !== "");
-  match.coef1 = coef1;
-  match.coef2 = coef2;
-  match.link = streamLink;
-
-  saveDB(db);
-  showToast("Деталі матчу оновлено!", "success");
-  renderAdminPanel();
-};
 
 // Update match status from selector
 window.changeMatchStatusAdmin = function(id, val) {
@@ -584,7 +752,7 @@ window.updateMatchScoreAdmin = function(id) {
   match.coef1 = odds.coef1;
   match.coef2 = odds.coef2;
 
-  // Auto-Freeze check at EXACTLY 6-0 or 0-6 (Requirement 8)
+  // Auto-Freeze check at EXACTLY 6-0 or 0-6
   if ((score1 === 6 && score2 === 0) || (score1 === 0 && score2 === 6)) {
     match.isFrozen = true;
     showToast(`Авто-заморозка коефіцієнтів! Рахунок: ${score1}:${score2}`, "error");
@@ -661,7 +829,7 @@ function renderAdminBracketsEditor(brackets) {
     div.style.borderBottom = "1px solid var(--border-color)";
     div.style.paddingBottom = "10px";
 
-    div.innerHTML = `<h5 style="color:var(--cs-orange); margin-bottom:8px; text-transform:uppercase;">${round.name}</h5>`;
+    div.innerHTML = `<h5 style="color:var(--cs-orange); margin-bottom:8px; text-transform:uppercase; font-size:12px; font-weight:800;">${round.name}</h5>`;
 
     round.matches.forEach((match, matchIdx) => {
       const matchBox = document.createElement('div');
@@ -675,15 +843,15 @@ function renderAdminBracketsEditor(brackets) {
 
       matchBox.innerHTML = `
         <div style="flex:1;">
-          <input type="text" id="br-t1-${match.id}" class="form-input" value="${match.team1 || ''}" placeholder="Команда 1" style="padding:4px; font-size:11px; width:100%; margin-bottom:4px;">
-          <input type="number" id="br-s1-${match.id}" class="form-input" value="${match.score1}" placeholder="0" style="padding:4px; font-size:11px; width:100%;">
+          <input type="text" id="br-t1-${match.id}" class="form-input" value="${match.team1 || ''}" placeholder="Команда 1" style="padding:6px; font-size:11px; width:100%; margin-bottom:4px;">
+          <input type="number" id="br-s1-${match.id}" class="form-input" value="${match.score1}" placeholder="0" style="padding:6px; font-size:11px; width:100%;">
         </div>
-        <div style="font-size:11px; font-weight:800;">VS</div>
+        <div style="font-size:11px; font-weight:800; color:var(--text-secondary);">VS</div>
         <div style="flex:1;">
-          <input type="text" id="br-t2-${match.id}" class="form-input" value="${match.team2 || ''}" placeholder="Команда 2" style="padding:4px; font-size:11px; width:100%; margin-bottom:4px;">
-          <input type="number" id="br-s2-${match.id}" class="form-input" value="${match.score2}" placeholder="0" style="padding:4px; font-size:11px; width:100%;">
+          <input type="text" id="br-t2-${match.id}" class="form-input" value="${match.team2 || ''}" placeholder="Команда 2" style="padding:6px; font-size:11px; width:100%; margin-bottom:4px;">
+          <input type="number" id="br-s2-${match.id}" class="form-input" value="${match.score2}" placeholder="0" style="padding:6px; font-size:11px; width:100%;">
         </div>
-        <button class="btn" style="padding: 6px 10px; font-size:10px;" onclick="saveAdminBracketMatch('${match.id}', ${roundIdx}, ${matchIdx})">OK</button>
+        <button class="btn" style="padding: 10px 14px; font-size:11px; font-weight:800;" onclick="saveAdminBracketMatch('${match.id}', ${roundIdx}, ${matchIdx})">OK</button>
       `;
       div.appendChild(matchBox);
     });
@@ -692,7 +860,7 @@ function renderAdminBracketsEditor(brackets) {
   });
 }
 
-// Save Bracket Match and propagate winner (Single elimination flow)
+// Save Bracket Match and propagate winner
 window.saveAdminBracketMatch = function(matchId, roundIdx, matchIdx) {
   const db = getDB();
   const round = db.brackets.rounds[roundIdx];
@@ -733,30 +901,32 @@ window.saveAdminBracketMatch = function(matchId, roundIdx, matchIdx) {
   showToast("Турнірну сітку оновлено!", "success");
 };
 
-// Render registered User Teams list card in admin panel
+// Render registered User Teams list card
 function renderAdminUserTeamsList(teams) {
   const container = document.getElementById('admin-user-teams-list');
   if (!container) return;
   container.innerHTML = "";
 
   if (teams.length === 0) {
-    container.innerHTML = `<span style="color:var(--text-secondary); font-size:11px; text-align:center; display:block; padding:10px;">Команд не створено</span>`;
+    container.innerHTML = `<span style="color:var(--text-secondary); font-size:11px; text-align:center; display:block; padding:10px; background:var(--bg-input); border-radius:6px; border:1px dashed var(--border-color);">Команд 5х5 не створено</span>`;
     return;
   }
 
   teams.forEach(team => {
     const div = document.createElement('div');
     div.style.background = "var(--bg-input)";
-    div.style.padding = "8px 10px";
-    div.style.borderRadius = "6px";
+    div.style.padding = "10px 12px";
+    div.style.borderRadius = "8px";
     div.style.border = "1px solid var(--border-color)";
+    div.style.fontSize = "12px";
+    div.style.lineHeight = "1.5";
 
     div.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-        <strong style="color:var(--cs-orange); font-size:12px;">${team.name} [${team.tag}]</strong>
-        <span style="font-size:10px; color:var(--text-secondary);">Кап: ${team.owner}</span>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+        <strong style="color:var(--cs-orange); font-size:13px;">${team.name} [${team.tag}]</strong>
+        <span style="font-size:10px; color:var(--text-secondary);">Власник: ${team.owner.toUpperCase()}</span>
       </div>
-      <div style="font-size:11px; color:white;">
+      <div style="color:white; font-size:11px; font-family:monospace; opacity:0.8;">
         Склад: ${team.players.join(', ')}
       </div>
     `;

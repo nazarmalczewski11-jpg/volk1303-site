@@ -144,10 +144,17 @@ const currentPage = pathName === "" ? "index.html" : pathName;
 
 function checkAuthGate() {
   const db = getDB();
+  const urlParams = new URLSearchParams(window.location.search);
+  const bypassRedirect = urlParams.has('register') || urlParams.has('logout');
+  
+  if (urlParams.has('logout')) {
+    db.currentUser = null;
+    saveDB(db);
+  }
   
   if (currentPage === 'index.html') {
     // If logged in, redirect to betting lobby
-    if (db.currentUser) {
+    if (db.currentUser && !bypassRedirect) {
       window.location.href = 'betting.html';
     }
   } else {

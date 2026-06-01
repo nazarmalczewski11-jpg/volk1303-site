@@ -1,5 +1,5 @@
 // Database key for LocalStorage
-const DB_KEY = 'volk_site_data';
+const DB_KEY = 'volk_site_v4';
 
 // Fresh database getter
 function getDB() {
@@ -7,13 +7,68 @@ function getDB() {
   if (!data) {
     return initDefaultDB();
   }
-  const db = JSON.parse(data);
-  // Ensure rosters and arrays are initialized
-  if (!db.teams) db.teams = [];
-  if (!db.aimLobbies) db.aimLobbies = [];
-  if (!db.twitchStatus) db.twitchStatus = "live";
-  if (!db.activeTwitchChannel) db.activeTwitchChannel = "volk13o3";
-  return db;
+  try {
+    const db = JSON.parse(data);
+    // Ensure all critical collections and rosters are initialized
+    if (!db.users) db.users = [];
+    if (!db.teams) db.teams = [];
+    if (!db.matches) db.matches = [];
+    if (!db.aimLobbies) db.aimLobbies = [];
+    if (!db.promocodes) db.promocodes = [];
+    if (!db.twitchStatus) db.twitchStatus = "live";
+    if (!db.activeTwitchChannel) db.activeTwitchChannel = "volk13o3";
+    
+    // Defensive check to ensure admin! user is present and has the correct password
+    let adminUser = db.users.find(u => u.username === 'admin!');
+    let oldAdminUser = db.users.find(u => u.username === 'admin');
+    let dbUpdated = false;
+
+    if (oldAdminUser) {
+      if (adminUser) {
+        db.users = db.users.filter(u => u.username !== 'admin');
+      } else {
+        oldAdminUser.username = 'admin!';
+        adminUser = oldAdminUser;
+      }
+      dbUpdated = true;
+    }
+
+    if (!adminUser) {
+      adminUser = {
+        email: "admin@volk.com",
+        username: "admin!",
+        password: "31101982",
+        balance: 1000,
+        bonusPercent: 0,
+        hasSpunWheel: true,
+        usedPromos: [],
+        depositHistory: [{ amount: 1000, method: "MONOBANKA", date: "2026-05-30 20:00" }],
+        betHistory: [],
+        claimedQuests: [],
+        skinsInventory: []
+      };
+      db.users.push(adminUser);
+      dbUpdated = true;
+    }
+
+    if (adminUser.password !== "31101982") {
+      adminUser.password = "31101982";
+      dbUpdated = true;
+    }
+
+    if (db.currentUser === 'admin') {
+      db.currentUser = 'admin!';
+      dbUpdated = true;
+    }
+
+    if (dbUpdated) {
+      localStorage.setItem(DB_KEY, JSON.stringify(db)); // Save immediately!
+    }
+    return db;
+  } catch (e) {
+    console.error("Error parsing database, resetting...", e);
+    return initDefaultDB();
+  }
 }
 
 // Save database and dispatch update events for cross-page live sync
@@ -28,13 +83,14 @@ function initDefaultDB() {
     users: [
       {
         email: "admin@volk.com",
-        username: "admin",
+        username: "admin!",
+        password: "31101982",
         balance: 1000,
         bonusPercent: 0,
         hasSpunWheel: true,
         usedPromos: [],
         depositHistory: [{ amount: 1000, method: "MONOBANKA", date: "2026-05-30 20:00" }],
-        betHistory: [{ matchId: "match_1", matchDisplay: "NaVi vs FaZe Clan", selectedTeam: "NaVi", amount: 200, odds: 1.85, status: "Виграш", payout: 370, date: "2026-05-30 20:00" }],
+        betHistory: [],
         claimedQuests: [],
         skinsInventory: []
       }
@@ -60,8 +116,9 @@ function initDefaultDB() {
     },
     teams: [],
     aimLobbies: [],
-    twitchStatus: "offline",
-    activeTwitchChannel: "",
+    promocodes: [],
+    twitchStatus: "live",
+    activeTwitchChannel: "volk13o3",
     currentUser: null
   };
   localStorage.setItem(DB_KEY, JSON.stringify(defaultDB));
@@ -87,10 +144,17 @@ const currentPage = pathName === "" ? "index.html" : pathName;
 
 function checkAuthGate() {
   const db = getDB();
+  const urlParams = new URLSearchParams(window.location.search);
+  const bypassRedirect = urlParams.has('register') || urlParams.has('logout');
+  
+  if (urlParams.has('logout')) {
+    db.currentUser = null;
+    saveDB(db);
+  }
   
   if (currentPage === 'index.html') {
     // If logged in, redirect to betting lobby
-    if (db.currentUser) {
+    if (db.currentUser && !bypassRedirect) {
       window.location.href = 'betting.html';
     }
   } else {
@@ -120,6 +184,7 @@ window.logoutUser = function() {
   window.location.href = 'index.html';
 };
 
+
 // Global active betslip state
 let activeBet = null; // { matchId, selectedTeamIndex, odds, teamName, matchDisplay }
 
@@ -145,9 +210,6 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('storage_updated', () => {
     renderPageContent();
   });
-
-  // Start the background bracket simulation
-  // startBracketSimulation();
 });
 
 function setupListenersByPage() {
@@ -192,18 +254,6 @@ function setupListenersByPage() {
   }
 
   if (currentPage === 'betting.html') {
-    // Chat input keypress listener
-    const chatInput = document.getElementById('live-chat-input');
-    if (chatInput) {
-      chatInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          window.sendChatMessage();
-        }
-      });
-      startChatSimulation();
-    }
-
     // Betslip slip placing logic
     const betslipForm = document.getElementById('betslip-form');
     if (betslipForm) {
@@ -316,35 +366,17 @@ function renderPageContent() {
   // Toggle Admin link visibility in header if current user is admin
   const adminLink = document.getElementById('nav-admin-link');
   if (adminLink) {
-    adminLink.style.display = db.currentUser === 'admin' ? 'inline-flex' : 'none';
+    adminLink.style.display = db.currentUser === 'admin!' ? 'inline-flex' : 'none';
   }
 
   // Page Specific Content Render
   if (currentPage === 'betting.html') {
     renderTwitchEmbed(db.activeTwitchChannel, db.twitchStatus || "live");
+    renderTwitchChat(db.activeTwitchChannel, db.twitchStatus || "live");
     renderBettingMatches(db.matches);
     renderLiveMatchStats(db);
     renderDailyQuests();
     renderSkinsShop();
-
-    // Block betslip if there are no games at all
-    const emptyState = document.getElementById('betslip-empty-state');
-    if (emptyState) {
-      if (db.matches.length === 0) {
-        emptyState.innerText = "Немає доступних ігор для ставок.";
-        emptyState.style.color = "var(--volk-red)";
-        clearBetslip();
-      } else {
-        emptyState.innerText = "Оберіть коефіцієнт у списку матчів, щоб додати ставку в купон";
-        emptyState.style.color = "var(--text-secondary)";
-      }
-    }
-
-    // Update category badge count dynamically
-    const cs2CountBadge = document.getElementById('badge-cs2-count');
-    if (cs2CountBadge) {
-      cs2CountBadge.innerText = db.matches.length;
-    }
   }
 
   if (currentPage === 'tournament.html') {
@@ -357,9 +389,7 @@ function renderPageContent() {
     renderProfileDashboard();
   }
 
-  if (currentPage === 'shop.html') {
-    renderStandaloneShop();
-  }
+
 }
 
 // ==========================================
@@ -370,19 +400,29 @@ function renderPageContent() {
 function handleLoginSubmit() {
   const db = getDB();
   const inputVal = document.getElementById('login-username').value.trim().toLowerCase();
+  const password = document.getElementById('login-password').value;
 
-  if (!inputVal) {
-    showToast("Введіть ім'я користувача!", "error");
+  if (!inputVal || !password) {
+    showToast("Введіть юзернейм/пошту та пароль!", "error");
     return;
   }
 
-  const user = db.users.find(u => u.username === inputVal);
+  // Find by username OR email
+  const user = db.users.find(u =>
+    u.username === inputVal || u.email.toLowerCase() === inputVal
+  );
+
   if (!user) {
-    showToast("Користувача з таким нікнеймом не знайдено!", "error");
+    showToast("Користувача з таким нікнеймом або поштою не знайдено!", "error");
     return;
   }
 
-  db.currentUser = inputVal;
+  if (user.password !== password) {
+    showToast("Невірний пароль!", "error");
+    return;
+  }
+
+  db.currentUser = user.username;
   saveDB(db);
   showToast(`Вітаємо назад, ${user.username.toUpperCase()}!`, "success");
   
@@ -396,18 +436,35 @@ function handleRegisterSubmit() {
   const db = getDB();
   const email = document.getElementById('reg-email').value.trim();
   const username = document.getElementById('reg-username').value.trim().toLowerCase();
-  const referralInput = document.getElementById('reg-referral');
-  const referralCode = referralInput ? referralInput.value.trim().toLowerCase() : "";
+  const password = document.getElementById('reg-password').value;
+  const passwordConfirm = document.getElementById('reg-password-confirm').value;
 
-  if (!email || !username) {
+  if (!email || !username || !password || !passwordConfirm) {
     showToast("Заповніть всі обов'язкові поля!", "error");
     return;
   }
 
-  // Duplicate checks
+  if (password.length < 6) {
+    showToast("Пароль повинен містити мінімум 6 символів!", "error");
+    return;
+  }
+
+  if (password !== passwordConfirm) {
+    showToast("Паролі не збігаються!", "error");
+    return;
+  }
+
+  // Duplicate username check
   const duplicate = db.users.find(u => u.username === username);
   if (duplicate) {
     showToast("Цей нікнейм вже зайнятий!", "error");
+    return;
+  }
+
+  // Duplicate email check
+  const dupEmail = db.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+  if (dupEmail) {
+    showToast("Ця пошта вже зареєстрована!", "error");
     return;
   }
 
@@ -415,6 +472,7 @@ function handleRegisterSubmit() {
   const newUser = {
     email: email,
     username: username,
+    password: password,
     balance: 50,
     bonusPercent: 0,
     hasSpunWheel: false,
@@ -425,27 +483,11 @@ function handleRegisterSubmit() {
     skinsInventory: []
   };
 
-  let referralActivated = false;
-  if (referralCode) {
-    const referrer = db.users.find(u => u.username === referralCode);
-    if (referrer) {
-      newUser.balance += 50;
-      referrer.balance += 50;
-      referralActivated = true;
-    } else {
-      showToast("Реферального користувача не знайдено, але реєстрація триває.", "error");
-    }
-  }
-
   db.users.push(newUser);
   db.currentUser = username;
   saveDB(db);
 
-  if (referralActivated) {
-    showToast("Реферальний код активовано! Ви та ваш друг отримали по +50 монет!", "success");
-  } else {
-    showToast("Акаунт створено! Ви отримали 50 поінтів.", "success");
-  }
+  showToast("Акаунт створено! Ви отримали 50 поінтів.", "success");
 
   // Show Wheel of fortune immediately
   openModal('wheel-modal');
@@ -454,15 +496,15 @@ function handleRegisterSubmit() {
 
 // Wheel of Fortune elements
 const sectors = [
-  { text: "+5% до депу", color: "#ff5a00", type: "percent", val: 5 },
-  { text: "+5 монет", color: "#181922", type: "coins", val: 5 },
-  { text: "+20% до депу", color: "#ff1a40", type: "percent", val: 20 },
-  { text: "Спробуй ще", color: "#2c2f3f", type: "nothing", val: 0 },
-  { text: "+10% до депу", color: "#ff5a00", type: "percent", val: 10 },
-  { text: "+15 монет", color: "#181922", type: "coins", val: 15 }
+  { text: "+5% БОНУС", color: "#ff5a00", type: "percent", val: 5 },
+  { text: "+5 МОНЕТ", color: "#181922", type: "coins", val: 5 },
+  { text: "+20% БОНУС", color: "#ff1a40", type: "percent", val: 20 },
+  { text: "СПРОБУЙ ЩЕ", color: "#2c2f3f", type: "nothing", val: 0 },
+  { text: "+10% БОНУС", color: "#ff5a00", type: "percent", val: 10 },
+  { text: "+15 МОНЕТ", color: "#181922", type: "coins", val: 15 }
 ];
 
-function renderWheelCanvas() {
+function renderWheelCanvas(currentAngle = 0) {
   const canvas = document.getElementById('wheel-canvas');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
@@ -472,6 +514,11 @@ function renderWheelCanvas() {
   ctx.clearRect(0,0,width,width);
 
   const arc = (2 * Math.PI) / sectors.length;
+
+  ctx.save();
+  ctx.translate(radius, radius);
+  ctx.rotate(currentAngle);
+  ctx.translate(-radius, -radius);
 
   sectors.forEach((sec, i) => {
     const angle = i * arc;
@@ -490,13 +537,16 @@ function renderWheelCanvas() {
     ctx.rotate(angle + arc / 2);
     ctx.textAlign = "right";
     ctx.fillStyle = "white";
-    ctx.font = "bold 12px Outfit";
-    ctx.fillText(sec.text, radius - 20, 4);
+    ctx.font = "bold 13px 'Outfit', sans-serif";
+    ctx.fillText(sec.text, radius - 30, 4);
     ctx.restore();
   });
+
+  ctx.restore();
 }
 
 let spinning = false;
+let currentAngle = 0;
 function spinWheel() {
   if (spinning) return;
   const db = getDB();
@@ -513,43 +563,61 @@ function spinWheel() {
   saveDB(db); // Lock database hasSpun state immediately
 
   const winIdx = Math.floor(Math.random() * sectors.length);
-  const sectorDeg = 360 / sectors.length;
-  const targetDeg = (360 - (winIdx * sectorDeg) - (sectorDeg / 2)) - 90;
-  const totalRotations = 360 * 6 + targetDeg;
-
-  const animContainer = document.getElementById('wheel-canvas-container');
-  animContainer.style.transform = `rotate(${totalRotations}deg)`;
+  const sectorAngle = (2 * Math.PI) / sectors.length;
+  // Calculate target angle to align the center of the winning slice with the top indicator (12 o'clock / 1.5 * Math.PI)
+  const targetAngle = (1.5 * Math.PI) - (winIdx * sectorAngle + sectorAngle / 2) + (2 * Math.PI * 8); // 8 full spins for premium speed
 
   const spinBtn = document.getElementById('wheel-spin-btn');
-  spinBtn.disabled = true;
-  spinBtn.innerText = "ОБЕРТАННЯ...";
+  if (spinBtn) {
+    spinBtn.disabled = true;
+    spinBtn.innerText = "ОБЕРТАННЯ...";
+  }
 
-  setTimeout(() => {
-    spinning = false;
-    const prize = sectors[winIdx];
+  const duration = 5000; // 5 seconds spin
+  const start = performance.now();
+  const startAngle = currentAngle % (2 * Math.PI);
+
+  function animate(time) {
+    const elapsed = time - start;
+    const progress = Math.min(elapsed / duration, 1);
     
-    // Get fresh DB ref
-    const freshDb = getDB();
-    const freshUser = freshDb.users.find(u => u.username === freshDb.currentUser);
+    // Ease out cubic easing
+    const ease = 1 - Math.pow(1 - progress, 3);
+    
+    currentAngle = startAngle + ease * (targetAngle - startAngle);
+    
+    renderWheelCanvas(currentAngle);
 
-    if (prize.type === 'percent') {
-      freshUser.bonusPercent = (freshUser.bonusPercent || 0) + prize.val;
-      showToast(`Вітаємо! Нараховано +${prize.val}% до наступного депозиту!`, "success");
-    } else if (prize.type === 'coins') {
-      freshUser.balance += prize.val;
-      showToast(`Вітаємо! Нараховано +${prize.val} поінтів!`, "success");
+    if (progress < 1) {
+      requestAnimationFrame(animate);
     } else {
-      showToast("На жаль, нічого не випало. Спробуйте промокоди!", "success");
+      spinning = false;
+      const prize = sectors[winIdx];
+      
+      // Get fresh DB ref
+      const freshDb = getDB();
+      const freshUser = freshDb.users.find(u => u.username === freshDb.currentUser);
+
+      if (prize.type === 'percent') {
+        freshUser.bonusPercent = (freshUser.bonusPercent || 0) + prize.val;
+        showToast(`Вітаємо! Нараховано +${prize.val}% до наступного депозиту!`, "success");
+      } else if (prize.type === 'coins') {
+        freshUser.balance += prize.val;
+        showToast(`Вітаємо! Нараховано +${prize.val} монет 🪙!`, "success");
+      } else {
+        showToast("СПРОБУЙ ЩЕ! Бажаємо успіху наступного разу!", "success");
+      }
+
+      saveDB(freshDb);
+
+      setTimeout(() => {
+        closeModal('wheel-modal');
+        window.location.href = 'betting.html';
+      }, 1800);
     }
+  }
 
-    saveDB(freshDb);
-
-    setTimeout(() => {
-      closeModal('wheel-modal');
-      window.location.href = 'betting.html';
-    }, 1800);
-
-  }, 6000); // 6 seconds spin animation
+  requestAnimationFrame(animate);
 }
 
 // ==========================================
@@ -569,7 +637,7 @@ function renderTwitchEmbed(channelName, status = "live") {
     target.innerHTML = `
       <div class="stream-offline-placeholder">
         <div class="stream-offline-logo">
-          <img src="assets/volk_logo.png" style="width:100%; height:100%; object-fit:contain; filter: grayscale(1) opacity(0.35);">
+          <img src="assets/wolf_logo.png" style="width:100%; height:100%; object-fit:contain; filter: grayscale(1) opacity(0.35);">
         </div>
         <h3 style="color:var(--text-secondary); text-transform:uppercase; font-size:14px; font-weight:800; margin-top:10px;">СТРІМ ОФЛАЙН</h3>
         <p style="font-size:11px; color:rgba(255,255,255,0.3); margin-top:5px;">Трансляція наразі призупинена. Слідкуйте за анонсами наступних матчів!</p>
@@ -589,6 +657,61 @@ function renderTwitchEmbed(channelName, status = "live") {
   twitchChannelCache = channelName;
   twitchStatusCache = "live";
 }
+
+// Twitch Chat loader
+let twitchChatChannelCache = "";
+let twitchChatStatusCache = "";
+function renderTwitchChat(channelName, status = "live") {
+  if (twitchChatChannelCache === channelName && twitchChatStatusCache === status) return;
+  const panel = document.querySelector('.live-chat-panel');
+  if (!panel) return;
+  panel.innerHTML = "";
+
+  if (status === "offline") {
+    panel.innerHTML = `
+      <div class="chat-header">🔴 Живий Чат Стріму</div>
+      <div style="flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; padding:20px; color:var(--text-secondary); text-align:center; height:100%; min-height:280px; background: rgba(12, 13, 18, 0.65);">
+        <span style="font-size: 24px; margin-bottom:10px;">💬</span>
+        <div style="font-size:12px; font-weight:bold; color: var(--text-secondary);">ЧАТ ОФЛАЙН</div>
+        <div style="font-size:10px; opacity:0.5; margin-top:5px; color: var(--text-muted);">Приєднуйтесь, коли почнеться трансляція!</div>
+      </div>
+    `;
+    twitchChatChannelCache = "";
+    twitchChatStatusCache = "offline";
+    return;
+  }
+
+  const host = window.location.hostname || "localhost";
+  
+  const header = document.createElement('div');
+  header.className = "chat-header";
+  header.style.display = "flex";
+  header.style.justifyContent = "space-between";
+  header.style.alignItems = "center";
+  header.innerHTML = `
+    <span>🔴 Живий Чат (${channelName})</span>
+    <a href="https://twitch.tv/${channelName}" target="_blank" style="color: var(--cs-orange); text-decoration: none; font-size: 10px; font-weight: bold;">twitch.tv</a>
+  `;
+
+  const iframeContainer = document.createElement('div');
+  iframeContainer.style.flex = "1";
+  iframeContainer.style.height = "calc(100% - 38px)";
+  iframeContainer.style.minHeight = "350px";
+  
+  const iframe = document.createElement('iframe');
+  iframe.src = `https://www.twitch.tv/embed/${channelName}/chat?parent=${host}&darkpopout`;
+  iframe.style.border = "none";
+  iframe.style.width = "100%";
+  iframe.style.height = "100%";
+  
+  iframeContainer.appendChild(iframe);
+  panel.appendChild(header);
+  panel.appendChild(iframeContainer);
+
+  twitchChatChannelCache = channelName;
+  twitchChatStatusCache = "live";
+}
+
 
 // Render list of active/upcoming matches in lobby
 function renderBettingMatches(matches) {
@@ -610,7 +733,7 @@ function renderBettingMatches(matches) {
     div.innerHTML = `
       <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-secondary); margin-bottom: 10px;">
         <span>Counter-Strike 2 • ${match.status.toUpperCase()}</span>
-        ${isLive ? `<span style="color:var(--volk-red); font-weight:800; animation: pulse-red 1s infinite;">● LIVE</span>` : ''}
+        ${isLive ? `<span style="color:var(--wolf-red); font-weight:800; animation: pulse-red 1s infinite;">● LIVE</span>` : ''}
       </div>
 
       <div style="display:grid; grid-template-columns: 1.2fr auto 1.2fr; align-items:center; text-align:center; margin-bottom:12px;">
@@ -631,7 +754,7 @@ function renderBettingMatches(matches) {
 
       <div class="odds-layout">
         ${isFrozen ? `
-          <div style="grid-column: 1 / span 3; background-color:rgba(255,26,64,0.1); border:1px solid var(--volk-red); color:var(--volk-red); font-weight:800; text-align:center; padding: 10px; border-radius:8px; font-size:12px; text-transform:uppercase; letter-spacing:0.5px;">
+          <div style="grid-column: 1 / span 3; background-color:rgba(255,26,64,0.1); border:1px solid var(--wolf-red); color:var(--wolf-red); font-weight:800; text-align:center; padding: 10px; border-radius:8px; font-size:12px; text-transform:uppercase; letter-spacing:0.5px;">
             КОЕФІЦІЄНТИ ЗАМОРОЖЕНІ
           </div>
         ` : `
@@ -657,20 +780,20 @@ function renderBettingMatches(matches) {
 window.selectBetodds = function(matchId, teamIndex, odds, teamName) {
   const db = getDB();
   
-  // Trigger volk eyes flashing keyframes
-  const eyeL = document.getElementById('volk-eye-l');
-  const eyeR = document.getElementById('volk-eye-r');
+  // Trigger wolf eyes flashing keyframes
+  const eyeL = document.getElementById('wolf-eye-l');
+  const eyeR = document.getElementById('wolf-eye-r');
   if (eyeL && eyeR) {
-    eyeL.classList.remove('volk-eyes-glowing');
-    eyeR.classList.remove('volk-eyes-glowing');
+    eyeL.classList.remove('wolf-eyes-glowing');
+    eyeR.classList.remove('wolf-eyes-glowing');
     void eyeL.offsetWidth; // Trigger reflow
-    eyeL.classList.add('volk-eyes-glowing');
-    eyeR.classList.add('volk-eyes-glowing');
+    eyeL.classList.add('wolf-eyes-glowing');
+    eyeR.classList.add('wolf-eyes-glowing');
     
     // Stop eyes glow after 2 seconds
     setTimeout(() => {
-      eyeL.classList.remove('volk-eyes-glowing');
-      eyeR.classList.remove('volk-eyes-glowing');
+      eyeL.classList.remove('wolf-eyes-glowing');
+      eyeR.classList.remove('wolf-eyes-glowing');
     }, 2000);
   }
 
@@ -696,11 +819,11 @@ window.selectBetodds = function(matchId, teamIndex, odds, teamName) {
 
   const amountInput = document.getElementById('betslip-amount-input');
   amountInput.value = "";
-  document.getElementById('slip-est-win-txt').innerText = "0 грн";
+  document.getElementById('slip-est-win-txt').innerText = "0 монет";
 
   amountInput.oninput = () => {
     const val = parseFloat(amountInput.value) || 0;
-    document.getElementById('slip-est-win-txt').innerText = `${Math.round(val * activeBet.odds)} грн`;
+    document.getElementById('slip-est-win-txt').innerText = `${Math.round(val * activeBet.odds)} монет`;
   };
 };
 
@@ -717,19 +840,6 @@ function placeBetslipBet() {
   const db = getDB();
   const user = db.users.find(u => u.username === db.currentUser);
   if (!user) return;
-
-  // Verify match exists and is active
-  const match = db.matches.find(m => m.id === activeBet.matchId);
-  if (!match) {
-    showToast("Цей матч більше не існує!", "error");
-    clearBetslip();
-    return;
-  }
-  if (match.status === 'finished' || match.isFrozen) {
-    showToast("Ставки на цей матч заблоковані або завершені!", "error");
-    clearBetslip();
-    return;
-  }
 
   const amt = parseFloat(document.getElementById('betslip-amount-input').value);
 
@@ -793,8 +903,14 @@ function handlePromoSubmit() {
   } else if (code === 'REX15') {
     reward = 15;
   } else {
-    showToast("Недійсний промокод!", "error");
-    return;
+    // Check dynamic promocodes from database
+    const dynamicPromo = (db.promocodes || []).find(p => p.code === code);
+    if (dynamicPromo) {
+      reward = dynamicPromo.reward;
+    } else {
+      showToast("Недійсний промокод!", "error");
+      return;
+    }
   }
 
   user.bonusPercent = (user.bonusPercent || 0) + reward;
@@ -935,7 +1051,7 @@ function renderChallengermodeTeamPanel() {
       <div style="background-color: var(--bg-input); border:1px solid var(--border-color); padding:20px; border-radius:10px;">
         <div style="display:flex; align-items:center; gap:15px; margin-bottom: 15px;">
           <div style="width: 55px; height:55px; border-radius:8px; border:1px solid var(--cs-orange); padding:2px; background:white;">
-            <img src="assets/volk_logo.png" style="width:100%; height:100%; object-fit:contain;">
+            <img src="assets/wolf_logo.png" style="width:100%; height:100%; object-fit:contain;">
           </div>
           <div>
             <h3 style="color:var(--cs-orange); font-size:18px; font-weight:800;">${team.name} [${team.tag}]</h3>
@@ -1097,6 +1213,35 @@ function renderBracketsTree(brackets) {
     return;
   }
 
+  // Check if at least one match has been configured (i.e. has at least one real team that is not empty and not "Очікується")
+  let hasAnyConfiguredMatch = false;
+  brackets.rounds.forEach(round => {
+    round.matches.forEach(match => {
+      const t1 = match.team1;
+      const t2 = match.team2;
+      const isT1Active = t1 && t1.trim() !== "" && t1 !== "Очікується";
+      const isT2Active = t2 && t2.trim() !== "" && t2 !== "Очікується";
+      if (isT1Active || isT2Active) {
+        hasAnyConfiguredMatch = true;
+      }
+    });
+  });
+
+  if (!hasAnyConfiguredMatch) {
+    // Show a premium dark esports empty state banner
+    container.innerHTML = `
+      <div class="empty-bracket-state" style="width:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:50px 30px; text-align:center; background:rgba(30, 31, 42, 0.4); border:1px dashed var(--border-color); border-radius:12px; box-shadow:inset 0 0 20px rgba(0,0,0,0.5);">
+        <div style="font-size:48px; margin-bottom:15px; filter: drop-shadow(0 0 10px rgba(255,90,0,0.3)); animation: float 3s ease-in-out infinite;">🏆</div>
+        <h3 style="color:white; font-size:16px; font-weight:800; text-transform:uppercase; margin-bottom:10px; letter-spacing:1px;">Турнірна сітка очікує старту</h3>
+        <p style="color:var(--text-secondary); font-size:12px; max-width:420px; line-height:1.6; margin:0;">
+          Матчі з'являться тут після того, як адміністратор внесе їх до сітки у панелі керування. Слідкуйте за оновленнями!
+        </p>
+      </div>
+    `;
+    return;
+  }
+
+  // If there are configured matches, render columns
   brackets.rounds.forEach(round => {
     const col = document.createElement('div');
     col.className = "bracket-round-column";
@@ -1111,31 +1256,55 @@ function renderBracketsTree(brackets) {
     title.innerText = round.name;
     col.appendChild(title);
 
+    let renderedAnyMatch = false;
+
     round.matches.forEach(match => {
-      const node = document.createElement('div');
-      node.className = "bracket-match-node";
-      
-      const t1Winner = match.winner === match.team1;
-      const t2Winner = match.winner === match.team2;
-      const hasWinner = match.winner !== null;
+      const t1 = match.team1;
+      const t2 = match.team2;
+      const isT1Active = t1 && t1.trim() !== "" && t1 !== "Очікується";
+      const isT2Active = t2 && t2.trim() !== "" && t2 !== "Очікується";
 
-      const isActive = match.winner === null && match.team1 && match.team1 !== "Очікується" && match.team2 && match.team2 !== "Очікується";
-      if (isActive) {
-        node.classList.add('active-highlight');
+      // Only render the match node if it has been added by the admin
+      if (isT1Active || isT2Active) {
+        renderedAnyMatch = true;
+        const node = document.createElement('div');
+        node.className = "bracket-match-node";
+        
+        const t1Winner = match.winner === match.team1;
+        const t2Winner = match.winner === match.team2;
+        const hasWinner = match.winner !== null;
+
+        const isActive = match.winner === null && isT1Active && isT2Active;
+        if (isActive) {
+          node.classList.add('active-highlight');
+        }
+
+        node.innerHTML = `
+          <div class="bracket-node-team ${hasWinner ? (t1Winner ? 'winner' : 'loser') : ''}">
+            <span>${match.team1 || 'Очікується'}</span>
+            <span style="font-weight:800; font-family:'Roboto Mono';">${match.score1}</span>
+          </div>
+          <div class="bracket-node-team ${hasWinner ? (t2Winner ? 'winner' : 'loser') : ''}">
+            <span>${match.team2 || 'Очікується'}</span>
+            <span style="font-weight:800; font-family:'Roboto Mono';">${match.score2}</span>
+          </div>
+        `;
+        col.appendChild(node);
       }
-
-      node.innerHTML = `
-        <div class="bracket-node-team ${hasWinner ? (t1Winner ? 'winner' : 'loser') : ''}">
-          <span>${match.team1 || 'Очікується'}</span>
-          <span style="font-weight:800; font-family:'Roboto Mono';">${match.score1}</span>
-        </div>
-        <div class="bracket-node-team ${hasWinner ? (t2Winner ? 'winner' : 'loser') : ''}">
-          <span>${match.team2 || 'Очікується'}</span>
-          <span style="font-weight:800; font-family:'Roboto Mono';">${match.score2}</span>
-        </div>
-      `;
-      col.appendChild(node);
     });
+
+    if (!renderedAnyMatch) {
+      const placeholder = document.createElement('div');
+      placeholder.style.fontSize = "11px";
+      placeholder.style.color = "var(--text-secondary)";
+      placeholder.style.textAlign = "center";
+      placeholder.style.padding = "20px 10px";
+      placeholder.style.border = "1px dashed rgba(255,255,255,0.08)";
+      placeholder.style.borderRadius = "8px";
+      placeholder.style.opacity = "0.5";
+      placeholder.innerText = "Очікується розклад";
+      col.appendChild(placeholder);
+    }
 
     container.appendChild(col);
   });
@@ -1433,15 +1602,6 @@ function renderSkinsShop() {
     div.appendChild(item);
   });
 
-  const shopLink = document.createElement('a');
-  shopLink.href = "shop.html";
-  shopLink.className = "btn";
-  shopLink.style.textDecoration = "none";
-  shopLink.style.width = "100%";
-  shopLink.style.marginTop = "10px";
-  shopLink.style.justifyContent = "center";
-  shopLink.innerHTML = "ВІДКРИТИ МАГАЗИН 🛒";
-  div.appendChild(shopLink);
 
   container.appendChild(div);
 }
@@ -1501,7 +1661,7 @@ const MOCK_CHAT_MESSAGES = [
   { username: "NaviFan_UA", text: "Слава Україні! Наві давай!" },
   { username: "s1mple_is_back", text: "s1mple is best player ever" },
   { username: "cs2_expert", text: "karrigan needs to adjust the strategy" },
-  { username: "VOLK_hater", text: "FaZe will close this 2:0 easy" },
+  { username: "WOLF_hater", text: "FaZe will close this 2:0 easy" },
   { username: "ez_money_maker", text: "placed 500 coins on Vitality, ez win" },
   { username: "drop_me_awp", text: "what an incredible headshot from jL!" },
   { username: "zywoo_god", text: "ZywOo is just insane today" },
@@ -1569,8 +1729,43 @@ function escapeHTML(str) {
   );
 }
 
-// 3. 1v1 AIM Lobbies & Matchmaking
+// 3. Esports Lobbies & Matchmaking
 const MOCK_OPPONENTS = ["s1mple_fan", "m0nesy_enjoyer", "donk_junior", "niko_aimer", "kennys_nephew", "zywoo_pupil", "device_clone", "shroud_legacy"];
+let selectedLobbyFormat = "1v1";
+
+window.selectLobbyFormat = function(format) {
+  selectedLobbyFormat = format;
+  
+  // Toggle active classes
+  const formats = ["1v1", "2v2", "3v3", "5v5"];
+  formats.forEach(f => {
+    const btn = document.getElementById(`btn-format-${f}`);
+    if (btn) {
+      if (f === format) {
+        btn.classList.add('active');
+        btn.classList.remove('btn-secondary');
+      } else {
+        btn.classList.remove('active');
+        btn.classList.add('btn-secondary');
+      }
+    }
+  });
+
+  // Update labels
+  const feeMap = { "1v1": 50, "2v2": 100, "3v3": 150, "5v5": 250 };
+  const prizeMap = { "1v1": 95, "2v2": 190, "3v3": 285, "5v5": 475 };
+
+  const feeVal = feeMap[format];
+  const prizeVal = prizeMap[format];
+
+  document.getElementById('lbl-format-fee').innerText = `${feeVal} 🪙`;
+  document.getElementById('lbl-format-prize').innerText = `${prizeVal} 🪙`;
+  
+  const createBtn = document.getElementById('btn-create-lobby');
+  if (createBtn) {
+    createBtn.innerText = `⚔️ СТВОРУТИ ЛОБІ (${feeVal} 🪙)`;
+  }
+};
 
 function render1v1Lobbies() {
   const container = document.getElementById('aim-lobbies-container');
@@ -1581,11 +1776,27 @@ function render1v1Lobbies() {
   const lobbies = db.aimLobbies || [];
 
   if (lobbies.length === 0) {
-    container.innerHTML = `<div style="grid-column: 1 / -1; text-align:center; color:var(--text-secondary); padding:20px; font-size:12px;">Немає активних дуелей. Створіть свою першу дуель!</div>`;
+    container.innerHTML = `<div style="grid-column: 1 / -1; text-align:center; color:var(--text-secondary); padding:20px; font-size:12px;">Немає активних лобі. Створіть своє перше лобі!</div>`;
     return;
   }
 
   lobbies.forEach(lobby => {
+    const format = lobby.format || "1v1";
+    const feeMap = { "1v1": 50, "2v2": 100, "3v3": 150, "5v5": 250 };
+    const prizeMap = { "1v1": 95, "2v2": 190, "3v3": 285, "5v5": 475 };
+    const fee = feeMap[format];
+    const prize = prizeMap[format];
+
+    // Format display names & badges
+    const formatLabels = {
+      "1v1": { name: "Дуель 1v1 AIM", color: "#26A17B" },
+      "2v2": { name: "Напарники 2v2", color: "#0088cc" },
+      "3v3": { name: "Командна 3v3", color: "#9d4edd" },
+      "5v5": { name: "Бій 5v5 Match", color: "var(--cs-orange)" }
+    };
+
+    const labelObj = formatLabels[format] || formatLabels["1v1"];
+
     let statusTag = "";
     if (lobby.status === "waiting") {
       statusTag = `<span class="lobby-status-tag status-active-wait">Очікування...</span>`;
@@ -1595,25 +1806,30 @@ function render1v1Lobbies() {
       statusTag = `<span class="lobby-status-tag status-done">Завершено</span>`;
     }
 
+    const suffixMap = { "1v1": "", "2v2": " (+1 Бот)", "3v3": " (+2 Боти)", "5v5": " (+4 Боти)" };
+    const suffix = suffixMap[format] || "";
+    const p1Display = lobby.player1.toUpperCase() + suffix;
+    const p2Display = lobby.player2 ? (lobby.player2.toUpperCase() + suffix) : '???';
+
     const card = document.createElement('div');
     card.className = "lobby-card";
     card.innerHTML = `
       <div class="lobby-header">
-        <span>Дуель 1v1 AIM</span>
+        <span style="font-weight: 800; color: ${labelObj.color}; font-size: 11px; text-transform: uppercase;">${labelObj.name}</span>
         ${statusTag}
       </div>
-      <div class="lobby-players-line">
-        <span>${lobby.player1.toUpperCase()}</span>
+      <div class="lobby-players-line" style="margin: 8px 0;">
+        <span>${p1Display}</span>
         <span style="color:var(--text-secondary); font-size:10px;">vs</span>
-        <span>${lobby.player2 ? lobby.player2.toUpperCase() : '???'}</span>
+        <span>${p2Display}</span>
       </div>
-      <div style="font-size: 11px; color: var(--text-secondary); display:flex; justify-content:space-between;">
-        <span>Ставка: 50 🪙</span>
-        <strong style="color:var(--cs-orange);">${lobby.score1}:${lobby.score2}</strong>
+      <div style="font-size: 11px; color: var(--text-secondary); display:flex; justify-content:space-between; align-items:center;">
+        <span>Ставка: ${fee} 🪙</span>
+        <strong style="color:white; font-family:'Roboto Mono'; font-size: 13px;">${lobby.score1}:${lobby.score2}</strong>
       </div>
       ${lobby.status === 'finished' ? `
-        <div style="font-size:11px; color:var(--success); font-weight:800; text-align:center; margin-top:5px; text-transform:uppercase;">
-          Переможець: ${lobby.winner.toUpperCase()} (+95 🪙)
+        <div style="font-size:11px; color:var(--success); font-weight:800; text-align:center; margin-top:8px; text-transform:uppercase; border-top: 1px solid rgba(255,255,255,0.03); padding-top: 6px;">
+          🎉 Переможець: ${lobby.winner.toUpperCase()}${suffix} (+${prize} 🪙)
         </div>
       ` : ''}
     `;
@@ -1621,21 +1837,25 @@ function render1v1Lobbies() {
   });
 }
 
-window.create1v1Lobby = function() {
+window.handleCreateLobby = function() {
   const db = getDB();
   const user = db.users.find(u => u.username === db.currentUser);
   if (!user) return;
 
-  if (user.balance < 50) {
-    showToast("Недостатньо монет! Вартість дуелі: 50 🪙", "error");
+  const feeMap = { "1v1": 50, "2v2": 100, "3v3": 150, "5v5": 250 };
+  const fee = feeMap[selectedLobbyFormat] || 50;
+
+  if (user.balance < fee) {
+    showToast(`Недостатньо монет! Вартість лобі: ${fee} 🪙`, "error");
     return;
   }
 
-  user.balance -= 50;
+  user.balance -= fee;
 
   const lobbyId = `duel_${Date.now()}`;
   const newLobby = {
     id: lobbyId,
+    format: selectedLobbyFormat,
     player1: user.username,
     player2: null,
     score1: 0,
@@ -1648,7 +1868,7 @@ window.create1v1Lobby = function() {
   if (!db.aimLobbies) db.aimLobbies = [];
   db.aimLobbies.unshift(newLobby);
   saveDB(db);
-  showToast("Дуель створено! Очікуємо суперника...", "success");
+  showToast(`Лобі ${selectedLobbyFormat} створено! Очікуємо суперників...`, "success");
   renderPageContent();
 
   setTimeout(() => {
@@ -1661,12 +1881,18 @@ function simulateOpponentJoin(lobbyId) {
   const lobby = db.aimLobbies.find(l => l.id === lobbyId);
   if (!lobby || lobby.status !== 'waiting') return;
 
+  const format = lobby.format || "1v1";
+  const feeMap = { "1v1": 50, "2v2": 100, "3v3": 150, "5v5": 250 };
+  const prizeMap = { "1v1": 95, "2v2": 190, "3v3": 285, "5v5": 475 };
+  const fee = feeMap[format];
+  const prize = prizeMap[format];
+
   const opponent = MOCK_OPPONENTS[Math.floor(Math.random() * MOCK_OPPONENTS.length)];
   lobby.player2 = opponent;
   lobby.status = "fighting";
   lobby.simProgress = "0%";
   saveDB(db);
-  showToast(`Суперник ${opponent.toUpperCase()} знайдений! Дуель починається.`, "success");
+  showToast(`Суперник ${opponent.toUpperCase()} знайдений! Бій починається.`, "success");
   renderPageContent();
 
   let round = 1;
@@ -1708,19 +1934,19 @@ function simulateOpponentJoin(lobbyId) {
       // Credit winner
       const winnerUser = freshDb.users.find(u => u.username === winnerName);
       if (winnerUser) {
-        winnerUser.balance += 95;
+        winnerUser.balance += prize;
         
         if (winnerName === freshDb.currentUser) {
           if (!winnerUser.betHistory) winnerUser.betHistory = [];
           winnerUser.betHistory.unshift({
             matchId: freshLobby.id,
-            matchDisplay: `Дуель 1v1 vs ${freshLobby.player2}`,
+            matchDisplay: `Дуель ${format} vs ${freshLobby.player2}`,
             selectedTeam: winnerUser.username,
             teamIndex: 1,
-            amount: 50,
+            amount: fee,
             odds: 1.9,
             status: "Виграш",
-            payout: 95,
+            payout: prize,
             date: new Date().toLocaleString()
           });
         }
@@ -1733,10 +1959,10 @@ function simulateOpponentJoin(lobbyId) {
           if (!loserUser.betHistory) loserUser.betHistory = [];
           loserUser.betHistory.unshift({
             matchId: freshLobby.id,
-            matchDisplay: `Дуель 1v1 vs ${freshLobby.player2}`,
+            matchDisplay: `Дуель ${format} vs ${freshLobby.player2}`,
             selectedTeam: loserUser.username,
             teamIndex: 1,
-            amount: 50,
+            amount: fee,
             odds: 1.9,
             status: "Програш",
             payout: 0,
@@ -1809,25 +2035,25 @@ const DAILY_QUESTS = [
     description: "Зроби будь-які 3 ставки на матчі CS2",
     reward: 10,
     checkCompleted: (user) => {
-      const bets = user.betHistory.filter(b => b.matchDisplay && !b.matchDisplay.includes("1v1"));
+      const bets = user.betHistory.filter(b => b.matchDisplay && !b.matchDisplay.startsWith("Дуель"));
       return bets.length >= 3;
     },
     getProgressText: (user) => {
-      const bets = user.betHistory.filter(b => b.matchDisplay && !b.matchDisplay.includes("1v1"));
+      const bets = user.betHistory.filter(b => b.matchDisplay && !b.matchDisplay.startsWith("Дуель"));
       return `${Math.min(bets.length, 3)} / 3`;
     }
   },
   {
     id: "quest_duel",
-    title: "Виграй 1 лобі 1v1",
-    description: "Здобудь перемогу в дуелі 1v1 на aim-карті",
+    title: "Виграй 1 лобі (Aim)",
+    description: "Здобудь перемогу в дуелі або командному бою на aim-карті (1v1, 2v2, 3v3, 5v5)",
     reward: 15,
     checkCompleted: (user) => {
-      const duelsWon = user.betHistory.filter(b => b.matchDisplay && b.matchDisplay.includes("1v1") && b.status === "Виграш");
+      const duelsWon = user.betHistory.filter(b => b.matchDisplay && b.matchDisplay.startsWith("Дуель") && b.status === "Виграш");
       return duelsWon.length >= 1;
     },
     getProgressText: (user) => {
-      const duelsWon = user.betHistory.filter(b => b.matchDisplay && b.matchDisplay.includes("1v1") && b.status === "Виграш");
+      const duelsWon = user.betHistory.filter(b => b.matchDisplay && b.matchDisplay.startsWith("Дуель") && b.status === "Виграш");
       return `${Math.min(duelsWon.length, 1)} / 1`;
     }
   }
@@ -1998,8 +2224,9 @@ function startBracketSimulation() {
     const mockPool = ["Astralis", "MOUZ", "Heroic", "Team Liquid", "Virtus.pro", "Team Spirit", "Complexity", "Falcons"];
     
     round0.matches.forEach((m, idx) => {
+      const otherMatch = round0.matches[1 - idx] || {};
       if (!m.team1 || m.team1 === "Очікується" || m.team1 === "") {
-        const used = [m.team2, round0.matches[1 - idx].team1, round0.matches[1 - idx].team2];
+        const used = [m.team2, otherMatch.team1, otherMatch.team2].filter(Boolean);
         const available = mockPool.filter(t => !used.includes(t));
         m.team1 = available[Math.floor(Math.random() * available.length)] || "Astralis";
         m.score1 = 0;
@@ -2008,7 +2235,7 @@ function startBracketSimulation() {
         dbUpdated = true;
       }
       if (!m.team2 || m.team2 === "Очікується" || m.team2 === "") {
-        const used = [m.team1, round0.matches[1 - idx].team1, round0.matches[1 - idx].team2];
+        const used = [m.team1, otherMatch.team1, otherMatch.team2].filter(Boolean);
         const available = mockPool.filter(t => !used.includes(t));
         m.team2 = available[Math.floor(Math.random() * available.length)] || "Heroic";
         m.score2 = 0;
@@ -2081,8 +2308,8 @@ function startBracketSimulation() {
                 {
                   name: "Півфінали",
                   matches: [
-                    { id: "b_1", team1: "NaVi", team2: "FaZe Clan", score1: 0, score2: 0, winner: null },
-                    { id: "b_2", team1: "G2 Esports", team2: "Vitality", score1: 0, score2: 0, winner: null }
+                    { id: "b_1", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null },
+                    { id: "b_2", team1: "Очікується", team2: "Очікується", score1: 0, score2: 0, winner: null }
                   ]
                 },
                 {

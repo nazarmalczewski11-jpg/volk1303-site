@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>VOLK 1303 | Ставки на Кіберспорт</title>
   <link rel="stylesheet" href="style.css">
+  <script src="smoke-bg.js"></script>
 </head>
 <body>
 
@@ -15,7 +16,7 @@
   <div id="verify-loader" class="verify-loader-overlay">
     <div class="loader-container">
       <div style="width: 100px; height: 100px; margin-bottom: 10px;">
-        <img src="assets/volk_logo.png" alt="Mascot" style="width:100%; height:100%; object-fit:contain; filter: drop-shadow(0 0 10px var(--volk-red-glow));">
+        <img src="assets/wolf_logo.png" alt="Mascot" style="width:100%; height:100%; object-fit:contain; filter: drop-shadow(0 0 10px var(--wolf-red-glow));">
       </div>
       <div class="loader-status-text" id="loader-status">З'єднання з сервером...</div>
       <div class="loader-progress-bar">
@@ -29,7 +30,7 @@
   <header>
     <a href="betting.html" class="logo-link">
       <div class="logo-img-wrapper">
-        <img src="assets/volk_logo.png" alt="Volk Logo">
+        <img src="assets/wolf_logo.png" alt="Wolf Logo">
       </div>
       <div class="logo-text">VOLK<span>1303</span></div>
     </a>
@@ -37,9 +38,7 @@
     <nav>
       <a href="betting.html" class="nav-link active">Ставки</a>
       <a href="tournament.html" class="nav-link">Турніри</a>
-      <a href="shop.html" class="nav-link">Магазин</a>
       <a href="profile.html" class="nav-link">Профіль</a>
-      <a href="admin.html" id="nav-admin-link" class="nav-link" style="display: none;">Адмінка</a>
     </nav>
 
     <div class="header-user-panel">
@@ -54,22 +53,6 @@
   <!-- GGBet-Style Layout -->
   <main class="betting-layout">
     
-    <!-- Left Sidebar: Categories Tree -->
-    <aside class="sidebar-left">
-      <div class="card" style="padding: 15px;">
-        <div class="section-title" style="margin-bottom: 15px; font-size:13px;">Категорії ігор</div>
-        
-        <div style="display: flex; flex-direction: column; gap: 8px;">
-          <button class="sidebar-category-btn active">
-            <span class="category-icon-label">
-              <span>🔫</span> Counter-Strike 2
-            </span>
-            <span class="category-count" id="badge-cs2-count">2</span>
-          </button>
-        </div>
-      </div>
-    </aside>
-
     <!-- Center Column: Video stream & live matches grid -->
     <section class="betting-center">
       
@@ -84,12 +67,8 @@
           </div>
           <div class="live-chat-panel">
             <div class="chat-header">🔴 Живий Чат Стріму</div>
-            <div class="chat-messages" id="live-chat-messages">
-              <!-- Filled dynamically by JS -->
-            </div>
-            <div class="chat-input-area">
-              <input type="text" id="live-chat-input" class="chat-input" placeholder="Напишіть повідомлення...">
-              <button onclick="sendChatMessage()" class="btn" style="padding:4px 8px; font-size:10px; margin-left:4px;">Надіслати</button>
+            <div style="flex: 1; display: flex; justify-content: center; align-items: center; background: rgba(12,13,18,0.45); height: 100%; min-height: 280px; color: var(--text-secondary); font-size: 13px;">
+              Завантаження чату...
             </div>
           </div>
         </div>
@@ -152,9 +131,9 @@
           <polygon points="25,35 40,50 30,55" stroke="var(--border-color)" stroke-width="1" />
           <polygon points="50,56 55,72 50,82 45,72" stroke="var(--cs-orange)" stroke-width="1.5" />
           <!-- Eye slots -->
-          <g class="volk-eyes">
-            <polygon id="volk-eye-l" points="34,46 44,48 40,43" fill="#3a3d4d" />
-            <polygon id="volk-eye-r" points="66,46 56,48 60,43" fill="#3a3d4d" />
+          <g class="wolf-eyes">
+            <polygon id="wolf-eye-l" points="34,46 44,48 40,43" fill="#3a3d4d" />
+            <polygon id="wolf-eye-r" points="66,46 56,48 60,43" fill="#3a3d4d" />
           </g>
         </svg>
         <span style="font-weight: 800; font-size:12px; color: var(--cs-orange); margin-top: 8px; text-transform:uppercase; letter-spacing:0.5px;">VOLK 1303 BETTING</span>
@@ -260,7 +239,6 @@
             <span style="color:var(--cs-orange); font-weight:800; font-size:11px;">2 500 🪙</span>
           </div>
         </div>
-        <a href="shop.html" class="btn" style="width: 100%; text-decoration:none; box-sizing:border-box; justify-content:center;">ВІДКРИТИ МАГАЗИН 🛒</a>
       </div>
 
     </aside>
@@ -269,99 +247,74 @@
 
   <!-- Deposit Modal -->
   <div id="deposit-modal" class="modal-overlay">
-    <div class="modal-content">
+    <div class="modal-content" style="max-width: 440px;">
       <button class="modal-close" onclick="closeModal('deposit-modal')">&times;</button>
       <div class="modal-title">Поповнити баланс</div>
       
+      <!-- Exchange Rate Badge -->
+      <div style="background: rgba(255, 90, 0, 0.06); padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(255, 90, 0, 0.2); font-size: 12px; color: var(--text-secondary); text-align: center; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: inset 0 0 8px rgba(255, 90, 0, 0.05);">
+        🪙 <span style="color: var(--text-primary); font-weight: 800;">КУРС ВАЛЮТИ:</span> 1 монета = 1 гривня (UAH)
+      </div>
+
       <div class="payment-tabs">
-        <button class="payment-tab-btn active" id="dep-tab-trc" onclick="switchPaymentTab('trc')">USDT TRC20</button>
-        <button class="payment-tab-btn" id="dep-tab-mono" onclick="switchPaymentTab('mono')">MONOBANKA</button>
+        <button class="payment-tab-btn active" id="dep-tab-trc" onclick="switchPaymentTab('trc')">
+          <span style="font-size: 14px;">🟢</span> USDT TRC20
+        </button>
+        <button class="payment-tab-btn" id="dep-tab-mono" onclick="switchPaymentTab('mono')">
+          <span style="font-size: 14px;">🟣</span> MONOBANKA
+        </button>
       </div>
 
       <!-- TRC20 Form -->
       <div id="payment-trc" class="payment-method-details active">
-        <div class="qr-code-placeholder">
-          <svg viewBox="0 0 100 100" style="width:100%; height:100%;">
-            <rect width="100" height="100" fill="white"/>
-            <rect x="5" y="5" width="25" height="25" fill="#0c0d12"/>
-            <rect x="9" y="9" width="17" height="17" fill="white"/>
-            <rect x="12" y="12" width="11" height="11" fill="#0c0d12"/>
-            
-            <rect x="70" y="5" width="25" height="25" fill="#0c0d12"/>
-            <rect x="74" y="9" width="17" height="17" fill="white"/>
-            <rect x="77" y="12" width="11" height="11" fill="#0c0d12"/>
-            
-            <rect x="5" y="70" width="25" height="25" fill="#0c0d12"/>
-            <rect x="9" y="74" width="17" height="17" fill="white"/>
-            <rect x="12" y="77" width="11" height="11" fill="#0c0d12"/>
-
-            <rect x="35" y="10" width="10" height="20" fill="#0c0d12"/>
-            <rect x="50" y="15" width="15" height="15" fill="#0c0d12"/>
-            <rect x="35" y="45" width="30" height="10" fill="#0c0d12"/>
-            <rect x="10" y="35" width="15" height="25" fill="#0c0d12"/>
-            <rect x="80" y="35" width="10" height="35" fill="#0c0d12"/>
-            <rect x="55" y="65" width="20" height="20" fill="#0c0d12"/>
-          </svg>
+        <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-secondary); font-weight: 700; text-align: center; margin-bottom: -5px;">Скануйте адресу або скопіюйте гаманець</div>
+        <div class="qr-code-placeholder" style="background: white; padding: 6px;">
+          <img src="assets/qr_crypto.png" alt="USDT TRC20 Wallet QR" style="width: 100%; height: 100%; object-fit: contain; border-radius: 8px;">
         </div>
         <div class="copy-field">
-          <input type="text" value="TL1fdPAkGugPVYAtVyZdcejT3wfEGE1vhH" readonly style="flex:1;">
-          <button class="btn btn-secondary" style="padding: 4px 8px; font-size:11px;" onclick="navigator.clipboard.writeText('TL1fdPAkGugPVYAtVyZdcejT3wfEGE1vhH'); showToast('Адресу скопійовано!')">Скопіювати</button>
+          <input type="text" value="TWe13o3VolkCS2BettingPlatformXyzTRC20" readonly style="flex:1;">
+          <button class="btn" style="padding: 8px 12px; font-size:10px;" onclick="navigator.clipboard.writeText('TWe13o3VolkCS2BettingPlatformXyzTRC20'); showToast('Адресу скопійовано!', 'success')">Скопіювати</button>
         </div>
         <form id="trc-deposit-form">
           <div class="form-group">
             <label for="trc-amount">Сума (монет)</label>
             <input type="number" id="trc-amount" class="form-input" placeholder="Мін. 500 монет" min="500" required>
           </div>
-          <div class="form-group">
+          <div class="form-group" style="margin-top: 12px;">
             <label for="trc-txid">TxID транзакції</label>
-            <input type="text" id="trc-txid" class="form-input" placeholder="TxID транзакції" required>
+            <input type="text" id="trc-txid" class="form-input" placeholder="Вставте TxID транзакції" required>
           </div>
-          <button type="submit" class="btn" style="width: 100%; margin-top: 10px;">ВЕРЕФІКУВАТИ ДЕПОЗИТ</button>
+          <button type="submit" class="btn" style="width: 100%; margin-top: 15px; padding: 12px;">ВЕРЕФІКУВАТИ ДЕПОЗИТ</button>
         </form>
       </div>
 
       <!-- Monobanka Form -->
       <div id="payment-mono" class="payment-method-details">
-        <div class="qr-code-placeholder">
-          <svg viewBox="0 0 100 100" style="width:100%; height:100%;">
-            <rect width="100" height="100" fill="white"/>
-            <rect x="5" y="5" width="25" height="25" fill="#ff5a00"/>
-            <rect x="9" y="9" width="17" height="17" fill="white"/>
-            <rect x="12" y="12" width="11" height="11" fill="#ff5a00"/>
-            
-            <rect x="70" y="5" width="25" height="25" fill="#ff5a00"/>
-            <rect x="74" y="9" width="17" height="17" fill="white"/>
-            <rect x="77" y="12" width="11" height="11" fill="#ff5a00"/>
-            
-            <rect x="5" y="70" width="25" height="25" fill="#ff5a00"/>
-            <rect x="9" y="74" width="17" height="17" fill="white"/>
-            <rect x="12" y="77" width="11" height="11" fill="#ff5a00"/>
-
-            <rect x="35" y="15" width="20" height="20" fill="#ff5a00"/>
-            <rect x="40" y="45" width="25" height="20" fill="#ff5a00"/>
-            <rect x="75" y="40" width="15" height="25" fill="#ff5a00"/>
-            <rect x="45" y="70" width="20" height="15" fill="#ff5a00"/>
-          </svg>
+        <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-secondary); font-weight: 700; text-align: center; margin-bottom: -5px;">Перейдіть за посиланням на Банку Mono</div>
+        <div class="qr-code-placeholder" style="background: white; padding: 6px;">
+          <img src="assets/qr_mono.png" alt="Monobank Jar QR" style="width: 100%; height: 100%; object-fit: contain; border-radius: 8px;">
         </div>
         <div class="copy-field">
-          <input type="text" value="https://send.monobank.ua/jar/828oCwM8Vw" readonly style="flex:1;">
-          <a href="https://send.monobank.ua/jar/828oCwM8Vw" target="_blank" class="btn btn-secondary" style="padding: 4px 8px; font-size:11px; text-decoration:none; display:flex; align-items:center;">ПЕРЕЙТИ</a>
+          <input type="text" value="https://send.monobank.ua/jar/volk13o3" readonly style="flex:1;">
+          <a href="https://send.monobank.ua/jar/volk13o3" target="_blank" class="btn" style="padding: 8px 12px; font-size:10px; text-decoration:none; display:flex; align-items:center; justify-content:center;">ПЕРЕЙТИ</a>
         </div>
         <form id="mono-deposit-form">
           <div class="form-group">
             <label for="mono-amount">Сума (монет)</label>
             <input type="number" id="mono-amount" class="form-input" placeholder="Мін. 500 монет" min="500" required>
           </div>
-          <div class="form-group">
+          <div class="form-group" style="margin-top: 12px;">
             <label for="mono-sender-name">ПІБ відправника</label>
-            <input type="text" id="mono-sender-name" class="form-input" placeholder="Прізвище, Ім'я" required>
+            <input type="text" id="mono-sender-name" class="form-input" placeholder="Прізвище, Ім'я відправника" required>
           </div>
-          <button type="submit" class="btn" style="width: 100%; margin-top: 10px;">ВЕРЕФІКУВАТИ ДЕПОЗИТ</button>
+          <button type="submit" class="btn" style="width: 100%; margin-top: 15px; padding: 12px;">ВЕРЕФІКУВАТИ ДЕПОЗИТ</button>
         </form>
       </div>
 
     </div>
   </div>
+
+
 
   <!-- Rules Modal -->
   <div id="rules-modal" class="modal-overlay">
@@ -390,7 +343,7 @@
       <div style="display:flex; gap:20px;">
         <a href="#" onclick="openModal('rules-modal')" style="color:var(--text-secondary); text-decoration:none; transition:var(--transition);">Правила</a>
         <a href="#" style="color:var(--text-secondary); text-decoration:none; transition:var(--transition);">Підтримка</a>
-        <a href="https://discord.gg/volk1303" target="_blank" style="color:var(--text-secondary); text-decoration:none; transition:var(--transition);">Discord</a>
+        <a href="https://discord.gg/wolf1303" target="_blank" style="color:var(--text-secondary); text-decoration:none; transition:var(--transition);">Discord</a>
       </div>
     </div>
   </footer>

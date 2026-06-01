@@ -3,265 +3,402 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>VOLK 1303 | Адмін Панель</title>
+  <title>VOLK 1303 | Панель Керування</title>
   <link rel="stylesheet" href="style.css">
+  <script src="smoke-bg.js"></script>
 </head>
-<body>
+<body style="margin: 0; padding: 0; background-color: #08090c; overflow: hidden;">
 
   <!-- Toast Notifications -->
   <div id="toast-container" class="toast-container"></div>
 
-  <!-- Shared Header -->
-  <header>
-    <a href="betting.html" class="logo-link">
-      <div class="logo-img-wrapper">
-        <img src="assets/volk_logo.png" alt="Volk Logo">
-      </div>
-      <div class="logo-text">VOLK<span>ADMIN</span></div>
-    </a>
+  <!-- Standalone Back-Office Grid Layout -->
+  <div class="admin-container">
 
-    <nav>
-      <a href="betting.html" class="nav-link">Ставки</a>
-      <a href="tournament.html" class="nav-link">Турніри</a>
-      <a href="shop.html" class="nav-link">Магазин</a>
-      <a href="profile.html" class="nav-link">Профіль</a>
-      <a href="admin.html" id="nav-admin-link" class="nav-link active" style="display: none;">Адмінка</a>
-    </nav>
-
-    <div class="header-user-panel">
-      <div class="user-balance">
-        🪙 <span id="header-balance-value" class="balance-coins">0</span> Монет
-      </div>
-      <button class="btn btn-secondary" onclick="logoutUser()">Вихід</button>
-    </div>
-  </header>
-
-  <!-- Admin Control Panels Grid -->
-  <main class="admin-layout" style="padding: 25px 4%; display:flex; flex-direction:column; gap:25px;">
-    
-    <!-- Top Configuration Row -->
-    <div class="admin-grid" style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+    <!-- Left Navigation Console Sidebar -->
+    <aside class="admin-sidebar">
       
-      <!-- Coin Dispenser Card -->
-      <div class="card">
-        <div class="section-title">
-          <span>ВИДАЧА ПОЇНТІВ (МОНЕТ)</span>
-        </div>
-        
-        <div class="inline-form" style="display:flex; gap:8px; margin-bottom: 12px;">
-          <input type="text" id="admin-user-search-input" class="form-input" placeholder="Точний Username користувача" style="flex:1;">
-          <button id="admin-user-search-btn" class="btn">Пошук</button>
-        </div>
-
-        <div id="searched-user-info" style="background: var(--bg-input); padding: 12px; border-radius: 8px; font-size:13px; margin-bottom:12px; border: 1px solid var(--border-color);">
-          <span style="color: var(--text-secondary);">Знайдіть користувача для нарахування монет...</span>
-        </div>
-
-        <div id="balance-adjust-controls" style="display: none;">
-          <!-- Add -->
-          <form id="admin-add-coins-form" style="display:flex; gap:8px; margin-bottom:8px;">
-            <input type="number" id="add-coins-amount" class="form-input" placeholder="Сума нарахування" min="1" step="1" required style="flex:1;">
-            <button type="submit" class="btn" style="background: linear-gradient(135deg, var(--success) 0%, #00b347 100%);">НАРАХУВАТИ</button>
-          </form>
-
-          <!-- Remove -->
-          <form id="admin-remove-coins-form" style="display:flex; gap:8px;">
-            <input type="number" id="remove-coins-amount" class="form-input" placeholder="Сума списання" min="1" step="1" required style="flex:1;">
-            <button type="submit" class="btn btn-danger">СПИСАТИ</button>
-          </form>
-        </div>
+      <!-- Brand Logo -->
+      <div class="admin-sidebar-brand">
+        <img src="assets/wolf_logo.png" alt="VOLK Logo">
+        <div class="brand-name">VOLK<span>ADMIN</span></div>
       </div>
 
-      <!-- Twitch Adjust & Controls Summary -->
-      <div class="card" style="display:flex; flex-direction:column; justify-content:space-between;">
+      <!-- Navigation Tabs List -->
+      <nav class="admin-tabs-list">
+        <button class="admin-tab-item active" onclick="switchAdminTab('dashboard')">
+          <span class="admin-tab-item-icon">📊</span>
+          <span>Дашборд</span>
+        </button>
+        <button class="admin-tab-item" onclick="switchAdminTab('betting')">
+          <span class="admin-tab-item-icon">🎮</span>
+          <span>Керування ставками</span>
+        </button>
+        <button class="admin-tab-item" onclick="switchAdminTab('brackets')">
+          <span class="admin-tab-item-icon">🏆</span>
+          <span>Турнірна сітка</span>
+        </button>
+        <button class="admin-tab-item" onclick="switchAdminTab('users')">
+          <span class="admin-tab-item-icon">👥</span>
+          <span>Користувачі та баланси</span>
+        </button>
+        <button class="admin-tab-item" onclick="switchAdminTab('promocodes')">
+          <span class="admin-tab-item-icon">🎟️</span>
+          <span>Промокоди</span>
+        </button>
+        <button class="admin-tab-item" onclick="switchAdminTab('stream')">
+          <span class="admin-tab-item-icon">📺</span>
+          <span>Трансляція Twitch</span>
+        </button>
+      </nav>
+
+      <!-- Sidebar Footer User Profile -->
+      <div class="admin-sidebar-profile">
         <div>
-          <div class="section-title">
-            <span>НАЛАШТУВАННЯ ТРАНСЛЯЦІЇ TWITCH</span>
+          <span style="opacity: 0.5; font-size: 10px; display: block; text-transform: uppercase;">Оператор</span>
+          <span class="admin-profile-name" id="sidebar-admin-username">ADMIN</span>
+        </div>
+        <button class="btn btn-secondary" onclick="logoutUser()" style="padding: 6px 12px; font-size: 11px;">Вихід</button>
+      </div>
+
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="admin-main">
+
+      <!-- Top Header Bar -->
+      <header class="admin-top-bar">
+        <div class="admin-top-title" id="admin-current-tab-title">Дашборд</div>
+        <div class="admin-top-actions">
+          <a href="betting.html" class="btn btn-secondary" style="font-size: 12px; text-decoration: none; padding: 8px 16px;">Перейти на сайт 🌐</a>
+        </div>
+      </header>
+
+      <!-- TAB 1: Dashboard Panel -->
+      <section id="pane-dashboard" class="admin-content-pane active">
+        
+        <!-- Live metrics widgets row -->
+        <div class="metrics-row">
+          
+          <div class="metric-card m-green">
+            <div class="metric-card-icon">🪙</div>
+            <div class="metric-card-details">
+              <span class="metric-card-label">Обіг депозитів</span>
+              <span class="metric-card-value" id="metric-total-deposits">0 🪙</span>
+            </div>
           </div>
-          <form id="admin-twitch-channel-form" class="form-group" style="margin-bottom:0;">
-            <label for="admin-twitch-channel-input">Twitch Channel ID</label>
+
+          <div class="metric-card m-blue">
+            <div class="metric-card-icon">👥</div>
+            <div class="metric-card-details">
+              <span class="metric-card-label">Всього гравців</span>
+              <span class="metric-card-value" id="metric-total-users">0</span>
+            </div>
+          </div>
+
+          <div class="metric-card m-purple">
+            <div class="metric-card-icon">⚔️</div>
+            <div class="metric-card-details">
+              <span class="metric-card-label">Дуелі та командні бої</span>
+              <span class="metric-card-value" id="metric-total-duels">0</span>
+            </div>
+          </div>
+
+          <div class="metric-card m-orange">
+            <div class="metric-card-icon">🎮</div>
+            <div class="metric-card-details">
+              <span class="metric-card-label">Активні матчі</span>
+              <span class="metric-card-value" id="metric-total-matches">0</span>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Terminal Operations Log -->
+        <div class="card" style="margin-top: 25px;">
+          <div class="section-title">💻 ЖУРНАЛ СИСТЕМНИХ ОПЕРАЦІЙ (REAL-TIME LOG)</div>
+          <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 15px; line-height: 1.5;">
+            Трансляція системних логів, депозитів, ставок та реєстрацій в реальному часі на платформі VOLK 1303.
+          </p>
+          <div class="ops-log-box" id="admin-ops-log-container">
+            <!-- Populated dynamically by JS -->
+          </div>
+        </div>
+
+      </section>
+
+      <!-- TAB 2: Betting Management Panel -->
+      <section id="pane-betting" class="admin-content-pane">
+        
+        <div style="display: grid; grid-template-columns: 1fr 1.3fr; gap: 20px;">
+          
+          <!-- Match Creator Form -->
+          <div class="card" style="height: fit-content;">
+            <div class="section-title">СТВОРЕННЯ НОВОГО МАТЧУ (1х1 - 5х5)</div>
+            <form id="admin-create-match-form" style="display:flex; flex-direction:column; gap:12px;">
+              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                <div class="form-group" style="margin-bottom:0;">
+                  <label for="match-team1-name">Команда 1</label>
+                  <input type="text" id="match-team1-name" class="form-input" placeholder="Team 1" required>
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                  <label for="match-team2-name">Команда 2</label>
+                  <input type="text" id="match-team2-name" class="form-input" placeholder="Team 2" required>
+                </div>
+              </div>
+              <div class="form-group" style="margin-bottom:0;">
+                <label for="match-team1-players">Гравці Команди 1 (через кому)</label>
+                <input type="text" id="match-team1-players" class="form-input" placeholder="s1mple, b1t, jL, iM, Aleksib" required>
+              </div>
+              <div class="form-group" style="margin-bottom:0;">
+                <label for="match-team2-players">Гравці Команди 2 (через кому)</label>
+                <input type="text" id="match-team2-players" class="form-input" placeholder="ropz, broky, frozen, rain, karrigan" required>
+              </div>
+              <div class="form-group" style="margin-bottom:0;">
+                <label for="match-stream-link">Посилання на стрім (необов'язково)</label>
+                <input type="text" id="match-stream-link" class="form-input" placeholder="Залиште пустим для дефолтного Twitch">
+              </div>
+              <button type="submit" class="btn" style="width: 100%; padding: 12px; font-weight: 800;">СТВОРУТИ НОВИЙ МАТЧ</button>
+            </form>
+          </div>
+
+          <!-- Active match list editor -->
+          <div class="card">
+            <div class="section-title">АКТИВНІ МАТЧІ ТА КЕРУВАННЯ КОЕФІЦІЄНТАМИ</div>
+            <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 15px; line-height: 1.5;">
+              Змінюйте рахунок активних подій. Коефіцієнти розраховуються автоматично. При рахунку <strong>6-0 або 0-6</strong> ставки заморожуються автоматично.
+            </p>
+            <div id="admin-matches-editor-list" style="display:flex; flex-direction:column; gap:15px; max-height: 520px; overflow-y:auto; padding-right:5px;">
+              <!-- Filled by JS -->
+            </div>
+          </div>
+
+        </div>
+
+      </section>
+
+      <!-- TAB 3: Tournament Brackets Panel -->
+      <section id="pane-brackets" class="admin-content-pane">
+        
+        <div class="card" style="max-width: 800px;">
+          <div class="section-title">🏆 КЕРУВАННЯ ТУРНІРНОЮ СІТКОЮ CHALLENGERMODE</div>
+          <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.6;">
+            Налаштуйте команди та поточні рахунки турнірної сітки. Внесення змін автоматично генерує та відображає матчі на клієнтському сайті. Переможці півфіналів автоматично просуваються до фінального поєдинку.
+          </p>
+          <div id="admin-brackets-editor-list">
+            <!-- Filled dynamically by JS -->
+          </div>
+        </div>
+
+      </section>
+
+      <!-- TAB 4: User Management Panel -->
+      <section id="pane-users" class="admin-content-pane">
+        
+        <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px;">
+          
+          <!-- Users table register -->
+          <div class="card">
+            <div class="section-title">👥 РЕЄСТР ЗАРЕЄСТРОВАНИХ КОРИСТУВАЧІВ</div>
+            <div style="overflow-x:auto;">
+              <table class="admin-table" style="width: 100%;">
+                <thead>
+                  <tr>
+                    <th>Користувач</th>
+                    <th>Баланс монет</th>
+                    <th>Дія</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-users-tbody">
+                  <!-- Filled by JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Coin Dispenser Adjust balance panel -->
+          <div style="display: flex; flex-direction: column; gap: 20px;">
+            
+            <div class="card">
+              <div class="section-title">💸 ДИСПЕНСЕР МОНЕТ (КОРЕГУВАННЯ БАЛАНСУ)</div>
+              
+              <div class="inline-form" style="display:flex; gap:8px; margin-bottom: 15px;">
+                <input type="text" id="admin-user-search-input" class="form-input" placeholder="Введіть нікнейм користувача" style="flex:1;">
+                <button id="admin-user-search-btn" class="btn">Знайти</button>
+              </div>
+
+              <div id="searched-user-info" style="background: var(--bg-input); padding: 15px; border-radius: 8px; font-size:13px; margin-bottom:15px; border: 1px solid var(--border-color); line-height: 1.6;">
+                <span style="color: var(--text-secondary);">Знайдіть користувача для нарахування або списання монет...</span>
+              </div>
+
+              <div id="balance-adjust-controls" style="display: none;">
+                <!-- Add -->
+                <form id="admin-add-coins-form" style="display:flex; gap:8px; margin-bottom:10px;">
+                  <input type="number" id="add-coins-amount" class="form-input" placeholder="Сума поповнення" min="1" step="1" required style="flex:1;">
+                  <button type="submit" class="btn" style="background: linear-gradient(135deg, var(--success) 0%, #00b347 100%);">НАРАХУВАТИ</button>
+                </form>
+
+                <!-- Remove -->
+                <form id="admin-remove-coins-form" style="display:flex; gap:8px;">
+                  <input type="number" id="remove-coins-amount" class="form-input" placeholder="Сума списання" min="1" step="1" required style="flex:1;">
+                  <button type="submit" class="btn btn-danger">СПИСАТИ</button>
+                </form>
+              </div>
+            </div>
+
+            <!-- Player registered teams registry -->
+            <div class="card">
+              <div class="section-title">🛡️ ЗАРЕЄСТРОВАНІ КОМАНДИ ГРАВЦІВ (5х5)</div>
+              <div id="admin-user-teams-list" style="display:flex; flex-direction:column; gap:8px;">
+                <!-- Filled dynamically by JS -->
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </section>
+
+      <!-- TAB 5: Promocode Center Panel -->
+      <section id="pane-promocodes" class="admin-content-pane">
+        
+        <div style="display: grid; grid-template-columns: 1fr 1.3fr; gap: 20px;">
+          
+          <!-- Promocode creator -->
+          <div class="card" style="height: fit-content;">
+            <div class="section-title">🎟️ СТВОРИТИ НОВИЙ ПРОМОКОД</div>
+            <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 15px; line-height: 1.5;">
+              Створіть свій власний унікальний промокод! Гравці зможуть активувати його на сторінці ставок та отримати відповідний відсоток бонусу до свого наступного депозиту.
+            </p>
+            <form id="admin-create-promo-form" style="display:flex; flex-direction:column; gap:12px;">
+              <div class="form-group" style="margin-bottom:0;">
+                <label for="promo-code-input">Код (наприклад: SLAVIKA50)</label>
+                <input type="text" id="promo-code-input" class="form-input" placeholder="Тільки англійські літери та цифри" required style="text-transform: uppercase;">
+              </div>
+              <div class="form-group" style="margin-bottom:0;">
+                <label for="promo-reward-input">Бонусний відсоток (%)</label>
+                <input type="number" id="promo-reward-input" class="form-input" placeholder="Напр: 50" min="1" max="1000" required>
+              </div>
+              <button type="submit" class="btn" style="width: 100%; padding: 12px; font-weight: 800;">СТВОРИТИ ПРОМОКОД</button>
+            </form>
+          </div>
+
+          <!-- Promocode List -->
+          <div class="card">
+            <div class="section-title">СПИСОК АКТИВНИХ ДИНАМІЧНИХ ПРОМОКОДІВ</div>
+            <div id="admin-promocodes-list-container" class="promocode-grid">
+              <!-- Filled dynamically by JS -->
+            </div>
+          </div>
+
+        </div>
+
+      </section>
+
+      <!-- TAB 6: Stream Settings Panel -->
+      <section id="pane-stream" class="admin-content-pane">
+        
+        <div class="card" style="max-width: 600px;">
+          <div class="section-title">📺 НАЛАШТУВАННЯ ТРАНСЛЯЦІЇ TWITCH</div>
+          <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.6;">
+            Керуйте параметрами медіа-плеєра та стріму, який бачать користувачі на сторінці ставок. Якщо статус трансляції переведено в <strong>OFFLINE</strong>, замість плеєра та чату відобразиться красива заставка.
+          </p>
+
+          <form id="admin-twitch-channel-form" class="form-group" style="margin-bottom: 20px;">
+            <label for="admin-twitch-channel-input" style="margin-bottom: 8px; display: block;">Twitch Channel ID (Channel Name)</label>
             <div style="display:flex; gap:8px; margin-bottom: 8px;">
               <input type="text" id="admin-twitch-channel-input" class="form-input" placeholder="volk13o3" required style="flex:1;">
               <button type="submit" class="btn">Оновити</button>
             </div>
-            <div style="display:flex; align-items:center; gap:10px;">
-              <label style="margin-bottom:0; font-size:12px; font-weight:600; color:var(--text-secondary); text-transform:uppercase;">Статус стріму:</label>
-              <select id="admin-twitch-status-select" class="form-input" style="padding:6px 12px; font-size:13px;" onchange="updateTwitchStatusAdmin(this.value)">
-                <option value="live">LIVE</option>
-                <option value="offline">OFFLINE</option>
+          </form>
+
+          <div style="background: var(--bg-input); border: 1px solid var(--border-color); padding: 20px; border-radius: 10px; display:flex; flex-direction:column; gap:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <strong style="color: white; font-size: 13px;">ПОТОЧНИЙ КАНАЛ TWITCH:</strong>
+              <span class="rank-badge-inline" style="background:#ff5500; color:white; border-color:#ff5500;" id="admin-active-stream-badge">volk13o3</span>
+            </div>
+            
+            <div style="display:flex; justify-content:space-between; align-items:center; border-top: 1px solid rgba(255,255,255,0.05); padding-top:12px;">
+              <div>
+                <strong style="color: white; font-size: 13px; display: block;">СТАТУС ТРАНСЛЯЦІЇ:</strong>
+                <span style="font-size:11px; color: var(--text-secondary);">Керує плеєром та чатом клієнта</span>
+              </div>
+              <select id="admin-twitch-status-select" class="form-input" style="padding:6px 12px; font-size:13px; width:130px;" onchange="updateTwitchStatusAdmin(this.value)">
+                <option value="live">LIVE 🟢</option>
+                <option value="offline">OFFLINE 🔴</option>
               </select>
             </div>
-            <div style="margin-top: 8px; font-size:12px; color: var(--text-secondary);">
-              Поточний ефір: <strong id="admin-active-stream-badge" style="color:var(--cs-orange);">volk13o3</strong>
-            </div>
-          </form>
+          </div>
+
         </div>
 
-        <div style="background-color:rgba(255, 90, 0, 0.05); padding:10px 15px; border-radius:8px; border: 1px solid var(--cs-orange); margin-top:15px; font-size:12px;">
-          <strong>Умови авто-заморозки 6-0:</strong> Якщо рахунок стає 6:0 або 0:6, ставки на матч блокуються автоматично. В адмінці з'являється червона кнопка розморозки.
-        </div>
+      </section>
+
+    </main>
+
+  </div>
+
+  <!-- Admin Login Overlay (Visible when not logged in as admin) -->
+  <div id="admin-login-overlay" style="display: none; position: fixed; inset: 0; background: #08090c; z-index: 9999; justify-content: center; align-items: center; padding: 20px;">
+    <div class="card" style="width: 100%; max-width: 400px; padding: 35px 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-color: rgba(255, 90, 0, 0.2);">
+      <div style="text-align: center; margin-bottom: 25px;">
+        <img src="assets/wolf_logo.png" alt="VOLK Logo" style="width: 64px; height: 64px; filter: drop-shadow(0 0 15px rgba(255, 90, 0, 0.5));">
+        <h2 style="color: white; margin-top: 12px; font-size: 22px; font-weight: 900; letter-spacing: 1px; text-transform: uppercase;">VOLK<span style="color: var(--cs-orange);">ADMIN</span></h2>
+        <span style="color: var(--text-secondary); font-size: 11px; letter-spacing: 1px; text-transform: uppercase;">Авторизація оператора</span>
       </div>
-
-    </div>
-
-    <!-- Match Creation & Editing Row -->
-    <div class="admin-grid" style="display:grid; grid-template-columns: 1fr 1.3fr; gap:20px;">
       
-      <!-- New Match Form -->
-      <div class="card">
-        <div class="section-title">
-          <span>СТВОРИТИ НОВИЙ МАТЧ</span>
+      <form id="admin-login-form" style="display: flex; flex-direction: column; gap: 15px;">
+        <div class="form-group" style="margin-bottom: 0;">
+          <label for="admin-login-username">Логін</label>
+          <input type="text" id="admin-login-username" class="form-input" placeholder="Username" required>
         </div>
-        <form id="admin-create-match-form" style="display:flex; flex-direction:column; gap:12px;">
-          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-            <div class="form-group">
-              <label for="match-team1-name">Команда 1</label>
-              <input type="text" id="match-team1-name" class="form-input" placeholder="Team 1" required>
-            </div>
-            <div class="form-group">
-              <label for="match-team2-name">Команда 2</label>
-              <input type="text" id="match-team2-name" class="form-input" placeholder="Team 2" required>
-            </div>
-          </div>
-          <div class="form-group">
-            <label for="match-team1-players">Гравці Команди 1 (через кому)</label>
-            <input type="text" id="match-team1-players" class="form-input" placeholder="s1mple, b1t, jL, iM, Aleksib" required>
-          </div>
-          <div class="form-group">
-            <label for="match-team2-players">Гравці Команди 2 (через кому)</label>
-            <input type="text" id="match-team2-players" class="form-input" placeholder="ropz, broky, frozen, rain, karrigan" required>
-          </div>
-          <div class="form-group">
-            <label for="match-stream-link">Посилання на стрім (якщо відрізняється)</label>
-            <input type="text" id="match-stream-link" class="form-input" placeholder="Пусто для дефолтного Twitch">
-          </div>
-          <button type="submit" class="btn" style="width: 100%; padding:12px;">СТВОРИТИ МАТЧ</button>
-        </form>
-      </div>
-
-      <!-- Live Matches adjustments list -->
-      <div class="card">
-        <div class="section-title">
-          <span>КЕРУВАННЯ МАТЧАМИ ТА КОЕФІЦІЄНТАМИ</span>
+        <div class="form-group" style="margin-bottom: 0;">
+          <label for="admin-login-password">Пароль</label>
+          <input type="password" id="admin-login-password" class="form-input" placeholder="Password" required>
         </div>
-        <div id="admin-matches-editor-list" style="display:flex; flex-direction:column; gap:15px; max-height:480px; overflow-y:auto; padding-right:5px;">
-          <!-- Filled by JS -->
-        </div>
-      </div>
-
-    </div>
-
-    <!-- Brackets, Users, and Teams Row -->
-    <div class="admin-grid" style="display:grid; grid-template-columns: 1fr 1.2fr; gap:20px;">
-      
-      <!-- Bracket Editor panel -->
-      <div class="card">
-        <div class="section-title">
-          <span>КЕРУВАННЯ ТУРНІРНОЮ СІТКОЮ</span>
-        </div>
-        <div id="admin-brackets-editor-list" style="max-height: 480px; overflow-y:auto; padding-right:5px;">
-          <!-- Filled by JS -->
-        </div>
-      </div>
-
-      <!-- Users & User Teams overview tab lists -->
-      <div class="card">
-        <div class="section-title">
-          <span>РЕЄСТРИ КОРИСТУВАЧІВ ТА КОМАНД</span>
-        </div>
-
-        <div style="display:grid; grid-template-columns: 1.2fr 1fr; gap:15px; margin-top: 15px;">
-          <!-- Users table -->
-          <div style="overflow-x:auto;">
-            <div style="font-weight:800; font-size:12px; margin-bottom:8px; color:var(--text-secondary); text-transform:uppercase;">Користувачі</div>
-            <table class="admin-table" style="width: 100%;">
-              <thead>
-                <tr>
-                  <th>Username</th>
-                  <th>Баланс</th>
-                  <th>Дія</th>
-                </tr>
-              </thead>
-              <tbody id="admin-users-tbody">
-                <!-- Filled by JS -->
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Teams list -->
-          <div>
-            <div style="font-weight:800; font-size:12px; margin-bottom:8px; color:var(--text-secondary); text-transform:uppercase;">Команди Гравців</div>
-            <div id="admin-user-teams-list" style="display:flex; flex-direction:column; gap:8px;">
-              <!-- Filled by JS -->
-            </div>
-          </div>
-        </div>
-      </div>
-
-    </div>
-
-  </main>
-
-  <!-- Edit User Modal -->
-  <div id="edit-user-modal" class="modal-overlay">
-    <div class="modal-content" style="max-width: 420px;">
-      <button class="modal-close" onclick="closeModal('edit-user-modal')">&times;</button>
-      <div class="modal-title">Редагувати користувача</div>
-      <form id="admin-edit-user-form" style="display:flex; flex-direction:column; gap:12px;">
-        <input type="hidden" id="edit-user-original-username">
-        <div class="form-group">
-          <label for="edit-user-username">Username</label>
-          <input type="text" id="edit-user-username" class="form-input" required placeholder="Нікнейм">
-        </div>
-        <div class="form-group">
-          <label for="edit-user-email">Email</label>
-          <input type="email" id="edit-user-email" class="form-input" required placeholder="Ел. пошта">
-        </div>
-        <div class="form-group">
-          <label for="edit-user-balance">Баланс (монет)</label>
-          <input type="number" id="edit-user-balance" class="form-input" required min="0" step="1" placeholder="Баланс">
-        </div>
-        <div class="form-group">
-          <label for="edit-user-bonus">Бонус до наступного депу (%)</label>
-          <input type="number" id="edit-user-bonus" class="form-input" required min="0" placeholder="Бонус">
-        </div>
-        <button type="submit" class="btn" style="width: 100%; padding: 12px; margin-top: 10px;">Зберегти зміни</button>
+        <button type="submit" class="btn" style="width: 100%; padding: 12px; font-weight: 800; margin-top: 10px;">Вхід в систему</button>
       </form>
     </div>
   </div>
 
-  <!-- Rules Modal -->
-  <div id="rules-modal" class="modal-overlay">
-    <div class="modal-content">
-      <button class="modal-close" onclick="closeModal('rules-modal')">&times;</button>
-      <div class="modal-title">Правила користування VOLK 1303</div>
-      <div style="font-size: 13px; line-height: 1.6; color: #f0f6fc; display:flex; flex-direction:column; gap:12px;">
-        <p>Курс валюти платформи становить: <strong>1 монета = 1 гривня (UAH)</strong>.</p>
-        <ul style="padding-left:18px; display:flex; flex-direction:column; gap:8px;">
-          <li>Мінімальне поповнення балансу (депозит) становить <strong style="color:var(--cs-orange);">500 монет</strong>.</li>
-          <li>Мінімальна сума для виведення монет становить <strong style="color:var(--cs-orange);">2000 монет</strong>.</li>
-          <li>Максимальна ставка на будь-яку одну подію чи матч обмежується до <strong style="color:var(--cs-orange);">10 000 монет</strong>.</li>
-          <li>Всі дуелі та квести розраховуються автоматично та зараховуються миттєво.</li>
-        </ul>
-        <p style="color: var(--text-secondary); font-size:11px; margin-top:10px; border-top: 1px solid var(--border-color); padding-top:10px;">
-          Адміністрація VOLK 1303 залишає за собою право проводити перевірки транзакцій у разі підозрілої активності. Грайте чесно!
-        </p>
-      </div>
-    </div>
-  </div>
-
-  <!-- Compact Footer -->
-  <footer>
-    <div class="footer-compact" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; font-size:12px; max-width:1400px; margin:0 auto; width:100%; gap: 15px;">
-      <div>© 2026 VOLK 1303. Усі права застережено.</div>
-      <div style="display:flex; gap:20px;">
-        <a href="#" onclick="openModal('rules-modal')" style="color:var(--text-secondary); text-decoration:none; transition:var(--transition);">Правила</a>
-        <a href="#" style="color:var(--text-secondary); text-decoration:none; transition:var(--transition);">Підтримка</a>
-        <a href="https://discord.gg/volk1303" target="_blank" style="color:var(--text-secondary); text-decoration:none; transition:var(--transition);">Discord</a>
-      </div>
-    </div>
-  </footer>
-
   <script src="admin.js"></script>
+
+  <script>
+    // In-page standalone console tab switcher
+    function switchAdminTab(tabId) {
+      // Deactivate all sidebar items
+      document.querySelectorAll('.admin-tab-item').forEach(item => {
+        item.classList.remove('active');
+      });
+      // Deactivate all content panes
+      document.querySelectorAll('.admin-content-pane').forEach(pane => {
+        pane.classList.remove('active');
+      });
+
+      // Find current tab button and activate it
+      const activeBtn = Array.from(document.querySelectorAll('.admin-tab-item')).find(btn => 
+        btn.getAttribute('onclick').includes(tabId)
+      );
+      if (activeBtn) activeBtn.classList.add('active');
+
+      // Find target pane and activate it
+      const targetPane = document.getElementById(`pane-${tabId}`);
+      if (targetPane) targetPane.classList.add('active');
+
+      // Update Top Bar Title
+      const titleMap = {
+        'dashboard': 'Дашборд (Зведений огляд)',
+        'betting': 'Керування ставками та матчами',
+        'brackets': 'Турнірна сітка Challengermode',
+        'users': 'Баланси та реєстри користувачів',
+        'promocodes': 'Центр керування промокодами',
+        'stream': 'Налаштування стріму Twitch'
+      };
+      
+      const barTitle = document.getElementById('admin-current-tab-title');
+      if (barTitle) barTitle.innerText = titleMap[tabId] || 'Адмін Панель';
+    }
+  </script>
 </body>
 </html>
