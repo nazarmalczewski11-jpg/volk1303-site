@@ -1167,6 +1167,7 @@ window.switchAdminTab = function(tabId) {
     'brackets': 'Турнірна сітка Challengermode',
     'teams': 'Команди та склади гравців',
     'users': 'Баланси та реєстри користувачів',
+    'deposits-verify': 'Верифікація депозитів Monobank',
     'database': 'База Даних (Логи та Активність)',
     'promocodes': 'Центр керування промокодами',
     'stream': 'Налаштування стріму Twitch'

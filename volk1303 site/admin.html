@@ -63,6 +63,10 @@
           <span class="admin-tab-item-icon">👥</span>
           <span>Користувачі та баланси</span>
         </button>
+        <button class="admin-tab-item" onclick="switchAdminTab('deposits-verify')">
+          <span class="admin-tab-item-icon">⏳</span>
+          <span>Запити Monobank</span>
+        </button>
         <button class="admin-tab-item" onclick="switchAdminTab('database')">
           <span class="admin-tab-item-icon">🗄️</span>
           <span>База Даних (Логи)</span>
@@ -355,9 +359,15 @@
 
         </div>
 
-        <!-- Pending deposit requests card -->
-        <div class="card" style="margin-top: 20px;">
+      </section>
+
+      <!-- TAB 9: Monobank Verification Panel -->
+      <section id="pane-deposits-verify" class="admin-content-pane">
+        <div class="card">
           <div class="section-title">⏳ ЗАПИТИ НА ВЕРИФІКАЦІЮ ДЕПОЗИТІВ (MONOBANK)</div>
+          <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.5;">
+            Тут відображаються активні запити на поповнення балансу через Monobank. Перевірте надходження коштів на карту за вказаними реквізитами і виберіть відповідну дію для зарахування поінтів.
+          </p>
           <div style="overflow-x:auto;">
             <table class="admin-table" style="width: 100%;">
               <thead>
@@ -376,7 +386,6 @@
             </table>
           </div>
         </div>
-
       </section>
 
       <!-- TAB 8: Database & Activity Logs Panel -->
