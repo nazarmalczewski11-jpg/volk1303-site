@@ -3,6 +3,8 @@ const DB_KEY = 'volk_site_v4';
 const CLOUD_BUCKET = 'https://kvdb.io/RewyBV3ePoEzaKv2H17apy/';
 
 let isSyncing = false;
+let openTournamentDetailsIds = {};
+let activeTournamentTabs = {};
 
 // Pull and sync from cloud
 async function syncWithCloud() {
@@ -373,9 +375,11 @@ function showToast(message, type = 'success') {
   }, 4000);
 }
 
-// Dynamic routing / Auth gate checks (Multi-page Authenticated Flow)
 const pathName = window.location.pathname.split('/').pop().toLowerCase();
-const currentPage = pathName === "" ? "index.html" : pathName;
+let currentPage = pathName === "" ? "index.html" : pathName;
+if (currentPage !== "" && !currentPage.endsWith('.html')) {
+  currentPage += '.html';
+}
 
 function checkAuthGate() {
   const db = getDB();
@@ -2652,11 +2656,11 @@ window.renderTournamentsPortal = function() {
         </div>
 
         <div style="display:flex; justify-content:flex-end;">
-          <button class="btn" style="margin-bottom:0; font-size:11px; padding:8px 16px; font-weight:800;" onclick="toggleTournamentDetails('${tour.id}')" id="toggle-btn-${tour.id}">🏆 ДЕТАЛІ ТА СІТКА</button>
+          <button class="btn" style="margin-bottom:0; font-size:11px; padding:8px 16px; font-weight:800;" onclick="toggleTournamentDetails('${tour.id}')" id="toggle-btn-${tour.id}">${openTournamentDetailsIds[tour.id] ? '❌ ЗАКРИТИ ДЕТАЛІ' : '🏆 ДЕТАЛІ ТА СІТКА'}</button>
         </div>
 
         <!-- Hidden details and Brackets Canvas tabs pane -->
-        <div class="tournament-details-panel" id="details-panel-${tour.id}" style="display:none; border-top:1px solid rgba(255,255,255,0.05); padding-top:15px; margin-top:10px;">
+        <div class="tournament-details-panel" id="details-panel-${tour.id}" style="display:${openTournamentDetailsIds[tour.id] ? 'block' : 'none'}; border-top:1px solid rgba(255,255,255,0.05); padding-top:15px; margin-top:10px;">
           <div class="details-tabs-bar">
             <button class="details-tab-btn active" id="tab-btn-info-${tour.id}" onclick="switchTournamentDetailTab('${tour.id}', 'info')">ℹ️ Інформація</button>
             <button class="details-tab-btn" id="tab-btn-rules-${tour.id}" onclick="switchTournamentDetailTab('${tour.id}', 'rules')">📜 Правила</button>
@@ -2712,6 +2716,12 @@ window.renderTournamentsPortal = function() {
         </div>
       `;
       container.appendChild(card);
+
+      // If it was already open, restore active tab rendering!
+      if (openTournamentDetailsIds[tour.id]) {
+        const lastActiveTab = activeTournamentTabs[tour.id] || 'info';
+        switchTournamentDetailTab(tour.id, lastActiveTab);
+      }
     });
   };
 
@@ -2729,16 +2739,22 @@ window.toggleTournamentDetails = function(tourId) {
   if (panel.style.display === "none") {
     panel.style.display = "block";
     btn.innerText = "❌ ЗАКРИТИ ДЕТАЛІ";
-    // Initialize to info tab
-    switchTournamentDetailTab(tourId, 'info');
+    openTournamentDetailsIds[tourId] = true;
+    
+    // Initialize to last active tab or info tab
+    const lastActiveTab = activeTournamentTabs[tourId] || 'info';
+    switchTournamentDetailTab(tourId, lastActiveTab);
   } else {
     panel.style.display = "none";
     btn.innerText = "🏆 ДЕТАЛІ ТА СІТКА";
+    delete openTournamentDetailsIds[tourId];
   }
 };
 
 // Switch tabs inside expanded tournament details
 window.switchTournamentDetailTab = function(tourId, tabKey) {
+  activeTournamentTabs[tourId] = tabKey;
+
   const tabs = ['info', 'rules', 'bracket', 'betting'];
   tabs.forEach(key => {
     const btn = document.getElementById(`tab-btn-${key}-${tourId}`);
