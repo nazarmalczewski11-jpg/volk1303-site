@@ -315,14 +315,24 @@ function getDB() {
       dbUpdated = true;
     }
     
-    // Defensive check to ensure admin user is present and has the correct password
-    let adminUser = db.users.find(u => u.username === 'admin');
-    let oldExclamationAdmin = db.users.find(u => u.username === 'admin!');
+    // Defensive check to ensure admin! user is present and has the correct password
+    let adminUser = db.users.find(u => u.username === 'admin!');
+    let oldAdminUser = db.users.find(u => u.username === 'admin');
+
+    if (oldAdminUser) {
+      if (adminUser) {
+        db.users = db.users.filter(u => u.username !== 'admin');
+      } else {
+        oldAdminUser.username = 'admin!';
+        adminUser = oldAdminUser;
+      }
+      dbUpdated = true;
+    }
 
     if (!adminUser) {
       adminUser = {
         email: "admin@volk.com",
-        username: "admin",
+        username: "admin!",
         password: "31101982",
         balance: 1000,
         bonusPercent: 0,
@@ -337,18 +347,13 @@ function getDB() {
       dbUpdated = true;
     }
 
-    if (adminUser.password !== "11111111" && adminUser.password !== "31101982") {
+    if (adminUser.password !== "31101982") {
       adminUser.password = "31101982";
       dbUpdated = true;
     }
 
-    if (oldExclamationAdmin && oldExclamationAdmin.password !== "11111111" && oldExclamationAdmin.password !== "31101982") {
-      oldExclamationAdmin.password = "31101982";
-      dbUpdated = true;
-    }
-
-    if (db.currentUser === 'admin!') {
-      db.currentUser = 'admin';
+    if (db.currentUser === 'admin') {
+      db.currentUser = 'admin!';
       dbUpdated = true;
     }
 
@@ -375,8 +380,8 @@ function initDefaultDB() {
     users: [
       {
         email: "admin@volk.com",
-        username: "admin",
-        password: "11111111",
+        username: "admin!",
+        password: "31101982",
         balance: 1000,
         bonusPercent: 0,
         hasSpunWheel: true,
@@ -754,7 +759,7 @@ function renderPageContent() {
   // Toggle Admin link visibility in header if current user is admin
   const adminLink = document.getElementById('nav-admin-link');
   if (adminLink) {
-    adminLink.style.display = db.currentUser === 'admin' ? 'inline-flex' : 'none';
+    adminLink.style.display = db.currentUser === 'admin!' ? 'inline-flex' : 'none';
   }
 
   // Page Specific Content Render
