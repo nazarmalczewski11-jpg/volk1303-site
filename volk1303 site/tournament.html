@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>VOLK 1303 | Турнірна сітка</title>
-  <link rel="stylesheet" href="style.css?v=2.0">
+  <link rel="stylesheet" href="style.css?v=4.0">
   <script src="smoke-bg.js"></script>
 </head>
 <body>
@@ -147,6 +147,7 @@
     </div>
   </div>
 
+
   <!-- Bet Modal -->
   <div id="bet-modal" class="modal-overlay">
     <div class="modal-content" style="max-width: 400px; border-color: var(--cs-orange); box-shadow: 0 0 25px rgba(255, 90, 0, 0.25);">
@@ -174,6 +175,7 @@
 
         <form id="bet-modal-form" onsubmit="submitBetModalForm(event)">
           <input type="hidden" id="bet-modal-tour-id">
+          <input type="hidden" id="bet-modal-match-id">
           <input type="hidden" id="bet-modal-team-id">
           <div class="form-group">
             <label for="bet-modal-amount" style="display: block; margin-bottom: 6px; font-size: 12px; color: var(--text-secondary);">Сума ставки (монет)</label>
@@ -190,6 +192,7 @@
       </div>
     </div>
   </div>
+
 
   <!-- Rules Modal -->
   <div id="rules-modal" class="modal-overlay">
@@ -220,6 +223,6 @@
     </div>
   </footer>
 
-  <script src="app.js?v=3.4"></script>
+  <script src="app.js?v=7.1"></script>
 </body>
 </html>

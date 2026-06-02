@@ -3250,42 +3250,30 @@ window.placeTournamentBet = function(tourId, teamId, teamName, odds) {
     return;
   }
 
-  const user = db.users.find(u => u.username === db.currentUser);
+  const user = db.users.find(u => u.username.toLowerCase() === db.currentUser.toLowerCase());
   if (!user) {
     showToast('Увійдіть в акаунт для ставки!', 'error');
     return;
   }
 
-  const amountStr = prompt(`Ставка на команду "${teamName}" (коеф. x${odds})\nВаш баланс: ${user.balance} 🪙\nВведіть суму ставки:`);
-  if (!amountStr) return;
-  const amount = parseInt(amountStr);
-  if (isNaN(amount) || amount < 1) {
-    showToast('Введіть коректну суму!', 'error');
-    return;
-  }
-  if (amount > user.balance) {
-    showToast('Недостатньо монет на балансі!', 'error');
-    return;
-  }
+  const balance = user.balance || 0;
 
-  user.balance -= amount;
-  if (!user.betHistory) user.betHistory = [];
-  user.betHistory.push({
-    id: 'tb_' + Date.now(),
-    type: 'tournament',
-    tourId,
-    teamId,
-    selectedTeam: teamName,
-    odds,
-    amount,
-    date: new Date().toLocaleString('uk-UA'),
-    status: 'В грі',
-    payout: 0
-  });
+  // Populate premium bet-modal
+  document.getElementById('bet-modal-tour-id').value = tourId;
+  document.getElementById('bet-modal-match-id').value = "";
+  document.getElementById('bet-modal-team-id').value = teamId;
 
-  saveDB(db);
-  showToast(`Ставку ${amount} 🪙 на "${teamName}" (x${odds}) прийнято!`, 'success');
-  renderTournamentBettingPortal(tourId);
+  document.getElementById('bet-modal-team-name').innerText = teamName;
+  document.getElementById('bet-modal-odds').innerText = 'x' + parseFloat(odds).toFixed(2);
+  document.getElementById('bet-modal-odds').dataset.odds = odds;
+  document.getElementById('bet-modal-balance').innerText = balance;
+
+  const amountInput = document.getElementById('bet-modal-amount');
+  amountInput.value = "";
+  amountInput.max = balance;
+  document.getElementById('bet-modal-payout').innerText = "0 🪙";
+
+  openModal('bet-modal');
 };
 
 window.calculateBetModalPayout = function() {
@@ -3356,7 +3344,48 @@ window.submitBetModalForm = function(event) {
     saveDB(db);
     closeModal('bet-modal');
     showToast(`Ставку ${amount} 🪙 на "${teamName}" (x${odds}) прийнято!`, 'success');
-    renderPageContent();
+    if (typeof renderPageContent === 'function') {
+      renderPageContent();
+    }
+  } else if (tourId) {
+    // ── TOURNAMENT BET ──
+    const tour = db.tournaments.find(t => t.id === tourId);
+    if (!tour) {
+      showToast('Турнір не знайдено!', 'error');
+      closeModal('bet-modal');
+      return;
+    }
+
+    if (isTournamentBettingFrozen(tour)) {
+      showToast('Ставки на цей турнір заморожено (різниця в рахунку матчу 6+ раундів)!', 'error');
+      closeModal('bet-modal');
+      return;
+    }
+
+    user.balance -= amount;
+    user.betHistory = user.betHistory || [];
+    user.betHistory.unshift({
+      id: 'tb_' + Date.now(),
+      type: 'tournament',
+      tourId: tourId,
+      teamId: teamId,
+      selectedTeam: teamName,
+      odds: odds,
+      amount: amount,
+      date: new Date().toLocaleString('uk-UA'),
+      status: 'В грі',
+      payout: 0
+    });
+
+    saveDB(db);
+    closeModal('bet-modal');
+    showToast(`Ставку ${amount} 🪙 на "${teamName}" (x${odds}) прийнято!`, 'success');
+    if (typeof renderTournamentBettingPortal === 'function') {
+      renderTournamentBettingPortal(tourId);
+    }
+    if (typeof renderPageContent === 'function') {
+      renderPageContent();
+    }
   }
 };
 
