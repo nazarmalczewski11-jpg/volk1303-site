@@ -44,7 +44,8 @@ files_to_upload_assets = [
     "qr_crypto.png",
     "qr_mono.png",
     "wolf_banner.png",
-    "wolf_logo.png"
+    "wolf_logo.png",
+    "stream_offline_bg.jpg"
 ]
 
 def main():
