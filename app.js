@@ -1922,9 +1922,9 @@ function renderProfileDashboard() {
 
       item.innerHTML = `
         <div>
-          <div style="font-weight: 800;">${bet.matchDisplay || bet.selectedTeam || 'Ставка'}</div>
+          <div style="font-weight: 800;">${bet.matchDisplay}</div>
           <div style="font-size: 11px; color:var(--text-secondary); margin-top:2px;">
-            Ставка на: ${bet.selectedTeam} (кэф ${(bet.odds || 0).toFixed(2)}) • ${bet.date}
+            Ставка на: ${bet.selectedTeam} (кэф ${bet.odds.toFixed(2)}) • ${bet.date}
           </div>
         </div>
         <div style="text-align:right;">
@@ -2800,9 +2800,9 @@ function renderMyBetsPage() {
       </div>
       
       <div class="bet-match-row">
-        <div class="bet-team-name">${(bet.matchDisplay || '').split(' vs ')[0] || (bet.matchDisplay || 'Матч')}</div>
-        <div class="bet-vs-box">${(bet.matchDisplay || '').includes(' vs ') ? 'VS' : '🏆'}</div>
-        <div class="bet-team-name">${(bet.matchDisplay || '').split(' vs ')[1] || ''}</div>
+        <div class="bet-team-name">${bet.matchDisplay.split(' vs ')[0] || bet.matchDisplay}</div>
+        <div class="bet-vs-box">VS</div>
+        <div class="bet-team-name">${bet.matchDisplay.split(' vs ')[1] || ''}</div>
       </div>
       
       <div class="bet-details-grid">
@@ -3251,20 +3251,36 @@ window.placeTournamentBet = function(tourId, teamId, teamName, odds) {
     return;
   }
 
-  // Prepopulate the bet modal
-  document.getElementById('bet-modal-tour-id').value = tourId;
-  document.getElementById('bet-modal-team-id').value = teamId;
-  document.getElementById('bet-modal-team-name').innerText = teamName;
-  document.getElementById('bet-modal-odds').innerText = 'x' + odds.toFixed(2);
-  document.getElementById('bet-modal-balance').innerText = user.balance;
-  document.getElementById('bet-modal-amount').value = '';
-  document.getElementById('bet-modal-amount').max = user.balance;
-  document.getElementById('bet-modal-payout').innerText = '0 🪙';
-  
-  // Save odds in element data attribute for easy payout calculation
-  document.getElementById('bet-modal-odds').dataset.odds = odds;
+  const amountStr = prompt(`Ставка на команду "${teamName}" (коеф. x${odds})\nВаш баланс: ${user.balance} 🪙\nВведіть суму ставки:`);
+  if (!amountStr) return;
+  const amount = parseInt(amountStr);
+  if (isNaN(amount) || amount < 1) {
+    showToast('Введіть коректну суму!', 'error');
+    return;
+  }
+  if (amount > user.balance) {
+    showToast('Недостатньо монет на балансі!', 'error');
+    return;
+  }
 
-  openModal('bet-modal');
+  user.balance -= amount;
+  if (!user.betHistory) user.betHistory = [];
+  user.betHistory.push({
+    id: 'tb_' + Date.now(),
+    type: 'tournament',
+    tourId,
+    teamId,
+    selectedTeam: teamName,
+    odds,
+    amount,
+    date: new Date().toLocaleString('uk-UA'),
+    status: 'В грі',
+    payout: 0
+  });
+
+  saveDB(db);
+  showToast(`Ставку ${amount} 🪙 на "${teamName}" (x${odds}) прийнято!`, 'success');
+  renderTournamentBettingPortal(tourId);
 };
 
 window.calculateBetModalPayout = function() {
@@ -3336,37 +3352,6 @@ window.submitBetModalForm = function(event) {
     closeModal('bet-modal');
     showToast(`Ставку ${amount} 🪙 на "${teamName}" (x${odds}) прийнято!`, 'success');
     renderPageContent();
-
-  } else {
-    // ── TOURNAMENT MATCH BET ──
-    const tour = db.tournaments.find(t => t.id === tourId);
-    if (!tour) {
-      showToast('Турнір не знайдено!', 'error');
-      closeModal('bet-modal');
-      return;
-    }
-
-    user.balance -= amount;
-    user.betHistory = user.betHistory || [];
-    const tourName = tour.name || 'Турнір';
-    user.betHistory.push({
-      id: 'tb_' + Date.now(),
-      type: 'tournament',
-      tourId,
-      teamId,
-      matchDisplay: `🏆 ${tourName}`,
-      selectedTeam: teamName,
-      odds,
-      amount,
-      date: new Date().toLocaleString('uk-UA'),
-      status: 'В грі',
-      payout: 0
-    });
-
-    saveDB(db);
-    closeModal('bet-modal');
-    showToast(`Ставку ${amount} 🪙 на "${teamName}" (x${odds}) прийнято!`, 'success');
-    renderTournamentBettingPortal(tourId);
   }
 };
 
