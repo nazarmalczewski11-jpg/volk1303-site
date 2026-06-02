@@ -1,6 +1,6 @@
 // Database key for LocalStorage
 const DB_KEY = 'volk_site_v4';
-const CLOUD_BUCKET = 'https://kvdb.io/RewyBV3ePoEzaKv2H17apy/';
+const CLOUD_BUCKET = 'https://volk-backend.onrender.com/';
 
 let isSyncing = false;
 let openTournamentDetailsIds = {};
