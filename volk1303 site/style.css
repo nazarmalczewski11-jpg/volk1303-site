@@ -7,10 +7,10 @@
   --bg-card: #161b22;
   --bg-input: #0f141c;
   --border-color: #30363d;
-  --border-glow: rgba(255, 107, 0, 0.15);
+  --border-glow: rgba(255, 165, 0, 0.15);
   
-  --cs-orange: #ff6b00;
-  --cs-orange-glow: rgba(255, 107, 0, 0.45);
+  --cs-orange: #FFA500;
+  --cs-orange-glow: rgba(255, 165, 0, 0.45);
   --wolf-red: #ff1a40;
   --wolf-red-glow: rgba(255, 26, 64, 0.7);
   
@@ -146,9 +146,9 @@ nav {
 }
 
 .user-balance {
-  background: linear-gradient(135deg, rgba(255, 107, 0, 0.1) 0%, rgba(22, 27, 34, 0.9) 100%);
+  background: linear-gradient(135deg, rgba(255, 165, 0, 0.1) 0%, rgba(22, 27, 34, 0.9) 100%);
   border: 1.5px solid var(--cs-orange);
-  box-shadow: 0 0 10px rgba(255, 107, 0, 0.2);
+  box-shadow: 0 0 10px rgba(255, 165, 0, 0.2);
   border-radius: 20px;
   padding: 6px 14px;
   display: flex;
@@ -1491,8 +1491,8 @@ footer {
 
 .odds-btn:hover {
   border-color: var(--cs-orange);
-  background-color: rgba(255, 107, 0, 0.05);
-  box-shadow: 0 0 10px rgba(255, 107, 0, 0.15);
+  background-color: rgba(255, 165, 0, 0.05);
+  box-shadow: 0 0 10px rgba(255, 165, 0, 0.15);
 }
 
 .odds-btn strong {
@@ -2253,8 +2253,8 @@ footer {
 
 .admin-table tbody tr:hover td {
   background-color: #161922 !important;
-  border-top-color: rgba(255, 107, 0, 0.25) !important;
-  border-bottom-color: rgba(255, 107, 0, 0.25) !important;
+  border-top-color: rgba(255, 165, 0, 0.25) !important;
+  border-bottom-color: rgba(255, 165, 0, 0.25) !important;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.35);
 }
 
@@ -2263,7 +2263,7 @@ footer {
 }
 
 .admin-table tbody tr:hover td:last-child {
-  border-right: 1px solid rgba(255, 107, 0, 0.25) !important;
+  border-right: 1px solid rgba(255, 165, 0, 0.25) !important;
 }
 
 /* Modern Glassmorphism Controls inside Database Tab */
@@ -2352,7 +2352,7 @@ footer {
 .admin-main::-webkit-scrollbar-thumb,
 .db-panes-wrapper div::-webkit-scrollbar-thumb,
 .ops-log-box::-webkit-scrollbar-thumb {
-  background: rgba(255, 107, 0, 0.25);
+  background: rgba(255, 165, 0, 0.25);
   border-radius: 4px;
   transition: background 0.3s ease;
 }
@@ -2360,7 +2360,7 @@ footer {
 .admin-main::-webkit-scrollbar-thumb:hover,
 .db-panes-wrapper div::-webkit-scrollbar-thumb:hover,
 .ops-log-box::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 107, 0, 0.65);
+  background: rgba(255, 165, 0, 0.65);
 }
 
 /* Action Buttons inside Table Row Card */
@@ -2374,8 +2374,8 @@ footer {
 }
 
 .admin-table .btn {
-  background: linear-gradient(135deg, rgba(255, 107, 0, 0.15) 0%, rgba(255, 107, 0, 0.3) 100%) !important;
-  border: 1px solid rgba(255, 107, 0, 0.4) !important;
+  background: linear-gradient(135deg, rgba(255, 165, 0, 0.15) 0%, rgba(255, 165, 0, 0.3) 100%) !important;
+  border: 1px solid rgba(255, 165, 0, 0.4) !important;
   color: white !important;
 }
 

@@ -7,10 +7,10 @@
   --bg-card: #161b22;
   --bg-input: #0f141c;
   --border-color: #30363d;
-  --border-glow: rgba(255, 107, 0, 0.15);
+  --border-glow: rgba(255, 165, 0, 0.15);
   
-  --cs-orange: #ff6b00;
-  --cs-orange-glow: rgba(255, 107, 0, 0.45);
+  --cs-orange: #FFA500;
+  --cs-orange-glow: rgba(255, 165, 0, 0.45);
   --wolf-red: #ff1a40;
   --wolf-red-glow: rgba(255, 26, 64, 0.7);
   
@@ -146,9 +146,9 @@ nav {
 }
 
 .user-balance {
-  background: linear-gradient(135deg, rgba(255, 107, 0, 0.1) 0%, rgba(22, 27, 34, 0.9) 100%);
+  background: linear-gradient(135deg, rgba(255, 165, 0, 0.1) 0%, rgba(22, 27, 34, 0.9) 100%);
   border: 1.5px solid var(--cs-orange);
-  box-shadow: 0 0 10px rgba(255, 107, 0, 0.2);
+  box-shadow: 0 0 10px rgba(255, 165, 0, 0.2);
   border-radius: 20px;
   padding: 6px 14px;
   display: flex;
@@ -235,8 +235,8 @@ nav {
 
 .card:hover {
   transform: translateY(-4px);
-  border-color: rgba(255, 107, 0, 0.3);
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.08), 0 15px 35px rgba(255, 107, 0, 0.05), 0 8px 32px rgba(0, 0, 0, 0.5);
+  border-color: rgba(255, 165, 0, 0.3);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.08), 0 15px 35px rgba(255, 165, 0, 0.05), 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
 .section-title {
@@ -648,7 +648,7 @@ nav {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 8px 32px rgba(255, 107, 0, 0.08);
+  box-shadow: 0 8px 32px rgba(255, 165, 0, 0.08);
 }
 
 .betslip-tabs {
@@ -876,7 +876,7 @@ nav {
   padding: 6px 18px;
   border-radius: 10px;
   color: var(--cs-orange);
-  text-shadow: 0 0 10px rgba(255, 107, 0, 0.6);
+  text-shadow: 0 0 10px rgba(255, 165, 0, 0.6);
   box-shadow: 
     0 4px 15px rgba(0, 0, 0, 0.5),
     inset 0 1px 1px rgba(255,255,255,0.03),
@@ -891,7 +891,7 @@ nav {
 .match-card:hover .score-display {
   border-color: var(--cs-orange);
   color: #ff8800;
-  text-shadow: 0 0 15px rgba(255, 107, 0, 0.9);
+  text-shadow: 0 0 15px rgba(255, 165, 0, 0.9);
   box-shadow: 
     0 6px 20px rgba(0, 0, 0, 0.6),
     0 0 18px rgba(255, 90, 0, 0.25);
@@ -1099,8 +1099,8 @@ nav {
 
 .skin-card:hover {
   transform: translateY(-4px);
-  border-color: rgba(255, 107, 0, 0.35);
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.06), 0 12px 25px rgba(255, 107, 0, 0.05), 0 4px 16px rgba(0, 0, 0, 0.4);
+  border-color: rgba(255, 165, 0, 0.35);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.06), 0 12px 25px rgba(255, 165, 0, 0.05), 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 
 .skin-img-placeholder {
@@ -1170,8 +1170,8 @@ nav {
 
 .lobby-card:hover {
   transform: translateY(-4px);
-  border-color: rgba(255, 107, 0, 0.35);
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.06), 0 12px 25px rgba(255, 107, 0, 0.05), 0 6px 20px rgba(0, 0, 0, 0.45);
+  border-color: rgba(255, 165, 0, 0.35);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.06), 0 12px 25px rgba(255, 165, 0, 0.05), 0 6px 20px rgba(0, 0, 0, 0.45);
 }
 
 .lobby-header {
@@ -1302,7 +1302,7 @@ nav {
 
 .roster-slot-card:hover {
   transform: translateX(4px);
-  border-color: rgba(255, 107, 0, 0.3);
+  border-color: rgba(255, 165, 0, 0.3);
 }
 
 .roster-slot-num {
@@ -1420,8 +1420,8 @@ nav {
 
 .profile-stat-box:hover {
   transform: translateY(-4px);
-  border-color: rgba(255, 107, 0, 0.35);
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.08), 0 12px 25px rgba(255, 107, 0, 0.05), 0 6px 20px rgba(0, 0, 0, 0.4);
+  border-color: rgba(255, 165, 0, 0.35);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.08), 0 12px 25px rgba(255, 165, 0, 0.05), 0 6px 20px rgba(0, 0, 0, 0.4);
 }
 
 .profile-stat-label {
@@ -2525,8 +2525,8 @@ footer {
 
 .admin-table tbody tr:hover td {
   background-color: #161922 !important;
-  border-top-color: rgba(255, 107, 0, 0.25) !important;
-  border-bottom-color: rgba(255, 107, 0, 0.25) !important;
+  border-top-color: rgba(255, 165, 0, 0.25) !important;
+  border-bottom-color: rgba(255, 165, 0, 0.25) !important;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.35);
 }
 
@@ -2535,7 +2535,7 @@ footer {
 }
 
 .admin-table tbody tr:hover td:last-child {
-  border-right: 1px solid rgba(255, 107, 0, 0.25) !important;
+  border-right: 1px solid rgba(255, 165, 0, 0.25) !important;
 }
 
 /* Modern Glassmorphism Controls inside Database Tab */
@@ -2597,13 +2597,13 @@ footer {
 
 .admin-tab-item:hover {
   padding-left: 24px !important; /* Premium smooth slide in */
-  background-color: rgba(255, 107, 0, 0.06) !important;
+  background-color: rgba(255, 165, 0, 0.06) !important;
   color: white !important;
 }
 
 .admin-tab-item.active {
   padding-left: 24px !important;
-  background: linear-gradient(90deg, rgba(255, 107, 0, 0.15) 0%, rgba(255, 107, 0, 0.02) 100%) !important;
+  background: linear-gradient(90deg, rgba(255, 165, 0, 0.15) 0%, rgba(255, 165, 0, 0.02) 100%) !important;
   color: white !important;
   border-left-color: var(--cs-orange) !important;
   box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.05);
@@ -2627,7 +2627,7 @@ footer {
 .admin-main::-webkit-scrollbar-thumb,
 .db-panes-wrapper div::-webkit-scrollbar-thumb,
 .ops-log-box::-webkit-scrollbar-thumb {
-  background: rgba(255, 107, 0, 0.25);
+  background: rgba(255, 165, 0, 0.25);
   border-radius: 4px;
   transition: background 0.3s ease;
 }
@@ -2635,7 +2635,7 @@ footer {
 .admin-main::-webkit-scrollbar-thumb:hover,
 .db-panes-wrapper div::-webkit-scrollbar-thumb:hover,
 .ops-log-box::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 107, 0, 0.65);
+  background: rgba(255, 165, 0, 0.65);
 }
 
 /* Action Buttons inside Table Row Card */
@@ -2649,8 +2649,8 @@ footer {
 }
 
 .admin-table .btn {
-  background: linear-gradient(135deg, rgba(255, 107, 0, 0.15) 0%, rgba(255, 107, 0, 0.3) 100%) !important;
-  border: 1px solid rgba(255, 107, 0, 0.4) !important;
+  background: linear-gradient(135deg, rgba(255, 165, 0, 0.15) 0%, rgba(255, 165, 0, 0.3) 100%) !important;
+  border: 1px solid rgba(255, 165, 0, 0.4) !important;
   color: white !important;
 }
 
