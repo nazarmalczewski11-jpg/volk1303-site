@@ -182,14 +182,41 @@
       defaultColorHex = "#9d4edd"; // Admin default: back-office neon purple
     }
     
-    // Set uniform deep dark solid color background for the canvas (NO wallpaper, NO gradient)
-    canvas.style.backgroundColor = "#08090c";
-    canvas.style.backgroundImage = "none";
+    // Check page paths
+    const path = window.location.pathname.toLowerCase();
+    const isTournament = path.includes("tournament.html");
+    const isBetsPage = path.includes("betting.html") || path.includes("my-bets.html") || path.endsWith("/");
 
-    // 3. Clear body backgrounds to let WebGL shine through
-    document.body.style.setProperty("background", "transparent", "important");
-    document.body.style.setProperty("background-color", "transparent", "important");
-    document.body.style.setProperty("background-image", "none", "important");
+    if (isTournament) {
+      canvas.style.backgroundColor = "transparent";
+      canvas.style.backgroundImage = "none";
+      canvas.style.opacity = "0.35"; // Make the smoke more transparent
+
+      document.body.style.setProperty("background-image", "linear-gradient(to bottom, rgba(8, 9, 12, 0.8) 0%, rgba(8, 9, 12, 0.7) 40%, rgba(8, 9, 12, 0.85) 100%), url('assets/tour_bg.png')", "important");
+      document.body.style.setProperty("background-size", "cover", "important");
+      document.body.style.setProperty("background-position", "center top", "important");
+      document.body.style.setProperty("background-attachment", "fixed", "important");
+      document.body.style.setProperty("background-color", "#08090c", "important");
+    } else if (isBetsPage) {
+      canvas.style.backgroundColor = "transparent";
+      canvas.style.backgroundImage = "none";
+      canvas.style.opacity = "0.35"; // Make the smoke more transparent
+
+      document.body.style.setProperty("background-image", "linear-gradient(to bottom, rgba(8, 9, 12, 0.8) 0%, rgba(8, 9, 12, 0.7) 40%, rgba(8, 9, 12, 0.85) 100%), url('assets/bets_bg.jpg')", "important");
+      document.body.style.setProperty("background-size", "cover", "important");
+      document.body.style.setProperty("background-position", "center top", "important");
+      document.body.style.setProperty("background-attachment", "fixed", "important");
+      document.body.style.setProperty("background-color", "#08090c", "important");
+    } else {
+      // Set uniform deep dark solid color background for the canvas (NO wallpaper, NO gradient)
+      canvas.style.backgroundColor = "#08090c";
+      canvas.style.backgroundImage = "none";
+
+      // 3. Clear body backgrounds to let WebGL shine through
+      document.body.style.setProperty("background", "transparent", "important");
+      document.body.style.setProperty("background-color", "transparent", "important");
+      document.body.style.setProperty("background-image", "none", "important");
+    }
 
     // 4. Inject canvas into document body
     document.body.insertBefore(canvas, document.body.firstChild);

@@ -1,6 +1,8 @@
 // Database key for LocalStorage
 const DB_KEY = 'volk_site_v4';
-const CLOUD_BUCKET = 'https://volk-backend.onrender.com/';
+const CLOUD_BUCKET = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ? 'http://localhost:10000/'
+  : 'https://volk-backend.onrender.com/';
 
 let isSyncing = false;
 let activePushes = 0;
@@ -404,16 +406,16 @@ function getDB() {
     if (!db.usedTxids) db.usedTxids = [];
     if (!db.tournaments) db.tournaments = [];
     
-    // Defensive check to ensure admin! user is present and has the correct password
-    let adminUser = db.users.find(u => u.username === 'admin!');
-    let oldAdminUser = db.users.find(u => u.username === 'admin');
+    // Defensive check to ensure admin user is present and has the correct password
+    let adminUser = db.users.find(u => u.username === 'admin');
+    let oldAdminUser = db.users.find(u => u.username === 'admin!');
     let dbUpdated = false;
 
     if (oldAdminUser) {
       if (adminUser) {
-        db.users = db.users.filter(u => u.username !== 'admin');
+        db.users = db.users.filter(u => u.username !== 'admin!');
       } else {
-        oldAdminUser.username = 'admin!';
+        oldAdminUser.username = 'admin';
         adminUser = oldAdminUser;
       }
       dbUpdated = true;
@@ -422,8 +424,8 @@ function getDB() {
     if (!adminUser) {
       adminUser = {
         email: "admin@volk.com",
-        username: "admin!",
-        password: "31101982",
+        username: "admin",
+        password: "111111",
         balance: 1000,
         bonusPercent: 0,
         hasSpunWheel: true,
@@ -437,13 +439,13 @@ function getDB() {
       dbUpdated = true;
     }
 
-    if (adminUser.password !== "31101982") {
-      adminUser.password = "31101982";
+    if (adminUser.password !== "111111") {
+      adminUser.password = "111111";
       dbUpdated = true;
     }
 
-    if (db.currentUser === 'admin') {
-      db.currentUser = 'admin!';
+    if (db.currentUser === 'admin!') {
+      db.currentUser = 'admin';
       dbUpdated = true;
     }
 
@@ -524,7 +526,7 @@ function checkAdminAuth() {
     window.history.replaceState({}, document.title, window.location.pathname);
   }
 
-  if (!db || db.currentUser !== 'admin!') {
+  if (!db || db.currentUser !== 'admin') {
     if (overlay) {
       overlay.style.display = 'flex';
     }
@@ -624,14 +626,14 @@ function handleAdminLoginSubmit() {
   const userVal = document.getElementById('admin-login-username').value.trim().toLowerCase();
   const passVal = document.getElementById('admin-login-password').value;
 
-  if (userVal === 'admin!' && passVal === '31101982') {
+  if (userVal === 'admin' && passVal === '111111') {
     let db = getDB();
     if (!db) {
       db = {
         users: [{
           email: "admin@volk.com",
-          username: "admin!",
-          password: "31101982",
+          username: "admin",
+          password: "111111",
           balance: 1000,
           bonusPercent: 0,
           hasSpunWheel: true,
@@ -668,15 +670,15 @@ function handleAdminLoginSubmit() {
       };
     }
     
-    db.currentUser = 'admin!';
+    db.currentUser = 'admin';
     
     // Make sure the admin user profile exists inside db
-    let adminUser = db.users.find(u => u.username === 'admin!');
+    let adminUser = db.users.find(u => u.username === 'admin');
     if (!adminUser) {
       adminUser = {
         email: "admin@volk.com",
-        username: "admin!",
-        password: "31101982",
+        username: "admin",
+        password: "111111",
         balance: 1000,
         bonusPercent: 0,
         hasSpunWheel: true,
@@ -688,7 +690,7 @@ function handleAdminLoginSubmit() {
       };
       db.users.push(adminUser);
     } else {
-      adminUser.password = "31101982";
+      adminUser.password = "111111";
     }
 
     saveDB(db);
@@ -941,7 +943,7 @@ function checkNewRegistrations(db) {
   if (knownUsernames !== null) {
     db.users.forEach(u => {
       const uname = u.username.toLowerCase();
-      if (uname !== 'admin!' && !knownUsernames.has(uname)) {
+      if (uname !== 'admin' && !knownUsernames.has(uname)) {
         showToast(`🔔 Новий гравець @${u.username.toUpperCase()} зареєструвався на сайті!`, 'success');
       }
     });
@@ -953,7 +955,7 @@ function checkNewRegistrations(db) {
 // Render Admin Panels
 function renderAdminPanel() {
   const db = getDB();
-  if (!db || db.currentUser !== 'admin!') return;
+  if (!db || db.currentUser !== 'admin') return;
 
   // Track and notify about new registrations in real-time
   checkNewRegistrations(db);
@@ -1035,7 +1037,7 @@ function renderDashboardOpsLog(db) {
 
   // Compile registrations
   db.users.forEach(u => {
-    if (u && u.username && u.username !== 'admin!') {
+    if (u && u.username && u.username !== 'admin') {
       const regEvent = u.loginHistory ? u.loginHistory.find(h => h.type === 'register') : null;
       const regTime = regEvent ? regEvent.date : "2026-06-01 12:00";
       events.push({
@@ -1138,7 +1140,7 @@ function renderAdminUsersTable(users) {
     const depSum = deps.reduce((acc, d) => acc + d.amount, 0);
     const depCount = deps.length;
 
-    const isSystemAdmin = user.username.toLowerCase() === 'admin!';
+    const isSystemAdmin = user.username.toLowerCase() === 'admin';
 
     tr.innerHTML = `
       <td><strong>${user.username.toUpperCase()}</strong></td>
@@ -1156,7 +1158,7 @@ function renderAdminUsersTable(users) {
 }
 
 window.deleteUserAdmin = function(username) {
-  if (username.toLowerCase() === 'admin!') {
+  if (username.toLowerCase() === 'admin') {
     showToast("Неможливо видалити акаунт адміністратора!", "error");
     return;
   }
@@ -1366,11 +1368,11 @@ function renderAdminMatchesEditor(matches) {
       <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:10px;">
         <div class="form-group" style="margin-bottom:0;">
           <label>Рахунок ${match.team1}</label>
-          <input type="number" id="score1-${match.id}" class="form-input" value="${match.score1}" min="0" onchange="updateMatchScoreAdmin('${match.id}')" style="padding:6px 10px;">
+          <input type="number" id="score1-${match.id}" class="form-input" value="${match.score1}" min="0" max="13" onchange="updateMatchScoreAdmin('${match.id}')" style="padding:6px 10px;">
         </div>
         <div class="form-group" style="margin-bottom:0;">
           <label>Рахунок ${match.team2}</label>
-          <input type="number" id="score2-${match.id}" class="form-input" value="${match.score2}" min="0" onchange="updateMatchScoreAdmin('${match.id}')" style="padding:6px 10px;">
+          <input type="number" id="score2-${match.id}" class="form-input" value="${match.score2}" min="0" max="13" onchange="updateMatchScoreAdmin('${match.id}')" style="padding:6px 10px;">
         </div>
       </div>
 
@@ -1447,8 +1449,17 @@ window.updateMatchScoreAdmin = function(id) {
   const match = db.matches.find(m => m.id === id);
   if (!match) return;
 
-  const score1 = parseInt(document.getElementById(`score1-${match.id}`).value) || 0;
-  const score2 = parseInt(document.getElementById(`score2-${match.id}`).value) || 0;
+  let score1 = parseInt(document.getElementById(`score1-${match.id}`).value) || 0;
+  let score2 = parseInt(document.getElementById(`score2-${match.id}`).value) || 0;
+
+  if (score1 > 13) {
+    score1 = 13;
+    document.getElementById(`score1-${match.id}`).value = 13;
+  }
+  if (score2 > 13) {
+    score2 = 13;
+    document.getElementById(`score2-${match.id}`).value = 13;
+  }
 
   match.score1 = score1;
   match.score2 = score2;
@@ -1458,8 +1469,8 @@ window.updateMatchScoreAdmin = function(id) {
   match.coef1 = odds.coef1;
   match.coef2 = odds.coef2;
 
-  // Auto-Freeze check at EXACTLY 6-0 or 0-6
-  if ((score1 === 6 && score2 === 0) || (score1 === 0 && score2 === 6)) {
+  // Auto-Freeze check if score difference is 6 or more
+  if (Math.abs(score1 - score2) >= 6) {
     match.isFrozen = true;
     showToast(`Авто-заморозка коефіцієнтів! Рахунок: ${score1}:${score2}`, "error");
   }
@@ -3084,7 +3095,13 @@ function renderAdminTournamentsList(tournaments) {
         </select>
       </td>
       <td>
-        <div style="display:flex; gap:6px;">
+        <div style="display:flex; gap:6px; align-items:center;">
+          ${tour.status === 'upcoming' ? `<button class="btn" style="padding:4px 8px; font-size:10px; background:var(--cs-orange); border-color:var(--cs-orange); color:white; font-weight:800;" onclick="quickChangeTourStatus('${tour.id}', 'active')">🚀 ЗАПУСТИТИ</button>` : ''}
+          ${tour.status === 'active' ? `
+            <button class="btn btn-secondary" style="padding:4px 8px; font-size:10px; font-weight:800;" onclick="quickChangeTourStatus('${tour.id}', 'upcoming')">⏸️ ПАУЗА</button>
+            <button class="btn btn-danger" style="padding:4px 8px; font-size:10px; font-weight:800;" onclick="quickChangeTourStatus('${tour.id}', 'completed')">🏁 ЗАВЕРШИТИ</button>
+          ` : ''}
+          ${tour.status === 'completed' ? `<span style="color:var(--text-secondary); font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px;">🏁 Завершено</span>` : ''}
           <button class="btn" style="padding:4px 8px; font-size:10px;" onclick="openBracketEditorCard('${tour.id}')">🏆 Керувати сіткою</button>
           <button class="btn btn-secondary" style="padding:4px 8px; font-size:10px;" onclick="openEditTournamentModal('${tour.id}')">📝</button>
           <button class="btn btn-danger" style="padding:4px 8px; font-size:10px;" onclick="deleteTournamentAdmin('${tour.id}')">❌</button>
@@ -3207,7 +3224,10 @@ window.openRosterModal = function(tourId) {
         <div style="background:#0c0d12; border-radius:8px; padding:12px; border:1px solid rgba(255,255,255,0.02); margin-top:8px; box-shadow: inset 0 2px 8px rgba(0,0,0,0.4);">
           <div style="font-size:11px; font-weight:800; color:var(--text-secondary); text-transform:uppercase; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; letter-spacing: 0.5px; gap: 8px;">
             <span>👥 Учасники (${players.length}):</span>
-            <a href="#" onclick="showAddPlayerToSlotForm(${i}, '${team.id}'); return false;" style="color:var(--cs-orange); text-decoration:none; font-weight:800; font-size:11px; background:rgba(255,90,0,0.1); padding:4px 8px; border-radius:4px; border:1px solid rgba(255,90,0,0.2); transition: all 0.2s; flex-shrink: 0;" onmouseover="this.style.background='var(--cs-orange)'; this.style.color='white';" onmouseout="this.style.background='rgba(255,90,0,0.1)'; this.style.color='var(--cs-orange)';">➕ Додати учасника</a>
+            <div style="display:flex; gap:6px;">
+              <a href="#" onclick="fillSlotTeamWithBots('${team.id}'); return false;" style="color:#26A17B; text-decoration:none; font-weight:800; font-size:11px; background:rgba(38,161,123,0.1); padding:4px 8px; border-radius:4px; border:1px solid rgba(38,161,123,0.2); transition: all 0.2s; flex-shrink: 0;" onmouseover="this.style.background='#26A17B'; this.style.color='white';" onmouseout="this.style.background='rgba(38,161,123,0.1)'; this.style.color='#26A17B';">🤖 Боти</a>
+              <a href="#" onclick="showAddPlayerToSlotForm(${i}, '${team.id}'); return false;" style="color:var(--cs-orange); text-decoration:none; font-weight:800; font-size:11px; background:rgba(255,90,0,0.1); padding:4px 8px; border-radius:4px; border:1px solid rgba(255,90,0,0.2); transition: all 0.2s; flex-shrink: 0;" onmouseover="this.style.background='var(--cs-orange)'; this.style.color='white';" onmouseout="this.style.background='rgba(255,90,0,0.1)'; this.style.color='var(--cs-orange)';">➕ Додати</a>
+            </div>
           </div>
           <div style="display:flex; flex-wrap:wrap; gap:6px; min-height: 28px; align-items:center;">
             ${players.length === 0 ? '<span style="font-size:11px; color:var(--text-secondary); font-style:italic;">Немає гравців</span>' : playersListHtml}
@@ -3483,7 +3503,7 @@ window.searchUsersForTeamSlot = function(slotIndex, teamId) {
   const teamPlayers = team.players || [];
 
   const matchingUsers = db.users.filter(u => 
-    u.username.toLowerCase() !== 'admin!' && 
+    u.username.toLowerCase() !== 'admin' && 
     u.username.toLowerCase().includes(query) && 
     !teamPlayers.map(p => p.toLowerCase()).includes(u.username.toLowerCase())
   );
@@ -3582,12 +3602,100 @@ window.removePlayerFromSlotTeam = function(teamId, username) {
   }
 };
 
+window.fillSlotTeamWithBots = function(teamId) {
+  const db = getDB();
+  const team = db.teams.find(t => t.id === teamId);
+  if (!team) return;
+
+  const tour = db.tournaments.find(t => t.id === activeRosterTournamentId);
+  const format = tour ? tour.format : (team.format || '2x2');
+  const maxAllowed = getMaxPlayersForFormat(format);
+
+  if (!team.players) team.players = [];
+
+  if (team.players.length >= maxAllowed) {
+    showToast(`Команда вже повністю заповнена!`, "error");
+    return;
+  }
+
+  const botPool = [
+    'bot_simple', 'bot_zywoo', 'bot_donk', 'bot_m0nesy', 'bot_niko', 
+    'bot_dev1ce', 'bot_ropz', 'bot_twistzz', 'bot_b1t', 'bot_elig', 
+    'bot_shox', 'bot_kennys', 'bot_coldzera', 'bot_fallen', 'bot_stewie2k', 
+    'bot_tarik', 'bot_scream', 'bot_getright', 'bot_forest', 'bot_pasha',
+    'bot_neo', 'bot_trinity', 'bot_morpheus', 'bot_smith', 'bot_cypher'
+  ];
+
+  let addedCount = 0;
+  // Get currently registered players in this tournament across all teams to ensure uniqueness
+  const activePlayers = new Set();
+  if (tour && tour.registeredTeams) {
+    tour.registeredTeams.forEach(tid => {
+      if (!tid) return;
+      const t = db.teams.find(o => o.id === tid);
+      if (t && t.players) {
+        t.players.forEach(p => activePlayers.add(p.toLowerCase()));
+      }
+    });
+  }
+
+  // Shuffle pool to get random bots
+  const shuffledPool = botPool.sort(() => 0.5 - Math.random());
+
+  for (const botName of shuffledPool) {
+    if (team.players.length >= maxAllowed) break;
+    const botNameLower = botName.toLowerCase();
+    
+    // Check if bot is already playing in the tournament or in the team
+    if (team.players.includes(botNameLower) || activePlayers.has(botNameLower)) {
+      continue;
+    }
+
+    team.players.push(botNameLower);
+    activePlayers.add(botNameLower);
+    addedCount++;
+
+    // Ensure bot is in db.users
+    const userExists = db.users.some(u => u.username.toLowerCase() === botNameLower);
+    if (!userExists) {
+      db.users.push({
+        email: `${botNameLower}@volk.bot`,
+        username: botNameLower,
+        password: "111111",
+        balance: 1000,
+        bonusPercent: 0,
+        hasSpunWheel: true,
+        usedPromos: [],
+        depositHistory: [],
+        betHistory: [],
+        claimedQuests: [],
+        skinsInventory: []
+      });
+    }
+  }
+
+  if (addedCount > 0) {
+    if (tour) {
+      tour.lastModified = Date.now();
+      rebuildBracketTeamSlots(tour);
+    }
+    saveDB(db);
+    showToast(`Команду заповнено ботами (+${addedCount})!`, "success");
+    if (activeRosterTournamentId) {
+      openRosterModal(activeRosterTournamentId);
+    }
+    renderAdminPanel();
+  } else {
+    showToast(`Не вдалося знайти унікальних ботів для заповнення.`, "error");
+  }
+};
+
 // Global state for bracket editor selection
 let activeEditorTournamentId = null;
 
 // Open Visual Match Bracket Editor Card for selected tournament
 // Open Visual Match Bracket Editor Card for selected tournament
-window.openBracketEditorCard = function(tourId) {
+window.openBracketEditorCard = function(tourId, skipScroll = false) {
   const db = getDB();
   if (!db) return;
   const tour = (db.tournaments || []).filter(Boolean).find(t => t.id === tourId);
@@ -3597,6 +3705,11 @@ window.openBracketEditorCard = function(tourId) {
   const titleEl = document.getElementById('admin-editor-tournament-name');
   if (titleEl) titleEl.innerText = tour.name;
   
+  const prizePoolInput = document.getElementById('admin-editor-prize-pool');
+  if (prizePoolInput) {
+    prizePoolInput.value = tour.prizePool || 0;
+  }
+  
   const container = document.getElementById('admin-bracket-matches-container');
   if (!container) return;
   container.innerHTML = "";
@@ -3604,7 +3717,9 @@ window.openBracketEditorCard = function(tourId) {
   const editorCard = document.getElementById('admin-bracket-editor-card');
   if (editorCard) {
     editorCard.style.display = "block";
-    editorCard.scrollIntoView({ behavior: 'smooth' });
+    if (!skipScroll) {
+      editorCard.scrollIntoView({ behavior: 'smooth' });
+    }
   }
 
   if (!tour.brackets || !tour.brackets.rounds) {
@@ -3638,8 +3753,10 @@ window.openBracketEditorCard = function(tourId) {
       matchCard.style.padding = "15px";
       matchCard.style.borderRadius = "8px";
 
-      const teamList1 = (db.teams || []).filter(t => t && t.name).map(t => `<option value="${t.name}" ${match.team1 === t.name ? 'selected' : ''}>${t.name}</option>`).join('');
-      const teamList2 = (db.teams || []).filter(t => t && t.name).map(t => `<option value="${t.name}" ${match.team2 === t.name ? 'selected' : ''}>${t.name}</option>`).join('');
+      const regTeamIds = tour.registeredTeams || [];
+      const tourTeams = (db.teams || []).filter(t => t && t.name && regTeamIds.includes(t.id));
+      const teamList1 = tourTeams.map(t => `<option value="${t.name}" ${match.team1 === t.name ? 'selected' : ''}>${t.name}</option>`).join('');
+      const teamList2 = tourTeams.map(t => `<option value="${t.name}" ${match.team2 === t.name ? 'selected' : ''}>${t.name}</option>`).join('');
 
       matchCard.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid rgba(255,255,255,0.03); padding-bottom:6px;">
@@ -3672,12 +3789,20 @@ window.openBracketEditorCard = function(tourId) {
 
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:12px;">
           <div class="form-group" style="margin-bottom:0;">
-            <label style="font-size:10px; margin-bottom:4px;">Рахунок Команди 1</label>
-            <input type="number" id="m-score1-${rIndex}-${mIndex}" class="form-input" min="0" value="${match.score1}" style="padding:6px 10px;">
+            <label style="font-size:10px; margin-bottom:4px;">Рахунок Команди 1 (${match.team1})</label>
+            <div style="display:flex; gap:6px; align-items:center;">
+              <button type="button" class="btn" style="padding: 6px 10px; background: #2d3748; border-color: #4a5568; margin-bottom: 0; font-size:11px;" onclick="adjustTourScore('${rIndex}', '${mIndex}', 1, -1)">-1</button>
+              <input type="number" id="m-score1-${rIndex}-${mIndex}" class="form-input" min="0" max="13" value="${match.score1}" readonly style="padding:6px 10px; text-align:center; flex:1;">
+              <button type="button" class="btn" style="padding: 6px 10px; background: var(--cs-orange); border-color: var(--cs-orange); margin-bottom: 0; font-weight: 800; font-size:11px;" onclick="adjustTourScore('${rIndex}', '${mIndex}', 1, 1)">+1</button>
+            </div>
           </div>
           <div class="form-group" style="margin-bottom:0;">
-            <label style="font-size:10px; margin-bottom:4px;">Рахунок Команди 2</label>
-            <input type="number" id="m-score2-${rIndex}-${mIndex}" class="form-input" min="0" value="${match.score2}" style="padding:6px 10px;">
+            <label style="font-size:10px; margin-bottom:4px;">Рахунок Команди 2 (${match.team2})</label>
+            <div style="display:flex; gap:6px; align-items:center;">
+              <button type="button" class="btn" style="padding: 6px 10px; background: #2d3748; border-color: #4a5568; margin-bottom: 0; font-size:11px;" onclick="adjustTourScore('${rIndex}', '${mIndex}', 2, -1)">-1</button>
+              <input type="number" id="m-score2-${rIndex}-${mIndex}" class="form-input" min="0" max="13" value="${match.score2}" readonly style="padding:6px 10px; text-align:center; flex:1;">
+              <button type="button" class="btn" style="padding: 6px 10px; background: var(--cs-orange); border-color: var(--cs-orange); margin-bottom: 0; font-weight: 800; font-size:11px;" onclick="adjustTourScore('${rIndex}', '${mIndex}', 2, 1)">+1</button>
+            </div>
           </div>
         </div>
 
@@ -3685,8 +3810,8 @@ window.openBracketEditorCard = function(tourId) {
           <label style="font-size:10px; margin-bottom:4px; display:block;">🏆 Переможець матчу (для завершених)</label>
           <select id="m-winner-${rIndex}-${mIndex}" class="form-input" style="padding:6px; font-size:12px; background:#0c0d12;">
             <option value="Очікується" ${(!match.winnerSlot && !match.winner) || match.winnerSlot === 'Очікується' || match.winner === 'Очікується' ? 'selected' : ''}>Очікується (Автовибір за рахунком)</option>
-            <option value="team1" ${match.winnerSlot === 'team1' || (match.winner && match.winner === match.team1 && match.team1 !== 'Очікується') ? 'selected' : ''}>Команда 1 (ліворуч)</option>
-            <option value="team2" ${match.winnerSlot === 'team2' || (match.winner && match.winner === match.team2 && match.team2 !== 'Очікується') ? 'selected' : ''}>Команда 2 (праворуч)</option>
+            <option value="team1" ${match.winnerSlot === 'team1' || (match.winner && match.winner === match.team1 && match.team1 !== 'Очікується') ? 'selected' : ''}>${match.team1}</option>
+            <option value="team2" ${match.winnerSlot === 'team2' || (match.winner && match.winner === match.team2 && match.team2 !== 'Очікується') ? 'selected' : ''}>${match.team2}</option>
           </select>
         </div>
 
@@ -3711,8 +3836,49 @@ window.closeBracketEditorCard = function() {
   activeEditorTournamentId = null;
 };
 
+window.saveBracketPrizePool = function() {
+  if (!activeEditorTournamentId) return;
+  const db = getDB();
+  if (!db) return;
+  const tour = (db.tournaments || []).filter(Boolean).find(t => t.id === activeEditorTournamentId);
+  if (!tour) return;
+
+  const prizeInput = document.getElementById('admin-editor-prize-pool');
+  if (!prizeInput) return;
+
+  const newPrize = parseFloat(prizeInput.value);
+  if (isNaN(newPrize) || newPrize < 0) {
+    showToast("Введіть коректний призовий фонд!", "error");
+    return;
+  }
+
+  tour.prizePool = newPrize;
+  tour.lastModified = Date.now();
+  
+  saveDB(db);
+  pushToCloud(db);
+
+  showToast(`Призовий фонд турніру "${tour.name}" успішно оновлено на ${newPrize} 🪙!`, "success");
+  renderAdminPanel();
+};
+
+// Adjust score in bracket editor using buttons
+window.adjustTourScore = function(rIndex, mIndex, teamNum, val) {
+  const el = document.getElementById(`m-score${teamNum}-${rIndex}-${mIndex}`);
+  if (!el) return;
+  let currentVal = parseInt(el.value, 10) || 0;
+  let newVal = currentVal + val;
+  if (newVal < 0) newVal = 0;
+  if (newVal > 13) newVal = 13;
+  el.value = newVal;
+
+  // Auto-save match score changes immediately to DB and Cloud
+  saveBracketMatchAdmin(rIndex, mIndex);
+};
+
 // Save edited match bracket properties and run auto propagation algorithm
 window.saveBracketMatchAdmin = function(rIndex, mIndex) {
+  const scrollPos = window.scrollY; // Preserve scroll position
   if (!activeEditorTournamentId) return;
   const db = getDB();
   if (!db) return;
@@ -3735,8 +3901,18 @@ window.saveBracketMatchAdmin = function(rIndex, mIndex) {
 
   const team1 = team1El ? team1El.value : "Очікується";
   const team2 = team2El ? team2El.value : "Очікується";
-  const score1 = score1El ? (parseInt(score1El.value, 10) || 0) : 0;
-  const score2 = score2El ? (parseInt(score2El.value, 10) || 0) : 0;
+  let score1 = score1El ? (parseInt(score1El.value, 10) || 0) : 0;
+  let score2 = score2El ? (parseInt(score2El.value, 10) || 0) : 0;
+
+  if (score1 > 13) {
+    score1 = 13;
+    if (score1El) score1El.value = 13;
+  }
+  if (score2 > 13) {
+    score2 = 13;
+    if (score2El) score2El.value = 13;
+  }
+
   let status = statusEl ? statusEl.value : "upcoming";
   const time = timeEl ? timeEl.value : "";
 
@@ -3856,8 +4032,9 @@ window.saveBracketMatchAdmin = function(rIndex, mIndex) {
   pushToCloud(db);
 
   showToast(`Матч ${match.id} успішно оновлено!`, "success");
-  openBracketEditorCard(activeEditorTournamentId); // Refresh editor list
+  openBracketEditorCard(activeEditorTournamentId, true); // Refresh editor list
   renderAdminPanel();
+  window.scrollTo(0, scrollPos); // Restore scroll position
 };
 
 
@@ -3983,6 +4160,37 @@ window.closeModal = function(modalId) {
   if (overlay) {
     overlay.classList.remove('active');
   }
+};
+
+// Clear statistics history (reset total deposits, bets, and logs) for all users
+window.clearDashboardStats = function() {
+  if (!confirm("Ви впевнені, що хочете очистити всю статистику дашборду (історію поповнень, історію ставок та консоль логів) для всіх користувачів? Це дійство є незворотнім.")) {
+    return;
+  }
+  const db = getDB();
+  db.users.forEach(u => {
+    u.depositHistory = [];
+    u.betHistory = [];
+  });
+  db.pendingDeposits = [];
+  db.pendingWithdrawals = [];
+  db.aimLobbies = [];
+  
+  saveDB(db);
+  
+  // Save to cloud too
+  fetch(CLOUD_BUCKET + 'users', { method: 'POST', body: JSON.stringify(db.users) });
+  fetch(CLOUD_BUCKET + 'pendingDeposits', { method: 'POST', body: JSON.stringify([]) });
+  fetch(CLOUD_BUCKET + 'pendingWithdrawals', { method: 'POST', body: JSON.stringify([]) });
+  fetch(CLOUD_BUCKET + 'aimLobbies', { method: 'POST', body: JSON.stringify([]) })
+    .then(() => {
+      showToast("Статистику дашборду успішно очищено!", "success");
+      renderAdminPanel();
+    })
+    .catch(e => {
+      console.error(e);
+      showToast("Помилка синхронізації з хмарою при очищенні!", "error");
+    });
 };
 
 

@@ -1,6 +1,8 @@
 // Database key for LocalStorage
 const DB_KEY = 'volk_site_v4';
-const CLOUD_BUCKET = 'https://volk-backend.onrender.com/';
+const CLOUD_BUCKET = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ? 'http://localhost:10000/'
+  : 'https://volk-backend.onrender.com/';
 
 let isSyncing = false;
 let openTournamentDetailsIds = {};
@@ -315,15 +317,15 @@ function getDB() {
       dbUpdated = true;
     }
     
-    // Defensive check to ensure admin! user is present and has the correct password
-    let adminUser = db.users.find(u => u.username === 'admin!');
-    let oldAdminUser = db.users.find(u => u.username === 'admin');
+    // Defensive check to ensure admin user is present and has the correct password
+    let adminUser = db.users.find(u => u.username === 'admin');
+    let oldAdminUser = db.users.find(u => u.username === 'admin!');
 
     if (oldAdminUser) {
       if (adminUser) {
-        db.users = db.users.filter(u => u.username !== 'admin');
+        db.users = db.users.filter(u => u.username !== 'admin!');
       } else {
-        oldAdminUser.username = 'admin!';
+        oldAdminUser.username = 'admin';
         adminUser = oldAdminUser;
       }
       dbUpdated = true;
@@ -332,8 +334,8 @@ function getDB() {
     if (!adminUser) {
       adminUser = {
         email: "admin@volk.com",
-        username: "admin!",
-        password: "31101982",
+        username: "admin",
+        password: "111111",
         balance: 1000,
         bonusPercent: 0,
         hasSpunWheel: true,
@@ -347,13 +349,13 @@ function getDB() {
       dbUpdated = true;
     }
 
-    if (adminUser.password !== "31101982") {
-      adminUser.password = "31101982";
+    if (adminUser.password !== "111111") {
+      adminUser.password = "111111";
       dbUpdated = true;
     }
 
-    if (db.currentUser === 'admin') {
-      db.currentUser = 'admin!';
+    if (db.currentUser === 'admin!') {
+      db.currentUser = 'admin';
       dbUpdated = true;
     }
 
@@ -380,8 +382,8 @@ function initDefaultDB() {
     users: [
       {
         email: "admin@volk.com",
-        username: "admin!",
-        password: "31101982",
+        username: "admin",
+        password: "111111",
         balance: 1000,
         bonusPercent: 0,
         hasSpunWheel: true,
@@ -392,7 +394,58 @@ function initDefaultDB() {
         skinsInventory: []
       }
     ],
-    matches: [],
+    matches: [
+      {
+        id: "m_seed_1",
+        team1: "NaVi",
+        team2: "Vitality",
+        players1: ["jL", "w0nderful", "iM", "Aleksib", "b1t"],
+        players2: ["ZywOo", "apEX", "Spinx", "flameZ", "mezii"],
+        score1: 11,
+        score2: 9,
+        status: "live",
+        coef1: 1.65,
+        coef2: 2.10,
+        isFrozen: false,
+        map: "Mirage",
+        format: "BO3",
+        tournamentName: "PGL Major Copenhagen"
+      },
+      {
+        id: "m_seed_2",
+        team1: "FaZe",
+        team2: "Spirit",
+        players1: ["broky", "rain", "ropz", "karrigan", "frozen"],
+        players2: ["donk", "sh1ro", "chopper", "magixx", "zoner"],
+        score1: 0,
+        score2: 0,
+        status: "prematch",
+        coef1: 2.30,
+        coef2: 1.55,
+        isFrozen: false,
+        map: "Nuke",
+        format: "BO3",
+        time: "19:30",
+        day: "Сьогодні",
+        tournamentName: "IEM Chengdu"
+      },
+      {
+        id: "m_seed_3",
+        team1: "G2",
+        team2: "MOUZ",
+        players1: ["m0NESY", "NiKo", "huNter-", "Snax", "malbsMd"],
+        players2: ["siuhy", "xertioN", "torzsi", "Jimpphat", "Brollan"],
+        score1: 16,
+        score2: 14,
+        status: "finished",
+        coef1: 1.90,
+        coef2: 1.90,
+        isFrozen: true,
+        map: "Ancient",
+        format: "BO3",
+        tournamentName: "ESL Pro League S20"
+      }
+    ],
     brackets: {
       type: "single",
       rounds: [
@@ -658,6 +711,21 @@ function setupListenersByPage() {
         startDepositVerify(amt, "MONOBANKA", name);
       });
     }
+
+    // Live chat message submission on enter
+    const chatInput = document.getElementById('chat-message-input') || document.getElementById('live-chat-input');
+    if (chatInput) {
+      chatInput.addEventListener('keyup', (e) => {
+        if (e.key === 'Enter') {
+          const text = chatInput.value.trim();
+          if (!text) return;
+          const db = getDB();
+          if (!db.currentUser) return;
+          appendChatMessage(db.currentUser, text, 'color-gold');
+          chatInput.value = "";
+        }
+      });
+    }
   }
 
   if (currentPage === 'profile.html') {
@@ -759,7 +827,7 @@ function renderPageContent() {
   // Toggle Admin link visibility in header if current user is admin
   const adminLink = document.getElementById('nav-admin-link');
   if (adminLink) {
-    adminLink.style.display = db.currentUser === 'admin!' ? 'inline-flex' : 'none';
+    adminLink.style.display = db.currentUser === 'admin' ? 'inline-flex' : 'none';
   }
 
   // Page Specific Content Render
@@ -767,18 +835,25 @@ function renderPageContent() {
     renderTwitchEmbed(db.activeTwitchChannel, db.twitchStatus || "live");
     renderTwitchChat(db.activeTwitchChannel, db.twitchStatus || "live");
     
+    // Start Spectator Live Chat simulation
+    startChatSimulation();
+    
     // Aggregate standard matches and active tournament matches
     const allMatches = [...(db.matches || [])];
     (db.tournaments || []).forEach(tour => {
       if (tour.status === 'active' && tour.brackets && tour.brackets.rounds) {
         tour.brackets.rounds.forEach(round => {
           (round.matches || []).forEach(match => {
-            if (match.status === 'live') {
-              // Find captains for team info
+            if (match.status === 'live' || match.status === 'upcoming') {
               const t1 = (db.teams || []).find(t => t.name === match.team1);
               const t2 = (db.teams || []).find(t => t.name === match.team2);
-              const p1 = t1 && t1.captain ? [`Капітан: @${t1.captain.toUpperCase()}`] : ['Склад очікується'];
-              const p2 = t2 && t2.captain ? [`Капітан: @${t2.captain.toUpperCase()}`] : ['Склад очікується'];
+              const p1 = t1 ? (t1.players || []) : [];
+              const p2 = t2 ? (t2.players || []) : [];
+
+              // Retrieve team coefficients from the admin panel settings
+              const teamOdds = tour.teamOdds || {};
+              const odds1 = (t1 && teamOdds[t1.id] !== undefined) ? teamOdds[t1.id] : 2.5;
+              const odds2 = (t2 && teamOdds[t2.id] !== undefined) ? teamOdds[t2.id] : 2.5;
 
               allMatches.push({
                 id: match.id,
@@ -791,9 +866,10 @@ function renderPageContent() {
                 players2: p2,
                 score1: match.score1 || 0,
                 score2: match.score2 || 0,
-                status: 'live',
-                coef1: 1.0,
-                coef2: 1.0
+                status: match.status,
+                coef1: odds1,
+                coef2: odds2,
+                map: match.map || tour.map || 'de_mirage'
               });
             }
           });
@@ -801,7 +877,12 @@ function renderPageContent() {
       }
     });
 
-    renderBettingMatches(allMatches);
+    // Filter matches: show all live, prematch, and upcoming matches (tabs removed)
+    const filteredMatches = allMatches.filter(m => {
+      return m.status === 'live' || m.status === 'prematch' || m.status === 'upcoming';
+    });
+
+    renderBettingMatches(filteredMatches);
     renderLiveMatchStats(db);
     renderDailyQuests();
     renderSkinsShop();
@@ -1135,8 +1216,8 @@ function renderTwitchEmbed(channelName, status = "live") {
         <div class="stream-offline-logo">
           <img src="assets/wolf_logo.png" style="width:100%; height:100%; object-fit:contain; filter: grayscale(1) opacity(0.35);">
         </div>
-        <h3 style="color:var(--text-secondary); text-transform:uppercase; font-size:14px; font-weight:800; margin-top:10px;">СТРІМ ОФЛАЙН</h3>
-        <p style="font-size:11px; color:rgba(255,255,255,0.3); margin-top:5px;">Трансляція наразі призупинена. Слідкуйте за анонсами наступних матчів!</p>
+        <h3 style="color:#d8d8d8; text-transform:uppercase; font-size:14px; font-weight:800; margin-top:10px;">СТРІМ ОФЛАЙН</h3>
+        <p style="font-size:11px; color:rgba(255,255,255,0.55); margin-top:5px;">Трансляція наразі призупинена. Слідкуйте за анонсами наступних матчів!</p>
       </div>
     `;
     twitchChannelCache = "";
@@ -1252,112 +1333,226 @@ function getTeamGradient(teamName) {
 }
 
 // Render list of active/upcoming matches in lobby
+// Map team names to custom emojis
+function getTeamEmoji(teamName) {
+  if (!teamName) return "🛡️";
+  const name = teamName.toLowerCase();
+  if (name.includes("navi") || name.includes("natus")) return "🔥";
+  if (name.includes("vitality")) return "🐝";
+  if (name.includes("faze")) return "🔴";
+  if (name.includes("spirit")) return "🐉";
+  if (name.includes("g2")) return "⚔️";
+  if (name.includes("mouz") || name.includes("mouse")) return "🐭";
+  if (name.includes("liquid")) return "💧";
+  if (name.includes("virtus") || name.includes("vp")) return "🐻";
+  return "🛡️";
+}
+
+// Render list of active/upcoming matches in lobby (Premium CS2 Horizontal Layout)
 function renderBettingMatches(matches) {
   const container = document.getElementById('live-matches-list');
   if (!container) return;
   container.innerHTML = "";
 
   if (matches.length === 0) {
-    container.innerHTML = `<div style="color:var(--text-secondary); text-align:center; padding: 30px; font-weight: 600;">На даний момент активних матчів немає в лінії</div>`;
+    container.innerHTML = `<div style="color:var(--text-secondary); text-align:center; padding: 30px; font-weight: 600; grid-column: span 4;">На даний момент активних матчів немає в лінії</div>`;
     return;
   }
 
   matches.forEach(match => {
     const isLive = match.status === 'live';
     const isFinished = match.status === 'finished';
-    const isFrozen = match.isFrozen || isFinished;
-
-    const div = document.createElement('div');
-    div.className = "match-card";
-    
-    let subheaderText = `Counter-Strike 2 • ${match.status.toUpperCase()}`;
-    if (match.isTournamentMatch) {
-      subheaderText = `🏆 CS2 ТУРНІР • ${match.tournamentName.toUpperCase()} • ${match.status.toUpperCase()}`;
+    let isFrozen = match.isFrozen || isFinished;
+    if (isLive) {
+      const s1 = parseInt(match.score1) || 0;
+      const s2 = parseInt(match.score2) || 0;
+      if (Math.abs(s1 - s2) >= 6) {
+        isFrozen = true;
+      }
     }
 
-    // Get team initials and gradients
-    const t1Initials = getTeamInitials(match.team1);
-    const t2Initials = getTeamInitials(match.team2);
-    const t1Grad = getTeamGradient(match.team1);
-    const t2Grad = getTeamGradient(match.team2);
-
-    const p1Html = match.players1.map(p => `<span class="player-chip">${p}</span>`).join('');
-    const p2Html = match.players2.map(p => `<span class="player-chip">${p}</span>`).join('');
-
+    const div = document.createElement('div');
+    div.className = "match-card-horizontal" + (isLive ? " live-border" : "");
+    
+    // Odds buttons
     let oddsHtml = "";
     if (match.isTournamentMatch) {
-      oddsHtml = `
-        <a href="tournament.html" class="btn btn-secondary" style="grid-column: 1 / span 3; padding: 12px; font-size:11px; font-weight:900; text-align:center; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:6px; background: rgba(255, 90, 0, 0.08); border: 1px solid rgba(255, 90, 0, 0.2); color: var(--cs-orange); border-radius: 10px; margin-bottom: 0; text-transform: uppercase; letter-spacing: 0.5px;">
-          🏆 ПЕРЕГЛЯНУТИ СІТКУ ТА ПОСТАВИТИ НА ПЕРЕМОЖЦЯ ТУРНІРУ
-        </a>
+      const db = getDB();
+      const user = db.users.find(u => u.username.toLowerCase() === db.currentUser.toLowerCase());
+      const userBets = user ? (user.betHistory || []) : [];
+      
+      const betOnTeam1 = userBets.find(b => b.type === "tournament" && b.tourId === match.tournamentId && b.selectedTeam.toLowerCase() === match.team1.toLowerCase());
+      const betOnTeam2 = userBets.find(b => b.type === "tournament" && b.tourId === match.tournamentId && b.selectedTeam.toLowerCase() === match.team2.toLowerCase());
+
+      const tour = db.tournaments.find(t => t.id === match.tournamentId);
+      const matchMap = match.map || (tour ? tour.map : 'de_mirage');
+      const mapFile = getMapFilename(matchMap);
+
+      const card = document.createElement('div');
+      card.className = "tournament-match-horizontal-card";
+      card.style.width = "100%";
+      card.innerHTML = `
+        <div style="position: relative; background: linear-gradient(135deg, rgba(22, 27, 34, 0.72) 0%, rgba(15, 20, 28, 0.80) 100%), url('assets/maps/${mapFile}.png'); background-size: cover; background-position: center; border: 1px solid var(--cs-orange); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 16px; box-shadow: 0 4px 20px rgba(255, 90, 0, 0.08); width: 100%; box-sizing: border-box;">
+          
+          <!-- Top Left: Map Name -->
+          <div style="position: absolute; top: 12px; left: 15px; background: rgba(11, 14, 20, 0.85); border: 1px solid rgba(255, 90, 0, 0.45); border-radius: 6px; padding: 4px 10px; font-size: 10px; color: white; font-weight: 800; font-family: monospace; letter-spacing: 0.5px; text-transform: uppercase; display: flex; align-items: center; gap: 6px;">
+            🗺️ ${matchMap}
+          </div>
+          <!-- Center: Tournament Name & Subtitle -->
+          <div style="text-align: center; border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 10px; display: flex; flex-direction: column; gap: 5px;">
+            <span style="font-size: 16px; color: var(--cs-orange); font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px;">🏆 ${match.tournamentName}</span>
+            <span style="font-size: 12px; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Матч: ${match.team1} vs ${match.team2}</span>
+          </div>
+
+          <!-- Bet Info Row (prevent score misalignment) -->
+          ${(betOnTeam1 || betOnTeam2) ? `
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 0 10px; margin-bottom: -10px;">
+            <div style="width: 45%; text-align: left;">
+              ${betOnTeam1 ? `<div style="font-size: 10px; color: #ffae00; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px;">🔥 ВАША СТАВКА: ${betOnTeam1.amount} 🪙</div>` : ''}
+            </div>
+            <div style="width: 10%;"></div>
+            <div style="width: 45%; text-align: right;">
+              ${betOnTeam2 ? `<div style="font-size: 10px; color: #ffae00; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px;">🔥 ВАША СТАВКА: ${betOnTeam2.amount} 🪙</div>` : ''}
+            </div>
+          </div>
+          ` : ''}
+
+          <!-- Teams and Scores row -->
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px 10px; gap: 10px;">
+            
+            <!-- Left Team: Name, Score, Odds -->
+            <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 6px; width: 45%;">
+              <div style="display: flex; align-items: center; gap: 8px; width: 100%;">
+                <span style="font-size: 18px; flex-shrink: 0;">${getTeamEmoji(match.team1)}</span>
+                <span style="font-size: 17px; font-weight: 800; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;">${match.team1}</span>
+                <span style="font-size: 19px; font-weight: 900; color: var(--cs-orange); margin-left: auto;">${match.score1}</span>
+              </div>
+              <div style="font-size: 13px; color: var(--text-secondary); margin-left: 26px;">Коефіцієнт: <strong style="color: #26a17b;">x${match.coef1.toFixed(2)}</strong></div>
+            </div>
+
+            <!-- VS Divider -->
+            <div style="font-size: 14px; font-weight: 900; color: var(--text-secondary); text-transform: uppercase; text-align: center; width: 10%;">VS</div>
+
+            <!-- Right Team: Name, Score, Odds -->
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px; width: 45%;">
+              <div style="display: flex; align-items: center; gap: 8px; width: 100%; flex-direction: row-reverse;">
+                <span style="font-size: 18px; flex-shrink: 0;">${getTeamEmoji(match.team2)}</span>
+                <span style="font-size: 17px; font-weight: 800; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; text-align: right;">${match.team2}</span>
+                <span style="font-size: 19px; font-weight: 900; color: var(--cs-orange); margin-right: auto;">${match.score2}</span>
+              </div>
+              <div style="font-size: 13px; color: var(--text-secondary); margin-right: 26px;">Коефіцієнт: <strong style="color: #26a17b;">x${match.coef2.toFixed(2)}</strong></div>
+            </div>
+
+          </div>
+
+          <!-- Bet placement button -->
+          <div style="display: flex; justify-content: center; margin-top: 5px;">
+            ${(() => {
+              const isFrozenTour = isTournamentBettingFrozen(tour);
+              if (isFrozenTour) {
+                return `
+                  <button disabled style="background: #1e293b; border: 1px solid #1e293b; color: var(--text-secondary); padding: 10px 32px; font-size: 13px; font-weight: 900; border-radius: 6px; cursor: not-allowed; text-transform: uppercase; letter-spacing: 0.5px;">
+                    ❄️ ЗАМОРОЖЕНО
+                  </button>
+                `;
+              } else {
+                return `
+                  <button onclick="openTourMatchBetModal('${match.tournamentId}', '${match.team1}', '${match.team2}')" style="background: var(--cs-orange); border: 1px solid var(--cs-orange); color: white; padding: 10px 32px; font-size: 13px; font-weight: 900; border-radius: 6px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; transition: all 0.2s; box-shadow: 0 0 10px rgba(255, 90, 0, 0.15);" onmouseover="this.style.background='#e05500'" onmouseout="this.style.background='var(--cs-orange)'">
+                    🎰 ПОСТАВИТИ
+                  </button>
+                `;
+              }
+            })()}
+          </div>
+
+        </div>
       `;
+      container.appendChild(card);
+      return;
     } else if (isFrozen) {
       oddsHtml = `
-        <div style="grid-column: 1 / span 3; background: rgba(255,26,64,0.08); border:1px solid rgba(255,26,64,0.3); color:var(--wolf-red); font-weight:900; text-align:center; padding: 12px; border-radius:10px; font-size:12px; text-transform:uppercase; letter-spacing:0.5px; text-shadow: 0 0 5px rgba(255,26,64,0.2);">
-          ${isFinished ? '🔒 ПРИЙОМ СТАВОК ЗАВЕРШЕНО' : '❄️ КОЕФІЦІЄНТИ ЗАМОРОЖЕНІ'}
+        <div style="width: 100%; background: rgba(255,26,64,0.08); border:1px solid rgba(255,26,64,0.3); color:var(--wolf-red); font-weight:900; text-align:center; padding: 8px; border-radius:6px; font-size:10px; text-transform:uppercase;">
+          ${isFinished ? '🔒 ЗАВЕРШЕНО' : '❄️ ЗАМОРОЖЕНО'}
         </div>
       `;
     } else {
       oddsHtml = `
-        <button class="odds-btn" onclick="selectBetodds('${match.id}', 1, ${match.coef1}, '${match.team1}')">
-          <span>Перемога: ${match.team1}</span>
-          <strong>${match.coef1.toFixed(2)}</strong>
-        </button>
-        
-        <div class="odds-vs">VS</div>
-        
-        <button class="odds-btn" onclick="selectBetodds('${match.id}', 2, ${match.coef2}, '${match.team2}')">
-          <span>Перемога: ${match.team2}</span>
-          <strong>${match.coef2.toFixed(2)}</strong>
-        </button>
+        <div class="match-h-odds-row" style="width: 100%;">
+          <button class="match-h-odds-btn" onclick="selectBetodds('${match.id}', 1, ${match.coef1}, '${match.team1}')">
+            <span class="odds-btn-label">ПЕРЕМОГА 1</span>
+            <span>${match.coef1.toFixed(2)}</span>
+          </button>
+          <button class="match-h-odds-btn" onclick="selectBetodds('${match.id}', 2, ${match.coef2}, '${match.team2}')">
+            <span class="odds-btn-label">ПЕРЕМОГА 2</span>
+            <span>${match.coef2.toFixed(2)}</span>
+          </button>
+        </div>
+      `;
+    }
+
+    // Body content depending on match status
+    let bodyHtml = "";
+    if (isLive) {
+      // Scoreboard layout for live matches
+      bodyHtml = `
+        <div class="match-h-body">
+          <div class="match-h-team-row">
+            <div class="match-h-team-left">
+              <span style="font-size: 14px; margin-right: 6px;">${getTeamEmoji(match.team1)}</span>
+              <span class="match-h-team-name">${match.team1}</span>
+            </div>
+            <span class="match-h-team-score ${match.score1 > match.score2 ? 'winning' : ''}">${match.score1}</span>
+          </div>
+          <div class="match-h-team-row">
+            <div class="match-h-team-left">
+              <span style="font-size: 14px; margin-right: 6px;">${getTeamEmoji(match.team2)}</span>
+              <span class="match-h-team-name">${match.team2}</span>
+            </div>
+            <span class="match-h-team-score ${match.score2 > match.score1 ? 'winning' : ''}">${match.score2}</span>
+          </div>
+        </div>
+      `;
+    } else {
+      // Prematch layout (Teams names on left/right, time clock centered)
+      bodyHtml = `
+        <div class="match-h-body" style="flex-direction: row; justify-content: space-between; align-items: center; padding: 5px 0;">
+          <div class="match-h-team-row" style="width: 35%;">
+            <div class="match-h-team-left">
+              <span style="font-size: 14px; margin-right: 6px;">${getTeamEmoji(match.team1)}</span>
+              <span class="match-h-team-name" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70px;">${match.team1}</span>
+            </div>
+          </div>
+          
+          <div class="match-h-time-display" style="width: 30%;">
+            <span class="match-h-time-clock">${match.time || '18:00'}</span>
+            <span class="match-h-time-day" style="font-size: 7px;">${match.day || 'СЬОГОДНІ'}</span>
+          </div>
+          
+          <div class="match-h-team-row" style="width: 35%; justify-content: flex-end;">
+            <div class="match-h-team-left" style="flex-direction: row-reverse; gap: 6px;">
+              <span style="font-size: 14px;">${getTeamEmoji(match.team2)}</span>
+              <span class="match-h-team-name" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70px;">${match.team2}</span>
+            </div>
+          </div>
+        </div>
       `;
     }
 
     div.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; font-weight: 800; color:var(--text-secondary); margin-bottom: 18px; border-bottom: 1px solid rgba(255,255,255,0.02); padding-bottom: 8px;">
-        <span style="letter-spacing: 0.5px; text-transform: uppercase;">${subheaderText}</span>
-        ${isLive ? `
-          <div class="live-pulse-badge">
-            <div class="live-pulse-dot"></div>
-            <span>LIVE</span>
-          </div>
-        ` : `
-          <span style="color:var(--text-secondary); font-size: 10px; border: 1px solid rgba(255,255,255,0.08); padding: 2px 8px; border-radius:6px; background: rgba(0,0,0,0.2);">UPCOMING</span>
-        `}
+      <div class="match-h-header">
+        <span class="match-h-status-badge ${isLive ? 'live' : 'prematch'}">
+          ${isLive ? '● LIVE' : 'PREMATCH'}
+        </span>
+        <span class="match-h-tournament">${match.tournamentName || 'Counter-Strike 2'}</span>
+        <span class="match-h-map">${match.map || 'Mirage'}</span>
       </div>
 
-      <div style="display:grid; grid-template-columns: 1.2fr auto 1.2fr; align-items:center; gap: 15px; margin-bottom:18px;">
-        <!-- Left Team Card -->
-        <div class="team-row left-team" style="z-index: 2;">
-          <div>
-            <div style="font-weight:900; font-size:16px; color:var(--text-primary); letter-spacing: 0.3px;">${match.team1}</div>
-            <div class="esports-players-row">
-              ${p1Html}
-            </div>
-          </div>
-        </div>
+      ${bodyHtml}
 
-        <!-- Central Score Widget -->
-        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; z-index: 2;">
-          <div class="score-display">
-            ${match.score1} : ${match.score2}
-          </div>
-          <div style="font-size: 8px; color: rgba(255, 90, 0, 0.5); font-weight: 900; letter-spacing: 2px; margin-top: 5px; text-transform: uppercase;">SCORE</div>
-        </div>
+      ${oddsHtml}
 
-        <!-- Right Team Card -->
-        <div class="team-row right-team" style="z-index: 2;">
-          <div>
-            <div style="font-weight:900; font-size:16px; color:var(--text-primary); letter-spacing: 0.3px;">${match.team2}</div>
-            <div class="esports-players-row">
-              ${p2Html}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="odds-layout" style="position: relative; z-index: 2;">
-        ${oddsHtml}
+      <div class="match-h-footer">
+        <span class="match-h-format">${match.format || 'BO3'}</span>
       </div>
     `;
     container.appendChild(div);
@@ -1378,23 +1573,32 @@ window.selectBetodds = function(matchId, teamIndex, odds, teamName) {
   const eyeL = document.getElementById('wolf-eye-l');
   const eyeR = document.getElementById('wolf-eye-r');
   if (eyeL && eyeR) {
-    eyeL.classList.remove('wolf-eyes-glowing');
-    eyeR.classList.remove('wolf-eyes-glowing');
+    eyeL.classList.remove('active-glow');
+    eyeR.classList.remove('active-glow');
     void eyeL.offsetWidth; // Trigger reflow
-    eyeL.classList.add('wolf-eyes-glowing');
-    eyeR.classList.add('wolf-eyes-glowing');
+    eyeL.classList.add('active-glow');
+    eyeR.classList.add('active-glow');
     
     // Stop eyes glow after 2 seconds
     setTimeout(() => {
-      eyeL.classList.remove('wolf-eyes-glowing');
-      eyeR.classList.remove('wolf-eyes-glowing');
+      eyeL.classList.remove('active-glow');
+      eyeR.classList.remove('active-glow');
     }, 2000);
   }
 
   const match = db.matches.find(m => m.id === matchId);
   if (!match) return;
 
-  if (match.status === 'finished' || match.isFrozen) {
+  let isFrozen = match.isFrozen;
+  if (match.status === 'live') {
+    const s1 = parseInt(match.score1) || 0;
+    const s2 = parseInt(match.score2) || 0;
+    if (Math.abs(s1 - s2) >= 6) {
+      isFrozen = true;
+    }
+  }
+
+  if (match.status === 'finished' || isFrozen) {
     showToast("Прийом ставок на цей матч завершено!", "error");
     return;
   }
@@ -1425,6 +1629,14 @@ window.selectBetodds = function(matchId, teamIndex, odds, teamName) {
   amountInput.max = balance;
   document.getElementById('bet-modal-payout').innerText = "0 🪙";
 
+  const betModalContent = document.querySelector('#bet-modal .modal-content');
+  if (betModalContent) {
+    const mapFile = getMapFilename(match.map);
+    betModalContent.style.backgroundImage = `linear-gradient(to bottom, rgba(11, 14, 20, 0.88) 0%, rgba(11, 14, 20, 0.96) 100%), url('assets/maps/${mapFile}.png')`;
+    betModalContent.style.backgroundSize = 'cover';
+    betModalContent.style.backgroundPosition = 'center';
+  }
+
   openModal('bet-modal');
 };
 
@@ -1444,7 +1656,15 @@ function placeBetslipBet() {
 
   // Double-check match is not finished or frozen (type-safe check)
   const match = db.matches.find(m => String(m.id) === String(activeBet.matchId));
-  if (!match || match.status === 'finished' || match.isFrozen) {
+  let isFrozen = match ? match.isFrozen : false;
+  if (match && match.status === 'live') {
+    const s1 = parseInt(match.score1) || 0;
+    const s2 = parseInt(match.score2) || 0;
+    if (Math.abs(s1 - s2) >= 6) {
+      isFrozen = true;
+    }
+  }
+  if (!match || match.status === 'finished' || isFrozen) {
     showToast("Прийом ставок на цей матч закритий!", "error");
     clearBetslip();
     return;
@@ -1532,6 +1752,20 @@ function handlePromoSubmit() {
   saveDB(db);
 
   showToast(`Промокод активовано! Нараховано +${reward} 🪙 на ваш баланс.`, "success");
+  
+  // Activate glowing eyes
+  const eyeL = document.getElementById('wolf-eye-l');
+  const eyeR = document.getElementById('wolf-eye-r');
+  if (eyeL && eyeR) {
+    eyeL.classList.add('active-glow');
+    eyeR.classList.add('active-glow');
+    
+    setTimeout(() => {
+      eyeL.classList.remove('active-glow');
+      eyeR.classList.remove('active-glow');
+    }, 6000); // Glow for 6 seconds
+  }
+
   input.value = "";
   renderPageContent();
 }
@@ -2169,8 +2403,29 @@ const MOCK_CHAT_MESSAGES = [
   { username: "silver_elite", text: "how did he miss that shot??" }
 ];
 
+
+let activeBettingTab = 'live';
+let chatSimulationStarted = false;
 let chatInterval = null;
+
+// Global tab switching functions
+window.switchBettingTab = function(tab) {
+  activeBettingTab = tab;
+  renderPageContent();
+};
+
+window.showAllMatches = function() {
+  activeBettingTab = 'all';
+  renderPageContent();
+};
+
 function startChatSimulation() {
+  const container = document.getElementById('chat-messages-list') || document.getElementById('live-chat-messages');
+  if (!container) return;
+
+  if (chatSimulationStarted) return;
+  chatSimulationStarted = true;
+
   if (chatInterval) clearInterval(chatInterval);
 
   // Prepopulate
@@ -2182,11 +2437,11 @@ function startChatSimulation() {
   chatInterval = setInterval(() => {
     const msg = MOCK_CHAT_MESSAGES[Math.floor(Math.random() * MOCK_CHAT_MESSAGES.length)];
     appendChatMessage(msg.username, msg.text);
-  }, 4000);
+  }, 3500);
 }
 
 window.sendChatMessage = function() {
-  const input = document.getElementById('live-chat-input');
+  const input = document.getElementById('chat-message-input') || document.getElementById('live-chat-input');
   if (!input) return;
   const text = input.value.trim();
   if (!text) return;
@@ -2194,17 +2449,44 @@ window.sendChatMessage = function() {
   const db = getDB();
   if (!db.currentUser) return;
 
-  appendChatMessage(db.currentUser, text);
+  appendChatMessage(db.currentUser, text, 'color-gold');
   input.value = "";
 };
 
-function appendChatMessage(username, text) {
-  const container = document.getElementById('live-chat-messages');
+function appendChatMessage(username, text, forceColorClass = null) {
+  const container = document.getElementById('chat-messages-list') || document.getElementById('live-chat-messages');
   if (!container) return;
 
+  const isNewChat = !!document.getElementById('chat-messages-list');
   const div = document.createElement('div');
-  div.className = "chat-msg";
-  div.innerHTML = `<span class="chat-user">${username}:</span><span class="chat-text">${escapeHTML(text)}</span>`;
+
+  if (isNewChat) {
+    div.className = "chat-msg-item";
+    const now = new Date();
+    const timeStr = now.toTimeString().slice(0, 5); // "HH:MM"
+    
+    // Choose username color class
+    let colorClass = forceColorClass;
+    if (!colorClass) {
+      const colors = ['color-purple', 'color-blue', 'color-green', 'color-orange', 'color-red', 'color-white', 'color-gold'];
+      // Hash username to keep color stable per user in session
+      let hash = 0;
+      for (let i = 0; i < username.length; i++) {
+        hash = username.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      colorClass = colors[Math.abs(hash) % colors.length];
+    }
+    
+    div.innerHTML = `
+      <span class="chat-msg-time">${timeStr}</span>
+      <span class="chat-msg-user ${colorClass}">${escapeHTML(username)}:</span>
+      <span class="chat-msg-text">${escapeHTML(text)}</span>
+    `;
+  } else {
+    div.className = "chat-msg";
+    div.innerHTML = `<span class="chat-user">${username}:</span><span class="chat-text">${escapeHTML(text)}</span>`;
+  }
+
   container.appendChild(div);
 
   while (container.childNodes.length > 50) {
@@ -2754,10 +3036,12 @@ function renderMyBetsPage() {
   let filtered = [];
   if (activeBetsFilter === 'all') {
     filtered = history;
-  } else if (activeBetsFilter === 'active') {
+  } else if (activeBetsFilter === 'placed' || activeBetsFilter === 'active') {
     filtered = history.filter(b => b.status === 'В грі');
+  } else if (activeBetsFilter === 'won') {
+    filtered = history.filter(b => b.status === 'Виграш');
   } else {
-    // "Розраховані"
+    // Fallback for old values
     filtered = history.filter(b => b.status === 'Виграш' || b.status === 'Програш' || b.status === 'Анульовано');
   }
 
@@ -2794,21 +3078,41 @@ function renderMyBetsPage() {
       payoutDisplay = "0 🪙";
     }
 
+    let matchDisplayHTML = "";
+    if (bet.type === 'tournament') {
+      const tour = db.tournaments.find(t => t.id === bet.tourId);
+      const tourName = tour ? tour.name : "Турнір";
+      matchDisplayHTML = `
+        <div class="bet-match-row" style="display: flex; justify-content: center; align-items: center; gap: 10px; padding: 10px 0;">
+          <div class="bet-team-name" style="color: var(--cs-orange); font-size: 15px;">🏆 Турнір: ${tourName}</div>
+        </div>
+      `;
+    } else {
+      const display = bet.matchDisplay || "Матч";
+      const teams = display.split(' vs ');
+      matchDisplayHTML = `
+        <div class="bet-match-row">
+          <div class="bet-team-name">${teams[0] || display}</div>
+          <div class="bet-vs-box">VS</div>
+          <div class="bet-team-name">${teams[1] || ''}</div>
+        </div>
+      `;
+    }
+
     const card = document.createElement('div');
     card.className = "bet-history-card";
     card.innerHTML = `
       <div class="bet-card-header">
         <div class="bet-game-info">
-          <span>🎮 Counter-Strike 2 • Ординар</span>
+          <span>${bet.type === 'tournament' ? '🏆 Турнір · Переможець' : '🎮 CS2 · Ординар'}</span>
         </div>
-        <span class="bet-badge ${statusClass}">${bet.status}</span>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 9px; color: var(--text-secondary); font-family: monospace;">ID: ${bet.id || '?'}</span>
+          <span class="bet-badge ${statusClass}">${bet.status}</span>
+        </div>
       </div>
       
-      <div class="bet-match-row">
-        <div class="bet-team-name">${bet.matchDisplay.split(' vs ')[0] || bet.matchDisplay}</div>
-        <div class="bet-vs-box">VS</div>
-        <div class="bet-team-name">${bet.matchDisplay.split(' vs ')[1] || ''}</div>
-      </div>
+      ${matchDisplayHTML}
       
       <div class="bet-details-grid">
         <div class="bet-detail-item">
@@ -2817,7 +3121,7 @@ function renderMyBetsPage() {
         </div>
         <div class="bet-detail-item">
           <span class="bet-detail-label">Коефіцієнт</span>
-          <span class="bet-detail-value">${bet.odds.toFixed(2)}</span>
+          <span class="bet-detail-value">x${bet.odds.toFixed(2)}</span>
         </div>
         <div class="bet-detail-item">
           <span class="bet-detail-label">Сума ставки</span>
@@ -2842,172 +3146,184 @@ function renderMyBetsPage() {
 // ==========================================
 
 // Render tournaments grouped by active, upcoming, and completed categories
+let activeTournamentTab = 'active';
+
+window.switchTournamentTab = function(tab) {
+  activeTournamentTab = tab;
+  renderTournamentsPortal();
+};
+
 window.renderTournamentsPortal = function() {
   const container = document.getElementById('tournaments-portal-list');
   if (!container) return;
 
+  // Update active tab buttons active classes on the page
+  const tabBtns = document.querySelectorAll('.tournament-tab-btn');
+  tabBtns.forEach(btn => {
+    if (btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(`'${activeTournamentTab}'`)) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+
   const db = getDB();
   const tournaments = db.tournaments || [];
 
-  if (tournaments.length === 0) {
+  container.innerHTML = "";
+
+  // Filter tournaments by tab
+  const filtered = tournaments.filter(t => t.status === activeTournamentTab);
+
+  if (filtered.length === 0) {
+    let emptyMsg = "На даний момент немає активних турнірів.";
+    if (activeTournamentTab === 'upcoming') {
+      emptyMsg = "На даний момент немає майбутніх турнірів.";
+    } else if (activeTournamentTab === 'completed') {
+      emptyMsg = "Немає завершених турнірів.";
+    }
+
     container.innerHTML = `
-      <div class="card" style="background:rgba(255,255,255,0.01); border-style:dashed; padding:40px; text-align:center;">
+      <div class="card" style="background:rgba(255,255,255,0.01); border-style:dashed; padding:40px; text-align:center; width: 100%;">
         <span style="font-size:24px;">🏆</span>
-        <div style="font-weight:900; font-size:14px; margin-top:10px; color:white;">ТУРНІРИ ТИМЧАСОВО ВІДСУТНІ</div>
+        <div style="font-weight:900; font-size:14px; margin-top:10px; color:white;">ТУРНІРИ ВІДСУТНІ</div>
         <p style="font-size:11px; color:var(--text-secondary); max-width:400px; margin:8px auto 0 auto; line-height:1.5;">
-          На даний момент адміністрацією сайту не створено активних чи запланованих змагань. Поверніться сюди пізніше!
+          ${emptyMsg}
         </p>
       </div>
     `;
     return;
   }
 
-  // Sort tournaments: Active first, then Upcoming, then Completed
-  const activeT = tournaments.filter(t => t.status === "active");
-  const upcomingT = tournaments.filter(t => t.status === "upcoming");
-  const completedT = tournaments.filter(t => t.status === "completed");
+  filtered.forEach(tour => {
+    const card = document.createElement('div');
+    card.className = "tournament-card";
+    card.id = `tour-card-${tour.id}`;
 
-  container.innerHTML = "";
+    let statusClass = "status-upcoming";
+    let statusText = "Майбутній";
+    if (tour.status === "active") {
+      statusClass = "status-active";
+      statusText = "Активний";
+    } else if (tour.status === "completed") {
+      statusClass = "status-completed";
+      statusText = "Завершений";
+    }
 
-  // Helper render loop
-  const renderList = (title, list) => {
-    if (list.length === 0) return;
+    const regCount = tour.registeredTeams ? tour.registeredTeams.length : 0;
+    const formattedDate = tour.datetime ? tour.datetime.replace('T', ' ') : "-";
 
-    const groupHeader = document.createElement('div');
-    groupHeader.style.fontSize = "11px";
-    groupHeader.style.fontWeight = "900";
-    groupHeader.style.textTransform = "uppercase";
-    groupHeader.style.letterSpacing = "1px";
-    groupHeader.style.color = "var(--cs-orange)";
-    groupHeader.style.marginBottom = "10px";
-    groupHeader.style.marginTop = "15px";
-    groupHeader.innerText = title;
-    container.appendChild(groupHeader);
+    card.innerHTML = `
+      <div class="tournament-card-header">
+        <div class="tournament-title-area">
+          <span class="tournament-card-title">${tour.name}</span>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="tournament-status-pill ${statusClass}">${statusText}</span>
+            <span style="font-size:11px; color:var(--text-secondary); font-family:monospace;">Початок: ${formattedDate}</span>
+          </div>
+        </div>
+        <div class="prize-pool-badge">
+          🪙 <span>${tour.prizePool}</span> монет
+        </div>
+      </div>
 
-    list.forEach(tour => {
-      const card = document.createElement('div');
-      card.className = "tournament-card";
-      card.id = `tour-card-${tour.id}`;
+      <div class="tournament-info-grid">
+        <div class="info-grid-item">
+          <span class="info-item-label">Учасники</span>
+          <span class="info-item-value">${regCount} / ${tour.maxTeams} команд</span>
+        </div>
+        <div class="info-grid-item">
+          <span class="info-item-label">Формат</span>
+          <span class="info-item-value">${tour.format} Competitive</span>
+        </div>
+        <div class="info-grid-item">
+          <span class="info-item-label">Карта</span>
+          <span class="info-item-value">${tour.map}</span>
+        </div>
+        <div class="info-grid-item">
+          <span class="info-item-label">Проведення</span>
+          <span class="info-item-value" style="text-transform: capitalize;">${tour.system} elimination</span>
+        </div>
+      </div>
 
-      let statusClass = "status-upcoming";
-      let statusText = "Майбутній";
-      if (tour.status === "active") {
-        statusClass = "status-active";
-        statusText = "Активний";
-      } else if (tour.status === "completed") {
-        statusClass = "status-completed";
-        statusText = "Завершений";
+      <div style="display:flex; justify-content:flex-end;">
+        <button class="btn" style="margin-bottom:0; font-size:11px; padding:8px 16px; font-weight:800;" onclick="toggleTournamentDetails('${tour.id}')" id="toggle-btn-${tour.id}">${openTournamentDetailsIds[tour.id] ? '❌ ЗАКРИТИ ДЕТАЛІ' : '🏆 ДЕТАЛІ ТА СІТКА'}</button>
+      </div>
+
+      <!-- Hidden details and Brackets Canvas tabs pane -->
+      <div class="tournament-details-panel" id="details-panel-${tour.id}" style="display:${openTournamentDetailsIds[tour.id] ? 'block' : 'none'}; border-top:1px solid rgba(255,255,255,0.05); padding-top:15px; margin-top:10px;">
+        <div class="details-tabs-bar">
+          <button class="details-tab-btn active" id="tab-btn-info-${tour.id}" onclick="switchTournamentDetailTab('${tour.id}', 'info')">ℹ️ Інформація</button>
+          <button class="details-tab-btn" id="tab-btn-rules-${tour.id}" onclick="switchTournamentDetailTab('${tour.id}', 'rules')">📜 Правила</button>
+          <button class="details-tab-btn" id="tab-btn-bracket-${tour.id}" onclick="switchTournamentDetailTab('${tour.id}', 'bracket')">🏆 Сітка матчів</button>
+          <button class="details-tab-btn" id="tab-btn-betting-${tour.id}" onclick="switchTournamentDetailTab('${tour.id}', 'betting')" style="background:rgba(255,90,0,0.08); border-color:rgba(255,90,0,0.2);">🎰 Ставки</button>
+        </div>
+
+        <!-- TAB CONTENT: Info -->
+        <div class="details-tab-content active" id="tab-content-info-${tour.id}">
+          <div style="display:grid; grid-template-columns: 1.2fr 1fr; gap:20px; font-size:12px; line-height:1.6;">
+            <div>
+              <strong style="color:white; display:block; margin-bottom:8px; font-size:13px; text-transform:uppercase;">🏆 Розподіл призового фонду:</strong>
+              <ul style="padding-left:15px; display:flex; flex-direction:column; gap:4px; color:var(--text-secondary);">
+                ${Object.entries(tour.percents || {}).map(([place, pct]) => `
+                  <li><strong>${place} місце:</strong> <span style="color:white;">${pct}%</span> (отримає <strong style="color:var(--cs-orange);">${Math.round(tour.prizePool * pct / 100)} 🪙</strong>)</li>
+                `).join('')}
+              </ul>
+              <p style="color:var(--text-secondary); margin-top:15px; font-size:11px;">
+                Призи розподіляються в автоматичному режимі одразу після внесення фінального результату в адмін-панелі. Кошти зараховуються безпосередньо капітану команди!
+              </p>
+            </div>
+            <div style="background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; border:1px solid rgba(255,255,255,0.02); display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;">
+              <span style="font-size:32px; filter:drop-shadow(0 0 8px rgba(255,90,0,0.3));">🗺️</span>
+              <strong style="color:white; margin-top:8px; text-transform:uppercase; font-size:13px;">Активна карта: de_${tour.map.replace('de_', '')}</strong>
+              <span style="font-size:10px; color:var(--text-secondary); margin-top:3px;">Усі поєдинки турніру будуть зіграні виключно на цій локації</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB CONTENT: Rules -->
+        <div class="details-tab-content" id="tab-content-rules-${tour.id}">
+          <div style="background:rgba(0,0,0,0.15); padding:15px; border-radius:8px; border:1px solid rgba(255,255,255,0.02); font-size:12px; line-height:1.6; color:#e1e7f0; white-space:pre-line;">
+            ${tour.rules || "Офіційні правила тимчасово відсутні."}
+          </div>
+        </div>
+
+        <!-- TAB CONTENT: Brackets Canvas -->
+        <div class="details-tab-content" id="tab-content-bracket-${tour.id}">
+          <div class="bracket-canvas-wrapper" id="bracket-wrapper-${tour.id}">
+            <div class="bracket-canvas-inner" id="bracket-inner-${tour.id}">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB CONTENT: Tournament Betting -->
+        <div class="details-tab-content" id="tab-content-betting-${tour.id}">
+          <div id="tour-betting-portal-${tour.id}">
+            <!-- Rendered by renderTournamentBettingPortal() -->
+          </div>
+        </div>
+
+      </div>
+    `;
+    container.appendChild(card);
+
+    // If it was already open, restore active tab rendering!
+    if (openTournamentDetailsIds[tour.id]) {
+      let defaultTab = 'info';
+      let totalMatches = 0;
+      if (tour.brackets && tour.brackets.rounds) {
+        tour.brackets.rounds.forEach(r => {
+          if (r.matches) totalMatches += r.matches.length;
+        });
       }
-
-      const regCount = tour.registeredTeams ? tour.registeredTeams.length : 0;
-      const formattedDate = tour.datetime ? tour.datetime.replace('T', ' ') : "-";
-
-      card.innerHTML = `
-        <div class="tournament-card-header">
-          <div class="tournament-title-area">
-            <span class="tournament-card-title">${tour.name}</span>
-            <div style="display:flex; align-items:center; gap:8px;">
-              <span class="tournament-status-pill ${statusClass}">${statusText}</span>
-              <span style="font-size:11px; color:var(--text-secondary); font-family:monospace;">Початок: ${formattedDate}</span>
-            </div>
-          </div>
-          <div class="prize-pool-badge">
-            🪙 <span>${tour.prizePool}</span> монет
-          </div>
-        </div>
-
-        <div class="tournament-info-grid">
-          <div class="info-grid-item">
-            <span class="info-item-label">Учасники</span>
-            <span class="info-item-value">${regCount} / ${tour.maxTeams} команд</span>
-          </div>
-          <div class="info-grid-item">
-            <span class="info-item-label">Формат</span>
-            <span class="info-item-value">${tour.format} Competitive</span>
-          </div>
-          <div class="info-grid-item">
-            <span class="info-item-label">Карта</span>
-            <span class="info-item-value">${tour.map}</span>
-          </div>
-          <div class="info-grid-item">
-            <span class="info-item-label">Проведення</span>
-            <span class="info-item-value" style="text-transform: capitalize;">${tour.system} elimination</span>
-          </div>
-        </div>
-
-        <div style="display:flex; justify-content:flex-end;">
-          <button class="btn" style="margin-bottom:0; font-size:11px; padding:8px 16px; font-weight:800;" onclick="toggleTournamentDetails('${tour.id}')" id="toggle-btn-${tour.id}">${openTournamentDetailsIds[tour.id] ? '❌ ЗАКРИТИ ДЕТАЛІ' : '🏆 ДЕТАЛІ ТА СІТКА'}</button>
-        </div>
-
-        <!-- Hidden details and Brackets Canvas tabs pane -->
-        <div class="tournament-details-panel" id="details-panel-${tour.id}" style="display:${openTournamentDetailsIds[tour.id] ? 'block' : 'none'}; border-top:1px solid rgba(255,255,255,0.05); padding-top:15px; margin-top:10px;">
-          <div class="details-tabs-bar">
-            <button class="details-tab-btn active" id="tab-btn-info-${tour.id}" onclick="switchTournamentDetailTab('${tour.id}', 'info')">ℹ️ Інформація</button>
-            <button class="details-tab-btn" id="tab-btn-rules-${tour.id}" onclick="switchTournamentDetailTab('${tour.id}', 'rules')">📜 Правила</button>
-            <button class="details-tab-btn" id="tab-btn-bracket-${tour.id}" onclick="switchTournamentDetailTab('${tour.id}', 'bracket')">🏆 Сітка матчів</button>
-            <button class="details-tab-btn" id="tab-btn-betting-${tour.id}" onclick="switchTournamentDetailTab('${tour.id}', 'betting')" style="background:rgba(255,90,0,0.08); border-color:rgba(255,90,0,0.2);">🎰 Ставки</button>
-          </div>
-
-          <!-- TAB CONTENT: Info -->
-          <div class="details-tab-content active" id="tab-content-info-${tour.id}">
-            <div style="display:grid; grid-template-columns: 1.2fr 1fr; gap:20px; font-size:12px; line-height:1.6;">
-              <div>
-                <strong style="color:white; display:block; margin-bottom:8px; font-size:13px; text-transform:uppercase;">🏆 Розподіл призового фонду:</strong>
-                <ul style="padding-left:15px; display:flex; flex-direction:column; gap:4px; color:var(--text-secondary);">
-                  ${Object.entries(tour.percents || {}).map(([place, pct]) => `
-                    <li><strong>${place} місце:</strong> <span style="color:white;">${pct}%</span> (отримає <strong style="color:var(--cs-orange);">${Math.round(tour.prizePool * pct / 100)} 🪙</strong>)</li>
-                  `).join('')}
-                </ul>
-                <p style="color:var(--text-secondary); margin-top:15px; font-size:11px;">
-                  Призи розподіляються в автоматичному режимі одразу після внесення фінального результату в адмін-панелі. Кошти зараховуються безпосередньо капітану команди!
-                </p>
-              </div>
-              <div style="background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; border:1px solid rgba(255,255,255,0.02); display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;">
-                <span style="font-size:32px; filter:drop-shadow(0 0 8px rgba(255,90,0,0.3));">🗺️</span>
-                <strong style="color:white; margin-top:8px; text-transform:uppercase; font-size:13px;">Активна карта: de_${tour.map.replace('de_', '')}</strong>
-                <span style="font-size:10px; color:var(--text-secondary); margin-top:3px;">Усі поєдинки турніру будуть зіграні виключно на цій локації</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- TAB CONTENT: Rules -->
-          <div class="details-tab-content" id="tab-content-rules-${tour.id}">
-            <div style="background:rgba(0,0,0,0.15); padding:15px; border-radius:8px; border:1px solid rgba(255,255,255,0.02); font-size:12px; line-height:1.6; color:#e1e7f0; white-space:pre-line;">
-              ${tour.rules || "Офіційні правила тимчасово відсутні."}
-            </div>
-          </div>
-
-          <!-- TAB CONTENT: Brackets Canvas -->
-          <div class="details-tab-content" id="tab-content-bracket-${tour.id}">
-            <div class="bracket-canvas-wrapper" id="bracket-wrapper-${tour.id}">
-              <div class="bracket-canvas-inner" id="bracket-inner-${tour.id}">
-                <!-- Rendered dynamically -->
-              </div>
-            </div>
-          </div>
-
-          <!-- TAB CONTENT: Tournament Betting -->
-          <div class="details-tab-content" id="tab-content-betting-${tour.id}">
-            <div id="tour-betting-portal-${tour.id}">
-              <!-- Rendered by renderTournamentBettingPortal() -->
-            </div>
-          </div>
-
-        </div>
-      `;
-      container.appendChild(card);
-
-      // If it was already open, restore active tab rendering!
-      if (openTournamentDetailsIds[tour.id]) {
-        const lastActiveTab = activeTournamentTabs[tour.id] || 'info';
-        switchTournamentDetailTab(tour.id, lastActiveTab);
+      if (totalMatches > 1) {
+        defaultTab = 'bracket';
       }
-    });
-  };
-
-  renderList("🟢 Активні турніри", activeT);
-  renderList("⏳ Заплановані події", upcomingT);
-  renderList("🏁 Завершені змагання", completedT);
+      const lastActiveTab = activeTournamentTabs[tour.id] || defaultTab;
+      switchTournamentDetailTab(tour.id, lastActiveTab);
+    }
+  });
 };
 
 // Toggle expanded tournament details view
@@ -3016,13 +3332,26 @@ window.toggleTournamentDetails = function(tourId) {
   const btn = document.getElementById(`toggle-btn-${tourId}`);
   if (!panel || !btn) return;
 
+  const db = getDB();
+  const tour = db.tournaments.find(t => t.id === tourId);
+
   if (panel.style.display === "none") {
     panel.style.display = "block";
     btn.innerText = "❌ ЗАКРИТИ ДЕТАЛІ";
     openTournamentDetailsIds[tourId] = true;
     
-    // Initialize to last active tab or info tab
-    const lastActiveTab = activeTournamentTabs[tourId] || 'info';
+    // Initialize to last active tab or bracket/info tab
+    let defaultTab = 'info';
+    let totalMatches = 0;
+    if (tour && tour.brackets && tour.brackets.rounds) {
+      tour.brackets.rounds.forEach(r => {
+        if (r.matches) totalMatches += r.matches.length;
+      });
+    }
+    if (totalMatches > 1) {
+      defaultTab = 'bracket';
+    }
+    const lastActiveTab = activeTournamentTabs[tourId] || defaultTab;
     switchTournamentDetailTab(tourId, lastActiveTab);
   } else {
     panel.style.display = "none";
@@ -3062,7 +3391,7 @@ function isTournamentBettingFrozen(tour) {
   for (const round of tour.brackets.rounds) {
     if (!round.matches) continue;
     for (const match of round.matches) {
-      if (match.status === 'live' || match.status === 'active') {
+      if (match.status === 'live' || match.status === 'active' || match.status === 'upcoming') {
         const s1 = parseInt(match.score1) || 0;
         const s2 = parseInt(match.score2) || 0;
         if (Math.abs(s1 - s2) >= 6) {
@@ -3236,6 +3565,137 @@ function renderTournamentBettingPortal(tourId) {
   `;
 }
 
+// Helper to resolve map name to locally downloaded map screenshot filename
+function getMapFilename(mapName) {
+  if (!mapName) return 'de_mirage';
+  const name = mapName.toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (name.includes('mirage')) return 'de_mirage';
+  if (name.includes('dust')) return 'de_dust2';
+  if (name.includes('inferno')) return 'de_inferno';
+  if (name.includes('nuke')) return 'de_nuke';
+  if (name.includes('ancient')) return 'de_ancient';
+  if (name.includes('anubis')) return 'de_anubis';
+  if (name.includes('train')) return 'de_train';
+  if (name.includes('cache')) return 'de_cache';
+  return 'de_mirage'; // default fallback
+}
+
+// Modal to choose which tournament team to bet on
+window.openTourMatchBetModal = function(tourId, team1Name, team2Name) {
+  const db = getDB();
+  const tour = db.tournaments.find(t => t.id === tourId);
+  if (!tour) {
+    showToast('Турнір не знайдено!', 'error');
+    return;
+  }
+
+  // Find actual team objects to get their IDs and names
+  const t1Obj = (db.teams || []).find(t => t.name === team1Name);
+  const t2Obj = (db.teams || []).find(t => t.name === team2Name);
+
+  const t1Id = t1Obj ? t1Obj.id : "";
+  const t2Id = t2Obj ? t2Obj.id : "";
+
+  document.getElementById('tour-bet-modal-subtitle').innerText = tour.name.toUpperCase();
+
+  const container = document.getElementById('tour-bet-modal-body');
+  if (!container) return;
+
+  const teamOdds = tour.teamOdds || {};
+  const odds1 = (t1Obj && teamOdds[t1Obj.id] !== undefined) ? teamOdds[t1Obj.id] : 2.5;
+  const odds2 = (t2Obj && teamOdds[t2Obj.id] !== undefined) ? teamOdds[t2Obj.id] : 2.5;
+
+  const frozen = isTournamentBettingFrozen(tour);
+  const user = db.currentUser ? db.users.find(u => u.username === db.currentUser) : null;
+
+  // Change modal container max-width to allow comfortable side-by-side display of cards
+  const modalContent = document.querySelector('#tournament-bet-match-modal .modal-content');
+  if (modalContent) {
+    modalContent.style.maxWidth = '580px';
+    const mapFile = getMapFilename(tour.map);
+    modalContent.style.backgroundImage = `linear-gradient(to bottom, rgba(11, 14, 20, 0.88) 0%, rgba(11, 14, 20, 0.96) 100%), url('assets/maps/${mapFile}.png')`;
+    modalContent.style.backgroundSize = 'cover';
+    modalContent.style.backgroundPosition = 'center';
+  }
+
+  function buildModalTeamBetCard(team, defaultName, defaultId, odds) {
+    if (!team) {
+      return `
+        <div style="background:#131525; border:1px solid rgba(255,255,255,0.05); border-radius:12px; padding:16px; width:48%; text-align:center; color:var(--text-secondary); display:flex; align-items:center; justify-content:center; box-sizing:border-box;">
+          Команда очікується
+        </div>
+      `;
+    }
+    const players = team.players || [];
+    
+    let btnText = `🎰 ПОСТАВИТИ`;
+    let btnDisabledAttr = '';
+    let btnStyle = `width:100%; border:none; color:white; border-radius:8px; padding:10px; font-size:11px; font-weight:900; letter-spacing:0.5px; transition:all 0.2s; text-transform:uppercase; margin-bottom:0;`;
+    
+    if (frozen) {
+      btnText = `❄️ ЗАМОРОЖЕНО`;
+      btnDisabledAttr = 'disabled';
+      btnStyle += `background:#1e293b; color:var(--text-secondary); cursor:not-allowed;`;
+    } else if (!user) {
+      btnDisabledAttr = 'disabled';
+      btnStyle += `background:#1e293b; color:var(--text-secondary); cursor:not-allowed;`;
+    } else {
+      btnStyle += `background:linear-gradient(135deg, rgba(255,90,0,0.9), rgba(255,60,0,0.9)); cursor:pointer;`;
+    }
+
+    return `
+      <div style="background:linear-gradient(135deg, #0e0f1a 0%, #131525 100%); border:1px solid rgba(255,255,255,0.07); border-radius:12px; padding:14px; display:flex; flex-direction:column; gap:10px; width:48%; box-sizing:border-box; transition:all 0.2s; min-width:0;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <div style="background:rgba(255,90,0,0.15); border:1px solid rgba(255,90,0,0.3); border-radius:6px; padding:6px 8px; font-size:14px; flex-shrink:0;">${getTeamEmoji(team.name)}</div>
+          <div style="min-width:0; overflow:hidden;">
+            <div style="font-size:13px; font-weight:900; color:white; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${team.name}</div>
+            <div style="font-size:9px; color:var(--text-secondary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">[${team.tag || '?'}] · ${players.length} гравців</div>
+          </div>
+        </div>
+        <div style="background:rgba(0,0,0,0.25); border-radius:8px; padding:8px; text-align:center;">
+          <div style="font-size:9px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:2px;">КОЕФІЦІЄНТ</div>
+          <div style="font-size:22px; font-weight:900; color:var(--cs-orange); line-height:1;">x${odds.toFixed(2)}</div>
+        </div>
+        ${players.length > 0 ? `
+          <div style="display:flex; flex-wrap:wrap; gap:3px; max-height: 50px; overflow-y: auto;">
+            ${players.slice(0,5).map(p => {
+              const userRecord = db.users.find(u => u.username.toLowerCase() === p.toLowerCase());
+              let isOnline = false;
+              if (userRecord && userRecord.loginHistory && userRecord.loginHistory.length > 0) {
+                const lastLogin = userRecord.loginHistory[0];
+                if (lastLogin && lastLogin.date) {
+                  const lastVisitTime = new Date(lastLogin.date);
+                  isOnline = lastVisitTime && (Date.now() - lastVisitTime.getTime() < 10 * 60 * 1000);
+                }
+              }
+              const dotColor = isOnline ? '#26A17B' : '#718096';
+              return `
+                <span style="background:#1e293b; color:white; padding:2px 5px; border-radius:3px; font-size:9px; font-weight:700; display:inline-flex; align-items:center; gap:3px;">
+                  @${p.toUpperCase()}
+                  <span style="width:4px; height:4px; border-radius:50%; background:${dotColor};"></span>
+                </span>
+              `;
+            }).join('')}
+            ${players.length > 5 ? `<span style="background:#1e293b; color:var(--text-secondary); padding:2px 5px; border-radius:3px; font-size:9px;">+${players.length-5}</span>` : ''}
+          </div>` : ''}
+        <button onclick="closeModal('tournament-bet-match-modal'); placeTournamentBet('${tourId}', '${team.id}', '${team.name}', ${odds})" style="${btnStyle}" ${btnDisabledAttr}>
+          ${btnText}
+        </button>
+      </div>
+    `;
+  }
+
+  // Render the two team option cards
+  container.innerHTML = `
+    <div style="display: flex; gap: 16px; justify-content: space-between; padding: 10px 0;">
+      ${buildModalTeamBetCard(t1Obj, team1Name, t1Id, odds1)}
+      ${buildModalTeamBetCard(t2Obj, team2Name, t2Id, odds2)}
+    </div>
+  `;
+
+  openModal('tournament-bet-match-modal');
+};
+
 // Handle placing tournament team bet on client side
 window.placeTournamentBet = function(tourId, teamId, teamName, odds) {
   const db = getDB();
@@ -3272,6 +3732,14 @@ window.placeTournamentBet = function(tourId, teamId, teamName, odds) {
   amountInput.value = "";
   amountInput.max = balance;
   document.getElementById('bet-modal-payout').innerText = "0 🪙";
+
+  const betModalContent = document.querySelector('#bet-modal .modal-content');
+  if (betModalContent) {
+    const mapFile = getMapFilename(tour.map);
+    betModalContent.style.backgroundImage = `linear-gradient(to bottom, rgba(11, 14, 20, 0.88) 0%, rgba(11, 14, 20, 0.96) 100%), url('assets/maps/${mapFile}.png')`;
+    betModalContent.style.backgroundSize = 'cover';
+    betModalContent.style.backgroundPosition = 'center';
+  }
 
   openModal('bet-modal');
 };
@@ -3512,9 +3980,11 @@ function renderVisualBracketPortal(tourId) {
       const team1WinnerClass = (match.status === "finished" && match.winner === match.team1) ? "winner" : (match.status === "finished" ? "loser" : "");
       const team2WinnerClass = (match.status === "finished" && match.winner === match.team2) ? "winner" : (match.status === "finished" ? "loser" : "");
 
+      const matchMap = match.map || tour.map || 'de_mirage';
+
       node.innerHTML = `
         <div class="match-node-header">
-          <span class="match-node-time">${match.time ? match.time.replace('T', ' ') : 'Час не вказано'}</span>
+          <span class="match-node-time">${match.time ? match.time.replace('T', ' ') : 'Час не вказано'} · <strong style="color:var(--cs-orange); font-family:monospace; font-size:8px;">${matchMap}</strong></span>
           ${statusBadge}
         </div>
         

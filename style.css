@@ -1,5 +1,5 @@
-/* Import Outfit & Roboto Mono Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&family=Roboto+Mono:wght@400;700&display=swap');
+/* Import Rubik Mono One, Rubik, Outfit & Roboto Mono Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Rubik+Mono+One&family=Rubik:wght@300;400;500;700&family=Outfit:wght@300;400;600;800;900&family=Roboto+Mono:wght@400;700&display=swap');
 
 :root {
   --bg-darker: #0b0e14;
@@ -25,8 +25,14 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Rubik', sans-serif;
+  letter-spacing: -0.02em; /* Standard tighter Rubik spacing */
   user-select: none;
+}
+
+/* Enable normal standard weights since the font now supports it */
+strong, b, h1, h2, h3, h4, h5, h6, button, .btn, .section-title, .logo-text, .profile-username, .stat-value {
+  font-weight: 500;
 }
 
 body {
@@ -112,18 +118,19 @@ header {
 
 nav {
   display: flex;
-  gap: 8px;
+  gap: 18px;
 }
 
 .nav-link {
   color: var(--text-secondary);
   text-decoration: none;
-  font-weight: 600;
-  padding: 8px 16px;
+  font-family: 'Rubik Mono One', monospace;
+  font-weight: 900 !important;
+  padding: 10px 22px;
   border-radius: 6px;
   font-size: 13px;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: -0.03em;
   transition: var(--transition);
   border: 1px solid transparent;
 }
@@ -553,7 +560,8 @@ nav {
   align-items: center;
   height: 100%;
   min-height: 280px;
-  background: radial-gradient(circle, rgba(26,27,35,0.9) 0%, rgba(12,13,18,0.98) 100%);
+  background: radial-gradient(circle, rgba(12, 13, 18, 0.6) 0%, rgba(12, 13, 18, 0.9) 100%), url('assets/stream_offline_bg.jpg') no-repeat center;
+  background-size: cover;
   padding: 40px;
   text-align: center;
   border-right: 1px solid var(--border-color);
@@ -636,7 +644,7 @@ nav {
 .sidebar-right {
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 24px;
 }
 
 .betslip-wrapper {
@@ -1631,7 +1639,7 @@ footer {
   font-size: 12px;
   color: var(--text-secondary);
   line-height: 1.5;
-  margin-top: auto;
+  margin-top: auto; width: 100%;
 }
 
 .footer-inner {
@@ -2768,8 +2776,7 @@ footer {
     padding: 6px 12px !important;
     font-size: 10px !important;
   }
-  
-  /* Tables wrapper for horizontal scroll */
+ /* Tables wrapper for horizontal scroll */
   .admin-table-wrapper, .card > div {
     overflow-x: auto;
   }
@@ -3127,6 +3134,84 @@ footer {
   font-weight: 800;
   color: white;
   font-family: monospace;
+}
+
+/* Match Filter Tab Buttons */
+.bottom-tab-btn {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  padding: 6px 14px;
+  font-size: 11px;
+  font-weight: 800;
+  border-radius: 6px;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.2s;
+}
+.bottom-tab-btn:hover {
+  border-color: rgba(255, 90, 0, 0.3);
+  color: white;
+}
+.bottom-tab-btn.active {
+  background: rgba(255, 90, 0, 0.15) !important;
+  border-color: var(--cs-orange) !important;
+  color: white !important;
+  box-shadow: 0 0 10px rgba(255, 90, 0, 0.2);
+}
+
+/* Tournament Filter Tab Buttons */
+.tournament-tab-btn {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  padding: 8px 16px;
+  font-size: 11px;
+  font-weight: 800;
+  border-radius: 6px;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.2s;
+}
+.tournament-tab-btn:hover {
+  border-color: rgba(255, 90, 0, 0.3);
+  color: white;
+}
+.tournament-tab-btn.active {
+  background: rgba(255, 90, 0, 0.15) !important;
+  border-color: var(--cs-orange) !important;
+  color: white !important;
+  box-shadow: 0 0 10px rgba(255, 90, 0, 0.2);
+}
+
+/* Glowing pulsing wolf eyes for sidebar logo card */
+.wolf-glowing-eye {
+  width: 5px;
+  height: 5px;
+  background-color: transparent;
+  border-radius: 50%;
+  box-shadow: none;
+  pointer-events: none;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.wolf-glowing-eye.active-glow {
+  background-color: #ff1a40;
+  box-shadow: 0 0 8px #ff1a40, 0 0 16px #ff1a40;
+  animation: wolf-eye-pulse 1.6s infinite ease-in-out;
+}
+
+@keyframes wolf-eye-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.85;
+    box-shadow: 0 0 6px #ff1a40, 0 0 12px #ff1a40;
+  }
+  50% {
+    transform: scale(1.5);
+    opacity: 1;
+    box-shadow: 0 0 14px #ff1a40, 0 0 24px #ff1a40;
+  }
 }
 
 

@@ -128,19 +128,11 @@
       
       <!-- Brand logo with glowing eyes interaction -->
       <div class="card" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding: 20px;">
-        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:120px; height:120px; filter: drop-shadow(0 0 8px rgba(0,0,0,0.6));">
-          <!-- Outer border -->
-          <polygon points="50,15 75,35 70,55 85,60 80,75 50,90 20,75 15,60 30,55 25,35" stroke="var(--cs-orange)" stroke-width="2.5" fill="rgba(26, 27, 35, 0.8)" />
-          <polygon points="50,15 57,32 50,42 43,32" stroke="var(--border-color)" stroke-width="1.5" />
-          <polygon points="75,35 60,50 70,55" stroke="var(--border-color)" stroke-width="1" />
-          <polygon points="25,35 40,50 30,55" stroke="var(--border-color)" stroke-width="1" />
-          <polygon points="50,56 55,72 50,82 45,72" stroke="var(--cs-orange)" stroke-width="1.5" />
-          <!-- Eye slots -->
-          <g class="wolf-eyes">
-            <polygon id="wolf-eye-l" points="34,46 44,48 40,43" fill="#3a3d4d" />
-            <polygon id="wolf-eye-r" points="66,46 56,48 60,43" fill="#3a3d4d" />
-          </g>
-        </svg>
+        <div style="position: relative; width:120px; height:120px; display:flex; align-items:center; justify-content:center;">
+          <img src="assets/wolf_head_trans.png" alt="Wolf Logo" style="width:100%; height:100%; object-fit:contain; filter: drop-shadow(0 0 10px rgba(255,90,0,0.15));">
+          <div id="wolf-eye-l" class="wolf-glowing-eye" style="position: absolute; top: 45%; left: 40%;"></div>
+          <div id="wolf-eye-r" class="wolf-glowing-eye" style="position: absolute; top: 45%; left: 60%;"></div>
+        </div>
         <span style="font-weight: 800; font-size:12px; color: var(--cs-orange); margin-top: 8px; text-transform:uppercase; letter-spacing:0.5px;">VOLK 1303 BETTING</span>
       </div>
 
@@ -152,6 +144,66 @@
           <button type="submit" class="btn" style="padding: 8px 14px;">ОК</button>
         </form>
       </div>
+
+      <!-- Contact Center Widget -->
+      <div class="card" style="padding: 18px; margin-top: 10px; background: rgba(20, 24, 33, 0.6); border: 1px solid var(--border-color);">
+        <div class="section-title" style="font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px; margin-bottom: 12px; color: var(--cs-orange);">
+          Контакт-центр
+        </div>
+        
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <!-- Owner Telegram -->
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <img src="assets/tg.png" alt="TG" style="width: 18px; height: 18px; object-fit: contain;">
+              <span style="font-size: 12px; color: var(--text-secondary); font-weight: 600;">Власник:</span>
+            </div>
+            <a href="https://t.me/UK_1303" target="_blank" style="font-size: 12px; color: #fff; text-decoration: none; font-weight: 700; background: rgba(255, 90, 0, 0.1); border: 1px solid rgba(255, 90, 0, 0.2); padding: 4px 10px; border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='rgba(255, 90, 0, 0.2)'; this.style.borderColor='var(--cs-orange)';" onmouseout="this.style.background='rgba(255, 90, 0, 0.1)'; this.style.borderColor='rgba(255, 90, 0, 0.2)';">@UK_1303</a>
+          </div>
+
+          <!-- Admin Telegram -->
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <img src="assets/tg.png" alt="TG" style="width: 18px; height: 18px; object-fit: contain;">
+              <span style="font-size: 12px; color: var(--text-secondary); font-weight: 600;">Головний адмін:</span>
+            </div>
+            <a href="https://t.me/flasco" target="_blank" style="font-size: 12px; color: #fff; text-decoration: none; font-weight: 700; background: rgba(255, 90, 0, 0.1); border: 1px solid rgba(255, 90, 0, 0.2); padding: 4px 10px; border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='rgba(255, 90, 0, 0.2)'; this.style.borderColor='var(--cs-orange)';" onmouseout="this.style.background='rgba(255, 90, 0, 0.1)'; this.style.borderColor='rgba(255, 90, 0, 0.2)';">@flasco</a>
+          </div>
+
+          <div style="height: 1px; background: rgba(255,255,255,0.05); margin: 4px 0;"></div>
+
+          <!-- TikTok -->
+          <a href="https://www.tiktok.com/@volk13034" target="_blank" style="display: flex; align-items: center; gap: 10px; color: var(--text-primary); text-decoration: none; font-size: 13px; font-weight: 600; padding: 6px; border-radius: 6px; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
+            <img src="assets/tiktok.png" alt="TikTok" style="width: 18px; height: 18px; object-fit: contain;">
+            <span>TikTok</span>
+          </a>
+
+          <!-- Twitch -->
+          <a href="https://www.twitch.tv/volk13o3" target="_blank" style="display: flex; align-items: center; gap: 10px; color: var(--text-primary); text-decoration: none; font-size: 13px; font-weight: 600; padding: 6px; border-radius: 6px; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
+            <img src="assets/twitch.png" alt="Twitch" style="width: 18px; height: 18px; object-fit: contain;">
+            <span>Twitch</span>
+          </a>
+
+          <!-- YouTube -->
+          <a href="https://www.youtube.com/@VOLK_1303" target="_blank" style="display: flex; align-items: center; gap: 10px; color: var(--text-primary); text-decoration: none; font-size: 13px; font-weight: 600; padding: 6px; border-radius: 6px; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
+            <img src="assets/youtube.png" alt="YouTube" style="width: 18px; height: 18px; object-fit: contain;">
+            <span>YouTube</span>
+          </a>
+
+          <!-- Chat -->
+          <a href="https://t.me/+AWXM1oAQAvw2MDQ6" target="_blank" style="display: flex; align-items: center; gap: 10px; color: var(--text-primary); text-decoration: none; font-size: 13px; font-weight: 600; padding: 6px; border-radius: 6px; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
+            <img src="assets/tg.png" alt="Telegram Chat" style="width: 18px; height: 18px; object-fit: contain;">
+            <span>Телеграм Чат</span>
+          </a>
+
+          <!-- Discord -->
+          <a href="https://discord.gg/Yr439EF2ax" target="_blank" style="display: flex; align-items: center; gap: 10px; color: var(--text-primary); text-decoration: none; font-size: 13px; font-weight: 600; padding: 6px; border-radius: 6px; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
+            <img src="assets/discord.png" alt="Discord" style="width: 18px; height: 18px; object-fit: contain;">
+            <span>Discord</span>
+          </a>
+        </div>
+      </div>
+
 
 
 
@@ -271,6 +323,21 @@
 
           <button type="submit" class="btn" style="width: 100%; margin-top: 20px; padding: 12px; font-weight: 900; letter-spacing: 0.5px;">ПІДТВЕРДИТИ СТАВКУ</button>
         </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tournament Bet Match Modal -->
+  <div id="tournament-bet-match-modal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 580px; border-color: var(--cs-orange); box-shadow: 0 0 25px rgba(255, 90, 0, 0.25);">
+      <button class="modal-close" onclick="closeModal('tournament-bet-match-modal')">&times;</button>
+      <div style="text-align: center; margin-bottom: 20px;">
+        <img src="assets/wolf_logo.png" alt="Logo" style="width: 50px; height: 50px; filter: drop-shadow(0 0 10px rgba(255, 90, 0, 0.4));">
+        <div class="modal-title" style="margin-top: 10px; font-size: 20px; font-weight: 900; color: white;">Ставка на Турнірний Матч</div>
+        <div id="tour-bet-modal-subtitle" style="font-size: 12px; color: var(--text-secondary); text-transform: uppercase; font-weight: 700; margin-top: 5px;">-</div>
+      </div>
+      <div id="tour-bet-modal-body">
+        <!-- Filled dynamically by JS -->
       </div>
     </div>
   </div>

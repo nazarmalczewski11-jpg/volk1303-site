@@ -22,7 +22,7 @@
     </a>
 
     <nav>
-      <a href="betting.html" class="nav-link">Ставки</a>
+      <a href="betting.html" class="nav-link">Трансляція</a>
       <a href="tournament.html" class="nav-link">Турніри</a>
       <a href="my-bets.html" class="nav-link">Мої ставки</a>
       <a href="profile.html" class="nav-link active">Профіль</a>
@@ -117,7 +117,6 @@
           <div class="profile-tabs">
             <button class="profile-tab-btn active" id="btn-tab-bets" onclick="switchProfileTab('bets')">Історія ставок</button>
             <button class="profile-tab-btn" id="btn-tab-deposits" onclick="switchProfileTab('deposits')">Історія поповнень</button>
-            <button class="profile-tab-btn" id="btn-tab-inventory" onclick="switchProfileTab('inventory')">Інвентар скінів</button>
           </div>
 
           <!-- History items containers -->
@@ -130,12 +129,6 @@
           <div id="tab-deposits" class="tab-pane" style="display: none; max-height: 400px; overflow-y:auto;">
             <div id="deposits-history-list">
               <!-- Filled by JS -->
-            </div>
-          </div>
-
-          <div id="tab-inventory" class="tab-pane" style="display: none; max-height: 400px; overflow-y:auto;">
-            <div class="inventory-grid" id="inventory-skins-list">
-              <!-- Filled dynamically by JS -->
             </div>
           </div>
         </div>
@@ -254,7 +247,7 @@
       <div>© 2026 VOLK 1303. Усі права застережено.</div>
       <div style="display:flex; gap:20px;">
         <a href="#" onclick="openModal('rules-modal')" style="color:var(--text-secondary); text-decoration:none; transition:var(--transition);">Правила</a>
-        <a href="#" style="color:var(--text-secondary); text-decoration:none; transition:var(--transition);">Підтримка</a>
+        <a href="https://t.me/UK_1303" target="_blank" style="color:var(--text-secondary); text-decoration:none; transition:var(--transition);">Підтримка</a>
         <a href="https://discord.gg/wolf1303" target="_blank" style="color:var(--text-secondary); text-decoration:none; transition:var(--transition);">Discord</a>
       </div>
     </div>
@@ -267,21 +260,17 @@
     function switchProfileTab(tab) {
       const tabBets = document.getElementById('tab-bets');
       const tabDeps = document.getElementById('tab-deposits');
-      const tabInv = document.getElementById('tab-inventory');
       
       const btnBets = document.getElementById('btn-tab-bets');
       const btnDeps = document.getElementById('btn-tab-deposits');
-      const btnInv = document.getElementById('btn-tab-inventory');
 
       // Hide all panels
       tabBets.style.display = 'none';
       tabDeps.style.display = 'none';
-      tabInv.style.display = 'none';
 
       // Deactivate all buttons
       btnBets.classList.remove('active');
       btnDeps.classList.remove('active');
-      btnInv.classList.remove('active');
 
       // Show and activate target tab
       if (tab === 'bets') {
@@ -290,9 +279,6 @@
       } else if (tab === 'deposits') {
         tabDeps.style.display = 'block';
         btnDeps.classList.add('active');
-      } else if (tab === 'inventory') {
-        tabInv.style.display = 'block';
-        btnInv.classList.add('active');
       }
     }
   </script>

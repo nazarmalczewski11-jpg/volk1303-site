@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
-const { Pool } = require('pg');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 const port = process.env.PORT || 10000;
@@ -12,54 +13,99 @@ app.use(cors());
 app.use(express.json({ limit: '15mb' }));
 app.use(express.text({ type: '*/*', limit: '15mb' }));
 
-// Initialize PostgreSQL connection pool
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL && (process.env.DATABASE_URL.includes('localhost') || process.env.DATABASE_URL.includes('127.0.0.1'))
-    ? false 
-    : { rejectUnauthorized: false }
-});
+// Determine database mode
+const usePostgres = !!process.env.DATABASE_URL;
+let pool = null;
+const JSON_DB_PATH = path.join(__dirname, 'kv_store.json');
 
-// Create tables on start
-async function initDb() {
-  try {
-    const client = await pool.connect();
-    console.log("Connected to PostgreSQL successfully!");
-    
-    // Create the key-value store table
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS kv_store (
-        key VARCHAR(255) PRIMARY KEY,
-        value TEXT NOT NULL,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-    client.release();
-    console.log("Database table initialized successfully.");
-  } catch (err) {
-    console.error("Database initialization error:", err);
+// Initialize database
+if (usePostgres) {
+  const { Pool } = require('pg');
+  pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.DATABASE_URL.includes('localhost') || process.env.DATABASE_URL.includes('127.0.0.1')
+      ? false 
+      : { rejectUnauthorized: false }
+  });
+  
+  async function initDb() {
+    try {
+      const client = await pool.connect();
+      console.log("Connected to PostgreSQL successfully!");
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS kv_store (
+          key VARCHAR(255) PRIMARY KEY,
+          value TEXT NOT NULL,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      client.release();
+      console.log("Database table initialized successfully.");
+    } catch (err) {
+      console.error("Database initialization error, falling back to JSON:", err);
+    }
+  }
+  initDb();
+} else {
+  console.log("No DATABASE_URL provided. Operating in LOCAL JSON mode.");
+  console.log(`Data will be saved in: ${JSON_DB_PATH}`);
+  if (!fs.existsSync(JSON_DB_PATH)) {
+    fs.writeFileSync(JSON_DB_PATH, JSON.stringify({}, null, 2), 'utf-8');
   }
 }
 
-initDb();
+// Helpers for JSON DB
+function readJsonDb() {
+  try {
+    if (!fs.existsSync(JSON_DB_PATH)) {
+      return {};
+    }
+    const raw = fs.readFileSync(JSON_DB_PATH, 'utf-8');
+    return JSON.parse(raw);
+  } catch (e) {
+    console.error("Error reading JSON database:", e);
+    return {};
+  }
+}
+
+function writeJsonDb(data) {
+  try {
+    fs.writeFileSync(JSON_DB_PATH, JSON.stringify(data, null, 2), 'utf-8');
+  } catch (e) {
+    console.error("Error writing JSON database:", e);
+  }
+}
+
+// Serve static frontend files
+app.use(express.static(__dirname));
 
 // Routes
 
 // 1. GET key value
 app.get('/:key', async (req, res) => {
   const { key } = req.params;
-  try {
-    const result = await pool.query('SELECT value FROM kv_store WHERE key = $1', [key]);
-    if (result.rows.length === 0) {
+  
+  if (usePostgres) {
+    try {
+      const result = await pool.query('SELECT value FROM kv_store WHERE key = $1', [key]);
+      if (result.rows.length === 0) {
+        return res.status(404).send('Key not found');
+      }
+      const val = result.rows[0].value;
+      res.setHeader('Content-Type', 'application/json');
+      res.send(val);
+    } catch (err) {
+      console.error(`Error retrieving key ${key} from Postgres:`, err);
+      res.status(500).send('Internal Server Error');
+    }
+  } else {
+    // JSON Mode
+    const db = readJsonDb();
+    if (db[key] === undefined) {
       return res.status(404).send('Key not found');
     }
-    
-    const val = result.rows[0].value;
     res.setHeader('Content-Type', 'application/json');
-    res.send(val);
-  } catch (err) {
-    console.error(`Error retrieving key ${key}:`, err);
-    res.status(500).send('Internal Server Error');
+    res.send(db[key]);
   }
 });
 
@@ -72,26 +118,35 @@ app.post('/:key', async (req, res) => {
     bodyValue = JSON.stringify(bodyValue);
   }
   
-  try {
-    await pool.query(
-      `INSERT INTO kv_store (key, value, updated_at) 
-       VALUES ($1, $2, CURRENT_TIMESTAMP) 
-       ON CONFLICT (key) 
-       DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP`,
-      [key, bodyValue]
-    );
+  if (usePostgres) {
+    try {
+      await pool.query(
+        `INSERT INTO kv_store (key, value, updated_at) 
+         VALUES ($1, $2, CURRENT_TIMESTAMP) 
+         ON CONFLICT (key) 
+         DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP`,
+        [key, bodyValue]
+      );
+      res.send('OK');
+    } catch (err) {
+      console.error(`Error saving key ${key} to Postgres:`, err);
+      res.status(500).send('Internal Server Error');
+    }
+  } else {
+    // JSON Mode
+    const db = readJsonDb();
+    db[key] = bodyValue;
+    writeJsonDb(db);
     res.send('OK');
-  } catch (err) {
-    console.error(`Error saving key ${key}:`, err);
-    res.status(500).send('Internal Server Error');
   }
 });
 
 // 3. Health check route
 app.get('/', (req, res) => {
-  res.send('VOLK 1303 Database Backend Server is active!');
+  const mode = usePostgres ? 'PostgreSQL' : 'Local JSON File';
+  res.send(`VOLK 1303 Database Backend Server is active! (Mode: ${mode})`);
 });
 
 app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
+  console.log(`Server is running on port ${port} in ${usePostgres ? 'PostgreSQL' : 'Local JSON'} mode`);
 });

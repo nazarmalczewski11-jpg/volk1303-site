@@ -22,7 +22,7 @@
     </a>
 
     <nav>
-      <a href="betting.html" class="nav-link">Ставки</a>
+      <a href="betting.html" class="nav-link">Трансляція</a>
       <a href="tournament.html" class="nav-link active">Турніри</a>
       <a href="my-bets.html" class="nav-link">Мої ставки</a>
       <a href="profile.html" class="nav-link">Профіль</a>
@@ -47,6 +47,13 @@
         <p style="font-size:12px; color:var(--text-secondary); margin-bottom: 20px; line-height: 1.6;">
           Беріть участь у професійних та аматорських змаганнях! Нижче представлені всі поточні, майбутні та завершені турніри. Клікніть на турнір, щоб відкрити його правила та інтерактивну сітку матчів.
         </p>
+
+        <!-- Tabs for tournament categories -->
+        <div style="display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 15px;">
+          <button class="tournament-tab-btn active" onclick="switchTournamentTab('active')">Активні</button>
+          <button class="tournament-tab-btn" onclick="switchTournamentTab('upcoming')">Майбутні</button>
+          <button class="tournament-tab-btn" onclick="switchTournamentTab('completed')">Завершені</button>
+        </div>
 
         <!-- Dynamic Portal List -->
         <div id="tournaments-portal-list" style="display:flex; flex-direction:column; gap:20px;">
@@ -217,7 +224,7 @@
       <div>© 2026 VOLK 1303. Усі права застережено.</div>
       <div style="display:flex; gap:20px;">
         <a href="#" onclick="openModal('rules-modal')" style="color:var(--text-secondary); text-decoration:none;">Правила</a>
-        <a href="#" style="color:var(--text-secondary); text-decoration:none;">Підтримка</a>
+        <a href="https://t.me/UK_1303" target="_blank" style="color:var(--text-secondary); text-decoration:none;">Підтримка</a>
         <a href="https://discord.gg/wolf1303" target="_blank" style="color:var(--text-secondary); text-decoration:none;">Discord</a>
       </div>
     </div>
