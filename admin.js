@@ -62,6 +62,9 @@ async function syncWithCloud() {
                 userUpdated = true;
               } else if (luBetLen > cuBetLen) {
                 shouldPush = true;
+              } else if (cuBetLen === luBetLen && JSON.stringify(lu.betHistory) !== JSON.stringify(cu.betHistory)) {
+                lu.betHistory = cu.betHistory;
+                userUpdated = true;
               }
 
               // D. Sync basic fields
@@ -93,48 +96,73 @@ async function syncWithCloud() {
       await pushToCloud(db);
     }
 
-    // 2. Sync structures
-    const [bRes, mRes, tRes, lRes, sRes, pRes, pdRes, txRes, tourRes] = await Promise.all([
-      fetch(CLOUD_BUCKET + 'brackets', { cache: 'no-store' }),
-      fetch(CLOUD_BUCKET + 'matches', { cache: 'no-store' }),
-      fetch(CLOUD_BUCKET + 'teams', { cache: 'no-store' }),
-      fetch(CLOUD_BUCKET + 'aimLobbies', { cache: 'no-store' }),
-      fetch(CLOUD_BUCKET + 'settings', { cache: 'no-store' }),
-      fetch(CLOUD_BUCKET + 'promocodes', { cache: 'no-store' }),
-      fetch(CLOUD_BUCKET + 'pendingDeposits', { cache: 'no-store' }),
-      fetch(CLOUD_BUCKET + 'usedTxids', { cache: 'no-store' }),
-      fetch(CLOUD_BUCKET + 'tournaments', { cache: 'no-store' })
-    ]);
+    // 2. Sync structures (staggered to prevent 429 rate limits)
+    if (!window.syncCycleCount) window.syncCycleCount = 0;
+    window.syncCycleCount++;
 
-    if (bRes.ok) {
+    const isFullSync = window.syncCycleCount % 3 === 0;
+
+    const fetches = [
+      fetch(CLOUD_BUCKET + 'matches', { cache: 'no-store' }),
+      fetch(CLOUD_BUCKET + 'tournaments', { cache: 'no-store' })
+    ];
+
+    if (isFullSync) {
+      fetches.push(
+        fetch(CLOUD_BUCKET + 'brackets', { cache: 'no-store' }),
+        fetch(CLOUD_BUCKET + 'teams', { cache: 'no-store' }),
+        fetch(CLOUD_BUCKET + 'aimLobbies', { cache: 'no-store' }),
+        fetch(CLOUD_BUCKET + 'settings', { cache: 'no-store' }),
+        fetch(CLOUD_BUCKET + 'promocodes', { cache: 'no-store' }),
+        fetch(CLOUD_BUCKET + 'pendingDeposits', { cache: 'no-store' }),
+        fetch(CLOUD_BUCKET + 'pendingWithdrawals', { cache: 'no-store' }),
+        fetch(CLOUD_BUCKET + 'usedTxids', { cache: 'no-store' })
+      );
+    }
+
+    const results = await Promise.all(fetches);
+    
+    // Assign results
+    let mRes = results[0];
+    let tourRes = results[1];
+    let bRes = isFullSync ? results[2] : null;
+    let tRes = isFullSync ? results[3] : null;
+    let lRes = isFullSync ? results[4] : null;
+    let sRes = isFullSync ? results[5] : null;
+    let pRes = isFullSync ? results[6] : null;
+    let pdRes = isFullSync ? results[7] : null;
+    let pwdRes = isFullSync ? results[8] : null;
+    let txRes = isFullSync ? results[9] : null;
+
+    if (bRes && bRes.ok) {
       const cloudBrackets = await bRes.json();
       if (JSON.stringify(db.brackets) !== JSON.stringify(cloudBrackets)) {
         db.brackets = cloudBrackets;
         dbChanged = true;
       }
     }
-    if (mRes.ok) {
+    if (mRes && mRes.ok) {
       const cloudMatches = await mRes.json();
       if (JSON.stringify(db.matches) !== JSON.stringify(cloudMatches)) {
         db.matches = cloudMatches;
         dbChanged = true;
       }
     }
-    if (tRes.ok) {
+    if (tRes && tRes.ok) {
       const cloudTeams = await tRes.json();
       if (JSON.stringify(db.teams) !== JSON.stringify(cloudTeams)) {
         db.teams = cloudTeams;
         dbChanged = true;
       }
     }
-    if (lRes.ok) {
+    if (lRes && lRes.ok) {
       const cloudLobbies = await lRes.json();
       if (JSON.stringify(db.aimLobbies) !== JSON.stringify(cloudLobbies)) {
         db.aimLobbies = cloudLobbies;
         dbChanged = true;
       }
     }
-    if (pRes.ok) {
+    if (pRes && pRes.ok) {
       const cloudPromocodes = await pRes.json();
       if (JSON.stringify(db.promocodes) !== JSON.stringify(cloudPromocodes)) {
         db.promocodes = cloudPromocodes;
@@ -173,6 +201,48 @@ async function syncWithCloud() {
         });
         if (toursChanged) dbChanged = true;
       }
+
+      // Retrospective settlement of any 'В грі' tournament bets for completed tournaments
+      let betsSettledRetrospectively = false;
+      db.tournaments.forEach(tour => {
+        if (tour.brackets && tour.brackets.rounds && tour.brackets.rounds.length > 0) {
+          const lastRound = tour.brackets.rounds[tour.brackets.rounds.length - 1];
+          const finalMatch = lastRound.matches[0];
+          if (finalMatch && finalMatch.status === 'finished' && finalMatch.winner) {
+            const winnerTeam = finalMatch.winner;
+            // Auto mark tournament as completed in db if not done yet
+            if (tour.status !== 'completed') {
+              tour.status = 'completed';
+              dbChanged = true;
+            }
+            db.users.forEach(u => {
+              let userModified = false;
+              (u.betHistory || []).forEach(bet => {
+                if (bet.tourId && bet.tourId === tour.id && bet.status === 'В грі') {
+                  const isWinner = bet.selectedTeam.toLowerCase() === winnerTeam.toLowerCase();
+                  bet.status = isWinner ? "Виграш" : "Програш";
+                  bet.payout = isWinner ? Math.round(bet.amount * bet.odds) : 0;
+                  if (isWinner) {
+                    u.balance = (u.balance || 0) + bet.payout;
+                  }
+                  betsSettledRetrospectively = true;
+                  dbChanged = true;
+                  userModified = true;
+                }
+              });
+              if (userModified) {
+                fetch(CLOUD_BUCKET + 'user_' + u.username.toLowerCase(), {
+                  method: 'POST',
+                  body: JSON.stringify(u)
+                }).catch(e => console.error("Error pushing individual user key retrospectively:", e));
+              }
+            });
+          }
+        }
+      });
+      if (betsSettledRetrospectively) {
+        shouldPush = true;
+      }
     }
     if (pdRes && pdRes.ok) {
       const cloudPending = await pdRes.json();
@@ -199,6 +269,31 @@ async function syncWithCloud() {
     } else if (pdRes && pdRes.status === 404) {
       shouldPush = true;
     }
+    if (pwdRes && pwdRes.ok) {
+      const cloudPendingWithdrawals = await pwdRes.json();
+      if (Array.isArray(cloudPendingWithdrawals)) {
+        db.pendingWithdrawals = db.pendingWithdrawals || [];
+        cloudPendingWithdrawals.forEach(cw => {
+          const idx = db.pendingWithdrawals.findIndex(w => w.id === cw.id);
+          if (idx === -1) {
+            db.pendingWithdrawals.push(cw);
+            dbChanged = true;
+          } else {
+            const localWithdraw = db.pendingWithdrawals[idx];
+            if (localWithdraw.status !== cw.status) {
+              if (cw.status !== "pending") {
+                localWithdraw.status = cw.status;
+                dbChanged = true;
+              } else if (localWithdraw.status !== "pending") {
+                shouldPush = true;
+              }
+            }
+          }
+        });
+      }
+    } else if (pwdRes && pwdRes.status === 404) {
+      shouldPush = true;
+    }
     if (txRes && txRes.ok) {
       const cloudTxids = await txRes.json();
       if (Array.isArray(cloudTxids)) {
@@ -212,7 +307,7 @@ async function syncWithCloud() {
     } else if (txRes && txRes.status === 404) {
       shouldPush = true;
     }
-    if (sRes.ok) {
+    if (sRes && sRes.ok) {
       const settings = await sRes.json();
       if (settings.twitchStatus && settings.twitchStatus !== db.twitchStatus) {
         db.twitchStatus = settings.twitchStatus;
@@ -251,11 +346,10 @@ async function syncWithCloud() {
 }
 window.syncWithCloud = syncWithCloud;
 
-// Push local changes to cloud
 async function pushToCloud(db) {
   activePushes++;
   try {
-    await Promise.all([
+    const promises = [
       fetch(CLOUD_BUCKET + 'users', { method: 'POST', body: JSON.stringify(db.users) }),
       fetch(CLOUD_BUCKET + 'brackets', { method: 'POST', body: JSON.stringify(db.brackets) }),
       fetch(CLOUD_BUCKET + 'matches', { method: 'POST', body: JSON.stringify(db.matches) }),
@@ -263,13 +357,29 @@ async function pushToCloud(db) {
       fetch(CLOUD_BUCKET + 'aimLobbies', { method: 'POST', body: JSON.stringify(db.aimLobbies) }),
       fetch(CLOUD_BUCKET + 'promocodes', { method: 'POST', body: JSON.stringify(db.promocodes) }),
       fetch(CLOUD_BUCKET + 'pendingDeposits', { method: 'POST', body: JSON.stringify(db.pendingDeposits || []) }),
+      fetch(CLOUD_BUCKET + 'pendingWithdrawals', { method: 'POST', body: JSON.stringify(db.pendingWithdrawals || []) }),
       fetch(CLOUD_BUCKET + 'usedTxids', { method: 'POST', body: JSON.stringify(db.usedTxids || []) }),
       fetch(CLOUD_BUCKET + 'tournaments', { method: 'POST', body: JSON.stringify(db.tournaments || []) }),
       fetch(CLOUD_BUCKET + 'settings', { method: 'POST', body: JSON.stringify({
         twitchStatus: db.twitchStatus,
         activeTwitchChannel: db.activeTwitchChannel
       }) })
-    ]);
+    ];
+
+    if (searchedUserNick) {
+      const username = searchedUserNick.toLowerCase();
+      const user = db.users.find(u => u.username.toLowerCase() === username);
+      if (user) {
+        promises.push(
+          fetch(CLOUD_BUCKET + 'user_' + username, {
+            method: 'POST',
+            body: JSON.stringify(user)
+          })
+        );
+      }
+    }
+
+    await Promise.all(promises);
   } catch (e) {
     console.error("Failed to push to cloud:", e);
   } finally {
@@ -290,6 +400,7 @@ function getDB() {
     if (!db.aimLobbies) db.aimLobbies = [];
     if (!db.promocodes) db.promocodes = [];
     if (!db.pendingDeposits) db.pendingDeposits = [];
+    if (!db.pendingWithdrawals) db.pendingWithdrawals = [];
     if (!db.usedTxids) db.usedTxids = [];
     if (!db.tournaments) db.tournaments = [];
     
@@ -375,9 +486,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // Setup Event Listeners
   setupAdminListeners();
 
-  // Trigger background cloud sync immediately and poll every 8 seconds
+  // Trigger background cloud sync immediately and poll every 12 seconds
   syncWithCloud();
-  setInterval(syncWithCloud, 8000);
+  setInterval(syncWithCloud, 12000);
 
   // Start background simulation loop in case admin panel is the only page open
   
@@ -584,7 +695,7 @@ function handleAdminLoginSubmit() {
 }
 
 // User Search in Admin Panel Database
-function handleUserSearchAdmin() {
+async function handleUserSearchAdmin() {
   const db = getDB();
   const input = document.getElementById('admin-user-search-input');
   const nick = input.value.trim().toLowerCase();
@@ -594,7 +705,31 @@ function handleUserSearchAdmin() {
     return;
   }
 
-  const user = db.users.find(u => u.username === nick);
+  // Fetch individual user key directly from cloud for real-time fresh balance
+  let user = null;
+  try {
+    const res = await fetch(CLOUD_BUCKET + 'user_' + nick, { cache: 'no-store' });
+    if (res.ok) {
+      const cloudUser = await res.json();
+      if (cloudUser && cloudUser.username) {
+        const luIdx = db.users.findIndex(u => u.username.toLowerCase() === nick);
+        if (luIdx === -1) {
+          db.users.push(cloudUser);
+        } else {
+          db.users[luIdx] = cloudUser;
+        }
+        localStorage.setItem(DB_KEY, JSON.stringify(db));
+        user = cloudUser;
+      }
+    }
+  } catch (e) {
+    console.error("Failed to fetch fresh user key from cloud:", e);
+  }
+
+  if (!user) {
+    user = db.users.find(u => u.username === nick);
+  }
+
   const details = document.getElementById('searched-user-info');
   const controls = document.getElementById('balance-adjust-controls');
 
@@ -848,6 +983,7 @@ function renderAdminPanel() {
   renderAdminUserTeamsList(db.teams || []);
   renderAdminPromocodesList(db.promocodes || []);
   renderAdminPendingDeposits(db.pendingDeposits || []);
+  renderAdminPendingWithdrawals(db.pendingWithdrawals || []);
   renderAdminTournamentsList(db.tournaments || []);
   renderTournamentBettingTab();
   
@@ -875,9 +1011,6 @@ function renderDashboardMetrics(db) {
 
   const usersVal = document.getElementById('metric-total-users');
   if (usersVal) usersVal.innerText = db.users.length;
-
-  const duelsVal = document.getElementById('metric-total-duels');
-  if (duelsVal) duelsVal.innerText = (db.aimLobbies || []).length;
 
   const matchesVal = document.getElementById('metric-total-matches');
   if (matchesVal) matchesVal.innerText = db.matches.length;
@@ -1269,9 +1402,35 @@ window.changeMatchStatusAdmin = function(id, val) {
   if (!match) return;
 
   match.status = val;
+  // Also freeze odds when finished
+  if (val === 'finished') {
+    match.isFrozen = true;
+  }
   saveDB(db);
+
+  // Push matches to cloud immediately so clients see the status change
+  fetch(CLOUD_BUCKET + 'matches', { method: 'POST', body: JSON.stringify(db.matches) })
+    .catch(e => console.error('Помилка пуша матчів:', e));
+
   showToast(`Статус матчу змінено на: ${val}`, "success");
+
+  // Remind admin to settle bets when match is finished
+  if (val === 'finished') {
+    let activeBetsOnMatch = 0;
+    db.users.forEach(u => {
+      (u.betHistory || []).forEach(bet => {
+        if (bet.matchId === id && bet.status === 'В грі') activeBetsOnMatch++;
+      });
+    });
+    if (activeBetsOnMatch > 0) {
+      setTimeout(() => {
+        showToast(`⚠️ Є ${activeBetsOnMatch} ставок "В грі" на цей матч! Натисніть кнопку розрахунку нижче.`, 'error');
+      }, 800);
+    }
+    renderAdminPanel();
+  }
 };
+
 
 // Update Match Score, dynamic recalculations and 6-0 auto-freezing check
 window.updateMatchScoreAdmin = function(id) {
@@ -1296,8 +1455,18 @@ window.updateMatchScoreAdmin = function(id) {
     showToast(`Авто-заморозка коефіцієнтів! Рахунок: ${score1}:${score2}`, "error");
   }
 
+  // Auto-finish if score reaches 13 or more (CS2 limit)
+  if (score1 >= 13 || score2 >= 13) {
+    match.status = 'finished';
+    match.isFrozen = true;
+    showToast(`Матч завершено! Рахунок: ${score1}:${score2}. Оберіть переможця нижче.`, "success");
+  }
+
   saveDB(db);
   showToast(`Рахунок оновлено: ${score1}:${score2}`, "success");
+  if (score1 >= 13 || score2 >= 13) {
+    renderAdminPanel();
+  }
 };
 
 // Manual toggle freeze/unfreeze
@@ -1313,11 +1482,30 @@ window.toggleFreezeMatchAdmin = function(id, freeze) {
 
 // Delete Match entry
 window.deleteMatchAdmin = function(id) {
-  if (!confirm("Ви впевнені, що хочете видалити цей матч?")) return;
+  if (!confirm("Ви впевнені, що хочете видалити цей матч? Усі ставки 'В грі' будуть анульовані і кошти повернуто!")) return;
   const db = getDB();
+
+  // Auto-cancel all active bets on this match and refund coins
+  let refundCount = 0;
+  db.users.forEach(user => {
+    (user.betHistory || []).forEach(bet => {
+      if (bet.matchId === id && bet.status === 'В грі') {
+        bet.status = 'Анульовано';
+        bet.payout = bet.amount; // full refund
+        user.balance += bet.amount;
+        refundCount++;
+      }
+    });
+  });
+
   db.matches = db.matches.filter(m => m.id !== id);
   saveDB(db);
-  showToast("Матч видалено!", "success");
+
+  if (refundCount > 0) {
+    showToast(`Матч видалено! Анульовано ${refundCount} ставок — кошти повернуто гравцям.`, "success");
+  } else {
+    showToast("Матч видалено!", "success");
+  }
 };
 
 // Settle Bets and distribute payouts
@@ -1327,9 +1515,11 @@ window.settleMatchPayouts = function(id, winningTeamIdx) {
   if (!match) return;
 
   const winnerName = winningTeamIdx === 1 ? match.team1 : match.team2;
+  const settledPromises = [];
 
   db.users.forEach(user => {
-    user.betHistory.forEach(bet => {
+    let userModified = false;
+    (user.betHistory || []).forEach(bet => {
       if (bet.matchId === id && bet.status === 'В грі') {
         if (bet.teamIndex === winningTeamIdx) {
           bet.status = "Виграш";
@@ -1339,15 +1529,32 @@ window.settleMatchPayouts = function(id, winningTeamIdx) {
           bet.status = "Програш";
           bet.payout = 0;
         }
+        userModified = true;
       }
     });
+
+    if (userModified) {
+      settledPromises.push(
+        fetch(CLOUD_BUCKET + 'user_' + user.username.toLowerCase(), {
+          method: 'POST',
+          body: JSON.stringify(user)
+        })
+      );
+    }
   });
 
-  // Filter finished match out from active editor listing
+  // Remove settled match from active list
   db.matches = db.matches.filter(m => m.id !== id);
   saveDB(db);
 
+  // Immediately push settled users AND updated matches to cloud
+  settledPromises.push(fetch(CLOUD_BUCKET + 'users', { method: 'POST', body: JSON.stringify(db.users) }));
+  settledPromises.push(fetch(CLOUD_BUCKET + 'matches', { method: 'POST', body: JSON.stringify(db.matches) }));
+
+  Promise.all(settledPromises).catch(e => console.error('Помилка пуша розрахунку:', e));
+
   showToast(`Ставки розраховано! Переможець: ${winnerName}`, "success");
+  renderAdminPanel();
 };
 
 // Tab switching functionality
@@ -2177,6 +2384,13 @@ window.approveDepositAdmin = async function(depositId) {
 
   showToast("Зарахування поповнення...", "success");
   await saveDB(db);
+
+  // Push dedicated user key for approved depositor instantly!
+  fetch(CLOUD_BUCKET + 'user_' + user.username.toLowerCase(), {
+    method: 'POST',
+    body: JSON.stringify(user)
+  }).catch(e => console.error("Failed to push approved user key:", e));
+
   showToast(`Запит схвалено! Гравцю ${deposit.username.toUpperCase()} нараховано ${creditedCoins} 🪙`, "success");
   renderAdminPanel();
 };
@@ -2200,6 +2414,128 @@ window.rejectDepositAdmin = async function(depositId) {
   showToast("Відхилення запиту...", "success");
   await saveDB(db);
   showToast("Запит відхилено!", "success");
+  renderAdminPanel();
+};
+
+// Render pending withdrawals list
+function renderAdminPendingWithdrawals(pendingWithdrawals) {
+  const tbody = document.getElementById('admin-pending-withdrawals-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  const activePending = pendingWithdrawals.filter(w => w.status === "pending");
+
+  if (activePending.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-secondary); padding: 15px;">Немає активних запитів на виведення коштів</td></tr>`;
+    return;
+  }
+
+  const db = getDB();
+
+  activePending.forEach(w => {
+    const user = db.users.find(u => u.username.toLowerCase() === w.username.toLowerCase());
+    const balance = user ? user.balance : 0;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><strong>${w.username ? w.username.toUpperCase() : ''}</strong></td>
+      <td>${balance} 🪙</td>
+      <td style="color: var(--cs-orange); font-weight: bold;">${w.amount} 🪙</td>
+      <td><span class="rank-badge-inline" style="background: rgba(255, 90, 0, 0.1); color: var(--cs-orange); border-color: rgba(255, 90, 0, 0.2);">${w.method}</span></td>
+      <td><code style="background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 11px;">${w.details || ''}</code></td>
+      <td>${w.date || ''}</td>
+      <td>
+        <button class="btn btn-success" style="padding:4px 8px; font-size:10px; background: var(--success); border-color: var(--success);" onclick="approveWithdrawAdmin('${w.id}')">Виплачено</button>
+        <button class="btn btn-danger" style="padding:4px 8px; font-size:10px; margin-left:5px;" onclick="rejectWithdrawAdmin('${w.id}')">Відхилити</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// Approve withdrawal request
+window.approveWithdrawAdmin = async function(withdrawId) {
+  const db = getDB();
+  const withdraw = (db.pendingWithdrawals || []).find(w => w.id === withdrawId);
+  if (!withdraw) {
+    showToast("Запит на виведення не знайдено!", "error");
+    return;
+  }
+
+  if (withdraw.status !== "pending") {
+    showToast("Цей запит вже було оброблено!", "error");
+    return;
+  }
+
+  const user = db.users.find(u => u.username.toLowerCase() === withdraw.username.toLowerCase());
+  if (!user) {
+    showToast(`Гравця ${withdraw.username} не знайдено!`, "error");
+    return;
+  }
+
+  // Update status in cloud/db pending collection
+  withdraw.status = "approved";
+
+  // Update status in user's withdrawHistory
+  if (user.withdrawHistory) {
+    const userW = user.withdrawHistory.find(w => w.id === withdrawId);
+    if (userW) userW.status = "approved";
+  }
+
+  showToast("Підтвердження виплати...", "success");
+  await saveDB(db);
+
+  // Push dedicated user key instantly!
+  fetch(CLOUD_BUCKET + 'user_' + user.username.toLowerCase(), {
+    method: 'POST',
+    body: JSON.stringify(user)
+  }).catch(e => console.error("Failed to push approved user key:", e));
+
+  showToast(`Запит схвалено! Статус виплати для ${withdraw.username.toUpperCase()} оновлено на 'Виплачено'.`, "success");
+  renderAdminPanel();
+};
+
+// Reject withdrawal request (Refund coins)
+window.rejectWithdrawAdmin = async function(withdrawId) {
+  const db = getDB();
+  const withdraw = (db.pendingWithdrawals || []).find(w => w.id === withdrawId);
+  if (!withdraw) {
+    showToast("Запит на виведення не знайдено!", "error");
+    return;
+  }
+
+  if (withdraw.status !== "pending") {
+    showToast("Цей запит вже було оброблено!", "error");
+    return;
+  }
+
+  const user = db.users.find(u => u.username.toLowerCase() === withdraw.username.toLowerCase());
+  if (!user) {
+    showToast(`Гравця ${withdraw.username} не знайдено!`, "error");
+    return;
+  }
+
+  // Refund the deducted coins to user balance
+  user.balance = (user.balance || 0) + withdraw.amount;
+
+  // Update status in cloud/db pending collection
+  withdraw.status = "rejected";
+
+  // Update status in user's withdrawHistory
+  if (user.withdrawHistory) {
+    const userW = user.withdrawHistory.find(w => w.id === withdrawId);
+    if (userW) userW.status = "rejected";
+  }
+
+  showToast("Відхилення запиту та повернення монет...", "success");
+  await saveDB(db);
+
+  // Push dedicated user key instantly!
+  fetch(CLOUD_BUCKET + 'user_' + user.username.toLowerCase(), {
+    method: 'POST',
+    body: JSON.stringify(user)
+  }).catch(e => console.error("Failed to push rejected user key:", e));
+
+  showToast(`Запит відхилено! Гравцю ${withdraw.username.toUpperCase()} повернуто ${withdraw.amount} 🪙`, "success");
   renderAdminPanel();
 };
 
@@ -2471,11 +2807,13 @@ function rebuildBracketTeamSlots(tour) {
   const round1 = tour.brackets.rounds[0];
   if (!round1 || !round1.matches) return;
 
-  // Clear all matches to "Очікується" first
+  // Clear only team names in all matches — PRESERVE winner, scores, status, time
+  // If manual overrides exist, initialize them instead of unconditionally resetting to "Очікується"
   tour.brackets.rounds.forEach(round => {
     round.matches.forEach(m => {
-      m.team1 = "Очікується";
-      m.team2 = "Очікується";
+      m.team1 = m.manualTeam1 || "Очікується";
+      m.team2 = m.manualTeam2 || "Очікується";
+      // winner, score1, score2, status, time are intentionally NOT reset here
     });
   });
 
@@ -2560,6 +2898,22 @@ function rebuildBracketTeamSlots(tour) {
       }
     }
   }
+
+  // Synchronize winner team name with winnerSlot in all matches to prevent reset and support auto-healing propagation
+  tour.brackets.rounds.forEach(round => {
+    round.matches.forEach(m => {
+      if (m.status === "finished") {
+        if (m.winnerSlot === "team1") {
+          m.winner = m.team1;
+        } else if (m.winnerSlot === "team2") {
+          m.winner = m.team2;
+        }
+      } else {
+        m.winner = null;
+        m.winnerSlot = null;
+      }
+    });
+  });
 }
 
 // Save or Update tournament in database
@@ -2713,7 +3067,13 @@ function renderAdminTournamentsList(tournaments) {
         </div>
       </td>
       <td><strong style="color:white;">🪙 ${tour.prizePool}</strong></td>
-      <td><span class="tournament-status-pill ${statusClass}" style="display:inline-block;">${statusText}</span></td>
+      <td>
+        <select onchange="quickChangeTourStatus('${tour.id}', this.value)" style="background:var(--bg-input); color:white; border:1px solid var(--border-color); border-radius:6px; padding:5px 8px; font-size:11px; font-weight:700; cursor:pointer;">
+          <option value="upcoming" ${tour.status === 'upcoming' ? 'selected' : ''}>Майбутній</option>
+          <option value="active" ${tour.status === 'active' ? 'selected' : ''}>Активний</option>
+          <option value="completed" ${tour.status === 'completed' ? 'selected' : ''}>Завершений</option>
+        </select>
+      </td>
       <td>
         <div style="display:flex; gap:6px;">
           <button class="btn" style="padding:4px 8px; font-size:10px;" onclick="openBracketEditorCard('${tour.id}')">🏆 Керувати сіткою</button>
@@ -2725,6 +3085,28 @@ function renderAdminTournamentsList(tournaments) {
     tbody.appendChild(tr);
   });
 }
+
+// Quick status change directly from table dropdown (no modal, no percent validation)
+window.quickChangeTourStatus = function(tourId, newStatus) {
+  const db = getDB();
+  const tour = (db.tournaments || []).find(t => t.id === tourId);
+  if (!tour) return;
+
+  tour.status = newStatus;
+  tour.lastModified = Date.now() + 1; // +1 to guarantee it's newer than cloud
+  saveDB(db);
+
+  // Immediately push tournaments to cloud
+  fetch(CLOUD_BUCKET + 'tournaments', { method: 'POST', body: JSON.stringify(db.tournaments) })
+    .then(() => {
+      const label = newStatus === 'upcoming' ? 'Майбутній' : newStatus === 'active' ? 'Активний' : 'Завершений';
+      showToast(`✅ Статус турніру змінено на: ${label}`, 'success');
+      renderAdminPanel();
+    })
+    .catch(e => { console.error(e); showToast('Помилка оновлення хмари!', 'error'); });
+};
+
+
 
 // Global state for roster modal selection
 let activeRosterTournamentId = null;
@@ -3278,9 +3660,9 @@ window.openBracketEditorCard = function(tourId) {
         <div class="form-group" style="margin-bottom:12px;">
           <label style="font-size:10px; margin-bottom:4px; display:block;">🏆 Переможець матчу (для завершених)</label>
           <select id="m-winner-${rIndex}-${mIndex}" class="form-input" style="padding:6px; font-size:12px; background:#0c0d12;">
-            <option value="Очікується" ${!match.winner || match.winner === 'Очікується' ? 'selected' : ''}>Очікується (Автовибір за рахунком)</option>
-            <option value="team1" ${match.winner && match.winner === match.team1 && match.team1 !== 'Очікується' ? 'selected' : ''}>Команда 1 (ліворуч)</option>
-            <option value="team2" ${match.winner && match.winner === match.team2 && match.team2 !== 'Очікується' ? 'selected' : ''}>Команда 2 (праворуч)</option>
+            <option value="Очікується" ${(!match.winnerSlot && !match.winner) || match.winnerSlot === 'Очікується' || match.winner === 'Очікується' ? 'selected' : ''}>Очікується (Автовибір за рахунком)</option>
+            <option value="team1" ${match.winnerSlot === 'team1' || (match.winner && match.winner === match.team1 && match.team1 !== 'Очікується') ? 'selected' : ''}>Команда 1 (ліворуч)</option>
+            <option value="team2" ${match.winnerSlot === 'team2' || (match.winner && match.winner === match.team2 && match.team2 !== 'Очікується') ? 'selected' : ''}>Команда 2 (праворуч)</option>
           </select>
         </div>
 
@@ -3323,11 +3705,41 @@ window.saveBracketMatchAdmin = function(rIndex, mIndex) {
   const team2 = document.getElementById(`m-team2-${rIndex}-${mIndex}`).value;
   const score1 = parseInt(document.getElementById(`m-score1-${rIndex}-${mIndex}`).value, 10) || 0;
   const score2 = parseInt(document.getElementById(`m-score2-${rIndex}-${mIndex}`).value, 10) || 0;
-  const status = document.getElementById(`m-status-${rIndex}-${mIndex}`).value;
+  let status = document.getElementById(`m-status-${rIndex}-${mIndex}`).value;
   const time = document.getElementById(`m-time-${rIndex}-${mIndex}`).value;
+
+  // Auto-finish if either score reaches 13 or more
+  if (score1 >= 13 || score2 >= 13) {
+    status = "finished";
+  }
+
+  // If editing first round, sync back to registeredTeams roster so rebuild preserves it
+  if (rIndex === 0) {
+    if (!tour.registeredTeams) tour.registeredTeams = [];
+    
+    if (team1 === "Очікується") {
+      tour.registeredTeams[mIndex * 2] = null;
+    } else {
+      const t = db.teams.find(team => team.name === team1);
+      if (t) {
+        tour.registeredTeams[mIndex * 2] = t.id;
+      }
+    }
+
+    if (team2 === "Очікується") {
+      tour.registeredTeams[mIndex * 2 + 1] = null;
+    } else {
+      const t = db.teams.find(team => team.name === team2);
+      if (t) {
+        tour.registeredTeams[mIndex * 2 + 1] = t.id;
+      }
+    }
+  }
 
   match.team1 = team1;
   match.team2 = team2;
+  match.manualTeam1 = team1;
+  match.manualTeam2 = team2;
   match.score1 = score1;
   match.score2 = score2;
   match.status = status;
@@ -3336,20 +3748,40 @@ window.saveBracketMatchAdmin = function(rIndex, mIndex) {
   // Settle Winner if finished
   if (status === "finished") {
     const winnerSelect = document.getElementById(`m-winner-${rIndex}-${mIndex}`).value;
-    if (winnerSelect === "team1") {
+    
+    // Auto-winner check by score threshold 13
+    if (score1 >= 13 && score1 > score2) {
       match.winner = team1;
-    } else if (winnerSelect === "team2") {
+      match.winnerSlot = "team1";
+    } else if (score2 >= 13 && score2 > score1) {
       match.winner = team2;
+      match.winnerSlot = "team2";
     } else {
-      // Fallback to scores if left as "Очікується"
-      if (score1 === score2) {
-        showToast("Помилка: У матчі на виліт не може бути нічиєї!", "error");
-        return;
+      // Manual selection or fallback
+      if (winnerSelect === "team1") {
+        match.winner = team1;
+        match.winnerSlot = "team1";
+      } else if (winnerSelect === "team2") {
+        match.winner = team2;
+        match.winnerSlot = "team2";
+      } else {
+        // Fallback to scores if left as "Очікується"
+        if (score1 === score2) {
+          showToast("Помилка: У матчі на виліт не може бути нічиєї!", "error");
+          return;
+        }
+        if (score1 > score2) {
+          match.winner = team1;
+          match.winnerSlot = "team1";
+        } else {
+          match.winner = team2;
+          match.winnerSlot = "team2";
+        }
       }
-      match.winner = (score1 > score2) ? team1 : team2;
     }
   } else {
     match.winner = null;
+    match.winnerSlot = null;
   }
 
   // Perform brackets rebuild and propagation
@@ -3364,15 +3796,38 @@ window.saveBracketMatchAdmin = function(rIndex, mIndex) {
     
     // Distribute prizes to team owners automatically
     distributeTournamentPrizes(tour, db);
+
+    // Automatically settle all tournament outright bets placed on this tournament
+    const winningTeamName = finalMatch.winner;
+    db.users.forEach(u => {
+      (u.betHistory || []).forEach(bet => {
+        if (bet.tourId && bet.tourId === tour.id && bet.status === 'В грі') {
+          if (bet.selectedTeam.toLowerCase() === winningTeamName.toLowerCase()) {
+            bet.status = "Виграш";
+            bet.payout = Math.round(bet.amount * bet.odds);
+            u.balance = (u.balance || 0) + bet.payout;
+          } else {
+            bet.status = "Програш";
+            bet.payout = 0;
+          }
+        }
+      });
+    });
+
     showToast(`🏆 Турнір завершено! Переможець: ${finalMatch.winner.toUpperCase()}! Кошти зараховано капітанам!`, "success");
   }
 
   tour.lastModified = Date.now();
   saveDB(db);
+
+  // Use pushToCloud to block background sync and prevent race conditions
+  pushToCloud(db);
+
   showToast(`Матч ${match.id} успішно оновлено!`, "success");
   openBracketEditorCard(activeEditorTournamentId); // Refresh editor list
   renderAdminPanel();
 };
+
 
 // Automatical prizes payout distribution to team owners
 function distributeTournamentPrizes(tour, db) {

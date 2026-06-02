@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>VOLK 1303 | Панель Керування</title>
-  <link rel="stylesheet" href="style.css?v=2.0">
+  <link rel="stylesheet" href="style.css?v=4.0">
   <script src="smoke-bg.js"></script>
   <script>
     window.onerror = function(message, source, lineno, colno, error) {
@@ -66,7 +66,7 @@
         </button>
         <button class="admin-tab-item" onclick="switchAdminTab('deposits-verify')">
           <span class="admin-tab-item-icon">⏳</span>
-          <span>Запити Monobank</span>
+          <span>Каса (Депозити/Виплати)</span>
         </button>
         <button class="admin-tab-item" onclick="switchAdminTab('database')">
           <span class="admin-tab-item-icon">🗄️</span>
@@ -108,7 +108,6 @@
         </div>
       </header>
 
-      <!-- TAB 1: Metrics Dashboard Panel -->
       <section id="pane-dashboard" class="admin-content-pane active">
         
         <!-- Stats Metrics Cards Grid -->
@@ -121,29 +120,66 @@
             <div class="metric-val" id="metric-total-users">0</div>
             <div class="metric-lbl">Користувачів в БД</div>
           </div>
-          <div class="metric-card card-blue">
-            <div class="metric-val" id="metric-total-duels">0</div>
-            <div class="metric-lbl">Дуелі та командні бої</div>
-          </div>
           <div class="metric-card card-red">
             <div class="metric-val" id="metric-total-matches">0</div>
             <div class="metric-lbl">Активні матчі</div>
           </div>
         </div>
 
-        <div style="margin-top: 25px;">
-          
-          <!-- Terminal Operations Logger -->
-          <div class="card" style="margin-bottom:0;">
-            <div class="section-title">💻 КОНСОЛЬ СИСТЕМНОЇ АКТИВНОСТІ (LOGS)</div>
-            <p style="font-size:11px; color: var(--text-secondary); margin-bottom: 15px; line-height: 1.5;">
-              Моніторинг дій користувачів у реальному часі. Журнал автоматично синхронізує події реєстрацій, поповнення балансів та укладання парі.
+        <div style="display: grid; grid-template-columns: 1fr 1.3fr; gap: 20px; margin-top: 25px;">
+          <!-- Left Column: Match Creator Form -->
+          <div class="card" style="height: fit-content;">
+            <div class="section-title">🎮 СТВОРЕННЯ АКТИВНОГО МАТЧУ</div>
+            <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 15px; line-height: 1.5;">
+              Створіть активний матч для прийому ставок від користувачів. Вкажіть назви команд, склади гравців (через кому) та посилання на Twitch стрім.
             </p>
-            <div class="ops-log-box" id="admin-ops-log-container">
-              <!-- Filled dynamically by JS -->
-            </div>
+            <form id="admin-create-match-form" style="display:flex; flex-direction:column; gap:12px;">
+              <div class="form-group" style="margin-bottom:0;">
+                <label for="match-team1-name">Назва Команди 1</label>
+                <input type="text" id="match-team1-name" class="form-input" placeholder="Напр: NAVI" required>
+              </div>
+              <div class="form-group" style="margin-bottom:0;">
+                <label for="match-team2-name">Назва Команди 2</label>
+                <input type="text" id="match-team2-name" class="form-input" placeholder="Напр: Vitality" required>
+              </div>
+              <div class="form-group" style="margin-bottom:0;">
+                <label for="match-team1-players">Гравці Команди 1 (через кому)</label>
+                <input type="text" id="match-team1-players" class="form-input" placeholder="s1mple, b1t, jL, iM, Aleksib" required>
+              </div>
+              <div class="form-group" style="margin-bottom:0;">
+                <label for="match-team2-players">Гравці Команди 2 (через кому)</label>
+                <input type="text" id="match-team2-players" class="form-input" placeholder="ZywOo, apEX, Spinx, flameZ, mezii" required>
+              </div>
+              <div class="form-group" style="margin-bottom:0;">
+                <label for="match-stream-link">Посилання на трансляцію (необов'язково)</label>
+                <input type="url" id="match-stream-link" class="form-input" placeholder="Залишіть порожнім для автовибору Twitch">
+              </div>
+              <button type="submit" class="btn" style="width: 100%; padding: 12px; font-weight: 800; margin-top: 5px;">СТВОРИТИ МАТЧ</button>
+            </form>
           </div>
 
+          <!-- Right Column: Active Matches List & Logs -->
+          <div style="display: flex; flex-direction: column; gap: 20px;">
+            <!-- Active Matches List -->
+            <div class="card">
+              <div class="section-title">⚡ АКТИВНІ МАТЧІ (КЕРУВАННЯ)</div>
+              <div id="admin-matches-editor-list" style="display:flex; flex-direction:column; gap:10px; max-height: 400px; overflow-y:auto; padding-right:5px;">
+                <!-- Filled dynamically by JS -->
+                <div style="text-align:center; color:var(--text-secondary); padding:20px; font-size:12px;">Завантаження...</div>
+              </div>
+            </div>
+
+            <!-- Terminal Operations Logger -->
+            <div class="card" style="margin-bottom:0;">
+              <div class="section-title">💻 КОНСОЛЬ СИСТЕМНОЇ АКТИВНОСТІ (LOGS)</div>
+              <p style="font-size:11px; color: var(--text-secondary); margin-bottom: 15px; line-height: 1.5;">
+                Моніторинг дій користувачів у реальному часі. Журнал автоматично синхронізує події реєстрацій, поповнення балансів та укладання парі.
+              </p>
+              <div class="ops-log-box" id="admin-ops-log-container">
+                <!-- Filled dynamically by JS -->
+              </div>
+            </div>
+          </div>
         </div>
 
       </section>
@@ -491,6 +527,31 @@
             </table>
           </div>
         </div>
+
+        <div class="card" style="margin-top: 30px;">
+          <div class="section-title">💸 ЗАПИТИ НА ВИВЕДЕННЯ КОШТІВ</div>
+          <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.5;">
+            Тут відображаються активні запити користувачів на виведення коштів. Перекажіть кошти за вказаними реквізитами (карта або криптогаманець) та підтвердіть транзакцію, або відхиліть запит для повернення монет користувачеві.
+          </p>
+          <div style="overflow-x:auto;">
+            <table class="admin-table" style="width: 100%;">
+              <thead>
+                <tr>
+                  <th>Користувач</th>
+                  <th>Баланс</th>
+                  <th>Сума</th>
+                  <th>Метод</th>
+                  <th>Реквізити / Гаманець</th>
+                  <th>Дата</th>
+                  <th>Дія</th>
+                </tr>
+              </thead>
+              <tbody id="admin-pending-withdrawals-tbody">
+                <!-- Filled dynamically by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
       </section>
 
       <!-- TAB 8: Database & Activity Logs Panel -->
@@ -820,6 +881,6 @@
     </div>
   </div>
 
-  <script src="admin.js?v=3.4"></script>
+  <script src="admin.js?v=4.0"></script>
 </body>
 </html>

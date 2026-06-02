@@ -16,122 +16,105 @@ async function syncWithCloud() {
   let shouldPush = false;
 
   try {
-    // 1. Sync users
-    const uRes = await fetch(CLOUD_BUCKET + 'users', { cache: 'no-store' });
-    if (uRes.ok) {
-      const cloudUsers = await uRes.json();
-      if (Array.isArray(cloudUsers)) {
-        cloudUsers.forEach(cu => {
-          const luIdx = db.users.findIndex(u => u.username.toLowerCase() === cu.username.toLowerCase());
+    // 1. Sync users using optimized dedicated user keys
+    if (db.currentUser) {
+      const username = db.currentUser.toLowerCase();
+      const uRes = await fetch(CLOUD_BUCKET + 'user_' + username, { cache: 'no-store' });
+      if (uRes.ok) {
+        const cloudUser = await uRes.json();
+        if (cloudUser && cloudUser.username) {
+          const luIdx = db.users.findIndex(u => u.username.toLowerCase() === username);
           if (luIdx === -1) {
-            db.users.push(cu);
+            db.users.push(cloudUser);
             dbChanged = true;
           } else {
             const lu = db.users[luIdx];
-            if (JSON.stringify(lu) !== JSON.stringify(cu)) {
-              let userUpdated = false;
-              
-              // A. Merge login history (keep the longer one)
-              const cuLogLen = cu.loginHistory ? cu.loginHistory.length : 0;
-              const luLogLen = lu.loginHistory ? lu.loginHistory.length : 0;
-              if (cuLogLen > luLogLen) {
-                lu.loginHistory = cu.loginHistory;
-                userUpdated = true;
-              } else if (luLogLen > cuLogLen) {
-                shouldPush = true;
-              }
-
-              // B. Merge deposit history
-              const cuDepLen = cu.depositHistory ? cu.depositHistory.length : 0;
-              const luDepLen = lu.depositHistory ? lu.depositHistory.length : 0;
-              if (cuDepLen > luDepLen) {
-                lu.depositHistory = cu.depositHistory;
-                userUpdated = true;
-              } else if (luDepLen > cuDepLen) {
-                shouldPush = true;
-              }
-
-              // C. Merge bet history
-              const cuBetLen = cu.betHistory ? cu.betHistory.length : 0;
-              const luBetLen = lu.betHistory ? lu.betHistory.length : 0;
-              if (cuBetLen > luBetLen) {
-                lu.betHistory = cu.betHistory;
-                userUpdated = true;
-              } else if (luBetLen > cuBetLen) {
-                shouldPush = true;
-              }
-
-              // D. Sync basic fields
-              if (lu.balance !== cu.balance) {
-                lu.balance = cu.balance;
-                userUpdated = true;
-              }
-              if (lu.bonusPercent !== cu.bonusPercent) {
-                lu.bonusPercent = cu.bonusPercent;
-                userUpdated = true;
-              }
-              if (lu.password !== cu.password) {
-                lu.password = cu.password;
-                userUpdated = true;
-              }
-              if (lu.email !== cu.email) {
-                lu.email = cu.email;
-                userUpdated = true;
-              }
-
-              if (userUpdated) {
-                dbChanged = true;
-              }
+            if (JSON.stringify(lu) !== JSON.stringify(cloudUser)) {
+              db.users[luIdx] = cloudUser;
+              dbChanged = true;
             }
           }
-        });
+        }
+      } else if (uRes.status === 404) {
+        // Migrate local user to their dedicated cloud key immediately
+        const user = db.users.find(u => u.username.toLowerCase() === username);
+        if (user) {
+          await fetch(CLOUD_BUCKET + 'user_' + username, {
+            method: 'POST',
+            body: JSON.stringify(user)
+          });
+        }
       }
-    } else if (uRes.status === 404) {
-      await pushToCloud(db);
     }
 
-    // 2. Sync structures
-    const [bRes, mRes, tRes, lRes, sRes, pRes, pdRes, txRes, tourRes] = await Promise.all([
-      fetch(CLOUD_BUCKET + 'brackets', { cache: 'no-store' }),
-      fetch(CLOUD_BUCKET + 'matches', { cache: 'no-store' }),
-      fetch(CLOUD_BUCKET + 'teams', { cache: 'no-store' }),
-      fetch(CLOUD_BUCKET + 'aimLobbies', { cache: 'no-store' }),
-      fetch(CLOUD_BUCKET + 'settings', { cache: 'no-store' }),
-      fetch(CLOUD_BUCKET + 'promocodes', { cache: 'no-store' }),
-      fetch(CLOUD_BUCKET + 'pendingDeposits', { cache: 'no-store' }),
-      fetch(CLOUD_BUCKET + 'usedTxids', { cache: 'no-store' }),
-      fetch(CLOUD_BUCKET + 'tournaments', { cache: 'no-store' })
-    ]);
+    // 2. Sync structures (staggered to prevent 429 rate limits)
+    if (!window.syncCycleCount) window.syncCycleCount = 0;
+    window.syncCycleCount++;
 
-    if (bRes.ok) {
+    const isFullSync = window.syncCycleCount % 3 === 0;
+
+    const fetches = [
+      fetch(CLOUD_BUCKET + 'matches', { cache: 'no-store' }),
+      fetch(CLOUD_BUCKET + 'tournaments', { cache: 'no-store' })
+    ];
+
+    if (isFullSync) {
+      fetches.push(
+        fetch(CLOUD_BUCKET + 'brackets', { cache: 'no-store' }),
+        fetch(CLOUD_BUCKET + 'teams', { cache: 'no-store' }),
+        fetch(CLOUD_BUCKET + 'aimLobbies', { cache: 'no-store' }),
+        fetch(CLOUD_BUCKET + 'settings', { cache: 'no-store' }),
+        fetch(CLOUD_BUCKET + 'promocodes', { cache: 'no-store' }),
+        fetch(CLOUD_BUCKET + 'pendingDeposits', { cache: 'no-store' }),
+        fetch(CLOUD_BUCKET + 'pendingWithdrawals', { cache: 'no-store' }),
+        fetch(CLOUD_BUCKET + 'usedTxids', { cache: 'no-store' })
+      );
+    }
+
+    const results = await Promise.all(fetches);
+    
+    // Assign results
+    let mRes = results[0];
+    let tourRes = results[1];
+    let bRes = isFullSync ? results[2] : null;
+    let tRes = isFullSync ? results[3] : null;
+    let lRes = isFullSync ? results[4] : null;
+    let sRes = isFullSync ? results[5] : null;
+    let pRes = isFullSync ? results[6] : null;
+    let pdRes = isFullSync ? results[7] : null;
+    let pwdRes = isFullSync ? results[8] : null;
+    let txRes = isFullSync ? results[9] : null;
+
+    if (bRes && bRes.ok) {
       const cloudBrackets = await bRes.json();
       if (JSON.stringify(db.brackets) !== JSON.stringify(cloudBrackets)) {
         db.brackets = cloudBrackets;
         dbChanged = true;
       }
     }
-    if (mRes.ok) {
+    if (mRes && mRes.ok) {
       const cloudMatches = await mRes.json();
       if (JSON.stringify(db.matches) !== JSON.stringify(cloudMatches)) {
         db.matches = cloudMatches;
         dbChanged = true;
       }
+      // Match auto-resolution removed to prevent client-side race conditions and incorrect bet cancellations. Match deletions and settlements are handled authoritatively by the Admin Panel.
     }
-    if (tRes.ok) {
+    if (tRes && tRes.ok) {
       const cloudTeams = await tRes.json();
       if (JSON.stringify(db.teams) !== JSON.stringify(cloudTeams)) {
         db.teams = cloudTeams;
         dbChanged = true;
       }
     }
-    if (lRes.ok) {
+    if (lRes && lRes.ok) {
       const cloudLobbies = await lRes.json();
       if (JSON.stringify(db.aimLobbies) !== JSON.stringify(cloudLobbies)) {
         db.aimLobbies = cloudLobbies;
         dbChanged = true;
       }
     }
-    if (pRes.ok) {
+    if (pRes && pRes.ok) {
       const cloudPromocodes = await pRes.json();
       if (JSON.stringify(db.promocodes) !== JSON.stringify(cloudPromocodes)) {
         db.promocodes = cloudPromocodes;
@@ -143,6 +126,48 @@ async function syncWithCloud() {
       if (JSON.stringify(db.tournaments) !== JSON.stringify(cloudTournaments)) {
         db.tournaments = cloudTournaments;
         dbChanged = true;
+      }
+      
+      // Retrospective settlement of any 'В грі' tournament bets for completed tournaments
+      let betsSettledRetrospectively = false;
+      db.tournaments.forEach(tour => {
+        if (tour.brackets && tour.brackets.rounds && tour.brackets.rounds.length > 0) {
+          const lastRound = tour.brackets.rounds[tour.brackets.rounds.length - 1];
+          const finalMatch = lastRound.matches[0];
+          if (finalMatch && finalMatch.status === 'finished' && finalMatch.winner) {
+            const winnerTeam = finalMatch.winner;
+            // Auto mark tournament as completed in db if not done yet
+            if (tour.status !== 'completed') {
+              tour.status = 'completed';
+              dbChanged = true;
+            }
+            db.users.forEach(u => {
+              let userModified = false;
+              (u.betHistory || []).forEach(bet => {
+                if (bet.tourId && bet.tourId === tour.id && bet.status === 'В грі') {
+                  const isWinner = bet.selectedTeam.toLowerCase() === winnerTeam.toLowerCase();
+                  bet.status = isWinner ? "Виграш" : "Програш";
+                  bet.payout = isWinner ? Math.round(bet.amount * bet.odds) : 0;
+                  if (isWinner) {
+                    u.balance = (u.balance || 0) + bet.payout;
+                  }
+                  betsSettledRetrospectively = true;
+                  dbChanged = true;
+                  userModified = true;
+                }
+              });
+              if (userModified) {
+                fetch(CLOUD_BUCKET + 'user_' + u.username.toLowerCase(), {
+                  method: 'POST',
+                  body: JSON.stringify(u)
+                }).catch(e => console.error("Error pushing individual user key retrospectively:", e));
+              }
+            });
+          }
+        }
+      });
+      if (betsSettledRetrospectively) {
+        shouldPush = true;
       }
     }
     if (pdRes && pdRes.ok) {
@@ -170,6 +195,31 @@ async function syncWithCloud() {
     } else if (pdRes && pdRes.status === 404) {
       shouldPush = true;
     }
+    if (pwdRes && pwdRes.ok) {
+      const cloudPendingWithdrawals = await pwdRes.json();
+      if (Array.isArray(cloudPendingWithdrawals)) {
+        db.pendingWithdrawals = db.pendingWithdrawals || [];
+        cloudPendingWithdrawals.forEach(cw => {
+          const idx = db.pendingWithdrawals.findIndex(w => w.id === cw.id);
+          if (idx === -1) {
+            db.pendingWithdrawals.push(cw);
+            dbChanged = true;
+          } else {
+            const localWithdraw = db.pendingWithdrawals[idx];
+            if (localWithdraw.status !== cw.status) {
+              if (cw.status !== "pending") {
+                localWithdraw.status = cw.status;
+                dbChanged = true;
+              } else if (localWithdraw.status !== "pending") {
+                shouldPush = true;
+              }
+            }
+          }
+        });
+      }
+    } else if (pwdRes && pwdRes.status === 404) {
+      shouldPush = true;
+    }
     if (txRes && txRes.ok) {
       const cloudTxids = await txRes.json();
       if (Array.isArray(cloudTxids)) {
@@ -183,7 +233,7 @@ async function syncWithCloud() {
     } else if (txRes && txRes.status === 404) {
       shouldPush = true;
     }
-    if (sRes.ok) {
+    if (sRes && sRes.ok) {
       const settings = await sRes.json();
       if (settings.twitchStatus && settings.twitchStatus !== db.twitchStatus) {
         db.twitchStatus = settings.twitchStatus;
@@ -213,15 +263,30 @@ async function syncWithCloud() {
   }
 }
 
-// Push local changes to cloud (Client side: only push collections modified by users to prevent overwriting admin state)
 async function pushToCloud(db) {
   try {
-    await Promise.all([
+    const promises = [
       fetch(CLOUD_BUCKET + 'users', { method: 'POST', body: JSON.stringify(db.users) }),
       fetch(CLOUD_BUCKET + 'aimLobbies', { method: 'POST', body: JSON.stringify(db.aimLobbies) }),
       fetch(CLOUD_BUCKET + 'pendingDeposits', { method: 'POST', body: JSON.stringify(db.pendingDeposits || []) }),
+      fetch(CLOUD_BUCKET + 'pendingWithdrawals', { method: 'POST', body: JSON.stringify(db.pendingWithdrawals || []) }),
       fetch(CLOUD_BUCKET + 'usedTxids', { method: 'POST', body: JSON.stringify(db.usedTxids || []) })
-    ]);
+    ];
+
+    if (db.currentUser) {
+      const username = db.currentUser.toLowerCase();
+      const user = db.users.find(u => u.username.toLowerCase() === username);
+      if (user) {
+        promises.push(
+          fetch(CLOUD_BUCKET + 'user_' + username, {
+            method: 'POST',
+            body: JSON.stringify(user)
+          })
+        );
+      }
+    }
+
+    await Promise.all(promises);
   } catch (e) {
     console.error("Failed to push to cloud:", e);
   }
@@ -235,6 +300,7 @@ function getDB() {
   }
   try {
     const db = JSON.parse(data);
+    let dbUpdated = false;
     // Ensure all critical collections and rosters are initialized
     if (!db.users) db.users = [];
     if (!db.teams) db.teams = [];
@@ -244,11 +310,14 @@ function getDB() {
     if (!db.tournaments) db.tournaments = [];
     if (!db.twitchStatus) db.twitchStatus = "live";
     if (!db.activeTwitchChannel) db.activeTwitchChannel = "volk13o3";
+    if (!db.pendingWithdrawals) {
+      db.pendingWithdrawals = [];
+      dbUpdated = true;
+    }
     
     // Defensive check to ensure admin user is present and has the correct password
     let adminUser = db.users.find(u => u.username === 'admin');
     let oldExclamationAdmin = db.users.find(u => u.username === 'admin!');
-    let dbUpdated = false;
 
     if (!adminUser) {
       adminUser = {
@@ -466,9 +535,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // Render layout details
   renderPageContent();
 
-  // Trigger background cloud sync immediately and poll every 8 seconds
+  // Trigger background cloud sync immediately and poll every 12 seconds
   syncWithCloud();
-  setInterval(syncWithCloud, 8000);
+  setInterval(syncWithCloud, 12000);
 
   // Start background tournament brackets simulation (only runs when enabled)
   
@@ -664,7 +733,7 @@ function renderPageContent() {
   const balanceVal = document.getElementById('header-balance-value');
   const withdrawBtn = document.getElementById('header-withdraw-btn');
   if (db.currentUser) {
-    const user = db.users.find(u => u.username === db.currentUser);
+    const user = db.users.find(u => u.username.toLowerCase() === db.currentUser.toLowerCase());
     if (user) {
       if (balanceVal) {
         balanceVal.innerText = user.balance;
@@ -692,7 +761,42 @@ function renderPageContent() {
   if (currentPage === 'betting.html') {
     renderTwitchEmbed(db.activeTwitchChannel, db.twitchStatus || "live");
     renderTwitchChat(db.activeTwitchChannel, db.twitchStatus || "live");
-    renderBettingMatches(db.matches);
+    
+    // Aggregate standard matches and active tournament matches
+    const allMatches = [...(db.matches || [])];
+    (db.tournaments || []).forEach(tour => {
+      if (tour.status === 'active' && tour.brackets && tour.brackets.rounds) {
+        tour.brackets.rounds.forEach(round => {
+          (round.matches || []).forEach(match => {
+            if (match.status === 'live') {
+              // Find captains for team info
+              const t1 = (db.teams || []).find(t => t.name === match.team1);
+              const t2 = (db.teams || []).find(t => t.name === match.team2);
+              const p1 = t1 && t1.captain ? [`Капітан: @${t1.captain.toUpperCase()}`] : ['Склад очікується'];
+              const p2 = t2 && t2.captain ? [`Капітан: @${t2.captain.toUpperCase()}`] : ['Склад очікується'];
+
+              allMatches.push({
+                id: match.id,
+                isTournamentMatch: true,
+                tournamentId: tour.id,
+                tournamentName: tour.name,
+                team1: match.team1,
+                team2: match.team2,
+                players1: p1,
+                players2: p2,
+                score1: match.score1 || 0,
+                score2: match.score2 || 0,
+                status: 'live',
+                coef1: 1.0,
+                coef2: 1.0
+              });
+            }
+          });
+        });
+      }
+    });
+
+    renderBettingMatches(allMatches);
     renderLiveMatchStats(db);
     renderDailyQuests();
     renderSkinsShop();
@@ -1100,6 +1204,48 @@ function renderTwitchChat(channelName, status = "live") {
 }
 
 
+// Helpers to generate esports team emblem initials and gradients dynamically
+function getTeamInitials(teamName) {
+  if (!teamName) return "VS";
+  const clean = teamName.replace(/[^a-zA-Z0-9\u0400-\u04FF\s]/g, '').trim();
+  const words = clean.split(/\s+/);
+  if (words.length >= 2) {
+    return (words[0][0] + words[1][0]).toUpperCase();
+  }
+  if (clean.length >= 2) {
+    const lower = clean.toLowerCase();
+    if (lower === 'navi' || lower === 'natusvincere') return 'NV';
+    if (lower === 'faze' || lower === 'fazeclan') return 'FZ';
+    if (lower === 'spirit') return 'SP';
+    if (lower === 'vitality') return 'VT';
+    if (lower === 'g2' || lower === 'g2esports') return 'G2';
+    if (lower === 'mouz') return 'MZ';
+    if (lower === 'heroic') return 'HR';
+    if (lower === 'astralis') return 'AS';
+    if (lower === 'virtuspro' || lower === 'vp') return 'VP';
+    return (clean[0] + clean[1]).toUpperCase();
+  }
+  return clean.toUpperCase();
+}
+
+function getTeamGradient(teamName) {
+  const gradients = [
+    { bg: 'linear-gradient(135deg, #ff5e62 0%, #ff9966 100%)', glow: 'rgba(255, 94, 98, 0.35)' }, // Coral Sunset
+    { bg: 'linear-gradient(135deg, #00c6ff 0%, #0072ff 100%)', glow: 'rgba(0, 198, 255, 0.35)' }, // Cyber Blue
+    { bg: 'linear-gradient(135deg, #f857a6 0%, #ff5858 100%)', glow: 'rgba(248, 87, 166, 0.35)' }, // Electric Pink
+    { bg: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)', glow: 'rgba(56, 239, 125, 0.35)' }, // Toxic Green
+    { bg: 'linear-gradient(135deg, #8a2387 0%, #e94057 50%, #f27121 100%)', glow: 'rgba(233, 64, 87, 0.35)' }, // Aurora Gold
+    { bg: 'linear-gradient(135deg, #4776e6 0%, #8e54e9 100%)', glow: 'rgba(142, 84, 233, 0.35)' }, // Violet Matrix
+    { bg: 'linear-gradient(135deg, #f12711 0%, #f5af19 100%)', glow: 'rgba(241, 39, 17, 0.35)' }  // Fire & Blood
+  ];
+  let hash = 0;
+  for (let i = 0; i < teamName.length; i++) {
+    hash = teamName.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % gradients.length;
+  return gradients[index];
+}
+
 // Render list of active/upcoming matches in lobby
 function renderBettingMatches(matches) {
   const container = document.getElementById('live-matches-list');
@@ -1107,56 +1253,106 @@ function renderBettingMatches(matches) {
   container.innerHTML = "";
 
   if (matches.length === 0) {
-    container.innerHTML = `<div style="color:var(--text-secondary); text-align:center; padding: 20px;">Немає матчів на даний момент</div>`;
+    container.innerHTML = `<div style="color:var(--text-secondary); text-align:center; padding: 30px; font-weight: 600;">На даний момент активних матчів немає в лінії</div>`;
     return;
   }
 
   matches.forEach(match => {
     const isLive = match.status === 'live';
-    const isFrozen = match.isFrozen;
+    const isFinished = match.status === 'finished';
+    const isFrozen = match.isFrozen || isFinished;
 
     const div = document.createElement('div');
     div.className = "match-card";
+    
+    let subheaderText = `Counter-Strike 2 • ${match.status.toUpperCase()}`;
+    if (match.isTournamentMatch) {
+      subheaderText = `🏆 CS2 ТУРНІР • ${match.tournamentName.toUpperCase()} • ${match.status.toUpperCase()}`;
+    }
+
+    // Get team initials and gradients
+    const t1Initials = getTeamInitials(match.team1);
+    const t2Initials = getTeamInitials(match.team2);
+    const t1Grad = getTeamGradient(match.team1);
+    const t2Grad = getTeamGradient(match.team2);
+
+    const p1Html = match.players1.map(p => `<span class="player-chip">${p}</span>`).join('');
+    const p2Html = match.players2.map(p => `<span class="player-chip">${p}</span>`).join('');
+
+    let oddsHtml = "";
+    if (match.isTournamentMatch) {
+      oddsHtml = `
+        <a href="tournament.html" class="btn btn-secondary" style="grid-column: 1 / span 3; padding: 12px; font-size:11px; font-weight:900; text-align:center; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:6px; background: rgba(255, 90, 0, 0.08); border: 1px solid rgba(255, 90, 0, 0.2); color: var(--cs-orange); border-radius: 10px; margin-bottom: 0; text-transform: uppercase; letter-spacing: 0.5px;">
+          🏆 ПЕРЕГЛЯНУТИ СІТКУ ТА ПОСТАВИТИ НА ПЕРЕМОЖЦЯ ТУРНІРУ
+        </a>
+      `;
+    } else if (isFrozen) {
+      oddsHtml = `
+        <div style="grid-column: 1 / span 3; background: rgba(255,26,64,0.08); border:1px solid rgba(255,26,64,0.3); color:var(--wolf-red); font-weight:900; text-align:center; padding: 12px; border-radius:10px; font-size:12px; text-transform:uppercase; letter-spacing:0.5px; text-shadow: 0 0 5px rgba(255,26,64,0.2);">
+          ${isFinished ? '🔒 ПРИЙОМ СТАВОК ЗАВЕРШЕНО' : '❄️ КОЕФІЦІЄНТИ ЗАМОРОЖЕНІ'}
+        </div>
+      `;
+    } else {
+      oddsHtml = `
+        <button class="odds-btn" onclick="selectBetodds('${match.id}', 1, ${match.coef1}, '${match.team1}')">
+          <span>Перемога: ${match.team1}</span>
+          <strong>${match.coef1.toFixed(2)}</strong>
+        </button>
+        
+        <div class="odds-vs">VS</div>
+        
+        <button class="odds-btn" onclick="selectBetodds('${match.id}', 2, ${match.coef2}, '${match.team2}')">
+          <span>Перемога: ${match.team2}</span>
+          <strong>${match.coef2.toFixed(2)}</strong>
+        </button>
+      `;
+    }
+
     div.innerHTML = `
-      <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-secondary); margin-bottom: 10px;">
-        <span>Counter-Strike 2 • ${match.status.toUpperCase()}</span>
-        ${isLive ? `<span style="color:var(--wolf-red); font-weight:800; animation: pulse-red 1s infinite;">● LIVE</span>` : ''}
-      </div>
-
-      <div style="display:grid; grid-template-columns: 1.2fr auto 1.2fr; align-items:center; text-align:center; margin-bottom:12px;">
-        <div>
-          <div style="font-weight:800; font-size:15px;">${match.team1}</div>
-          <div style="font-size:10px; color:var(--text-secondary); margin-top:2px;">${match.players1.join(', ')}</div>
-        </div>
-
-        <div style="background-color:var(--bg-input); font-weight:900; font-size:20px; padding: 4px 14px; border-radius:6px; color:var(--cs-orange); border: 1px solid var(--border-color);">
-          ${match.score1} : ${match.score2}
-        </div>
-
-        <div>
-          <div style="font-weight:800; font-size:15px;">${match.team2}</div>
-          <div style="font-size:10px; color:var(--text-secondary); margin-top:2px;">${match.players2.join(', ')}</div>
-        </div>
-      </div>
-
-      <div class="odds-layout">
-        ${isFrozen ? `
-          <div style="grid-column: 1 / span 3; background-color:rgba(255,26,64,0.1); border:1px solid var(--wolf-red); color:var(--wolf-red); font-weight:800; text-align:center; padding: 10px; border-radius:8px; font-size:12px; text-transform:uppercase; letter-spacing:0.5px;">
-            КОЕФІЦІЄНТИ ЗАМОРОЖЕНІ
+      <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; font-weight: 800; color:var(--text-secondary); margin-bottom: 18px; border-bottom: 1px solid rgba(255,255,255,0.02); padding-bottom: 8px;">
+        <span style="letter-spacing: 0.5px; text-transform: uppercase;">${subheaderText}</span>
+        ${isLive ? `
+          <div class="live-pulse-badge">
+            <div class="live-pulse-dot"></div>
+            <span>LIVE</span>
           </div>
         ` : `
-          <button class="odds-btn" onclick="selectBetodds('${match.id}', 1, ${match.coef1}, '${match.team1}')">
-            <span>${match.team1}</span>
-            <strong>${match.coef1.toFixed(2)}</strong>
-          </button>
-          
-          <div class="odds-vs">VS</div>
-          
-          <button class="odds-btn" onclick="selectBetodds('${match.id}', 2, ${match.coef2}, '${match.team2}')">
-            <span>${match.team2}</span>
-            <strong>${match.coef2.toFixed(2)}</strong>
-          </button>
+          <span style="color:var(--text-secondary); font-size: 10px; border: 1px solid rgba(255,255,255,0.08); padding: 2px 8px; border-radius:6px; background: rgba(0,0,0,0.2);">UPCOMING</span>
         `}
+      </div>
+
+      <div style="display:grid; grid-template-columns: 1.2fr auto 1.2fr; align-items:center; gap: 15px; margin-bottom:18px;">
+        <!-- Left Team Card -->
+        <div class="team-row left-team" style="z-index: 2;">
+          <div>
+            <div style="font-weight:900; font-size:16px; color:var(--text-primary); letter-spacing: 0.3px;">${match.team1}</div>
+            <div class="esports-players-row">
+              ${p1Html}
+            </div>
+          </div>
+        </div>
+
+        <!-- Central Score Widget -->
+        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; z-index: 2;">
+          <div class="score-display">
+            ${match.score1} : ${match.score2}
+          </div>
+          <div style="font-size: 8px; color: rgba(255, 90, 0, 0.5); font-weight: 900; letter-spacing: 2px; margin-top: 5px; text-transform: uppercase;">SCORE</div>
+        </div>
+
+        <!-- Right Team Card -->
+        <div class="team-row right-team" style="z-index: 2;">
+          <div>
+            <div style="font-weight:900; font-size:16px; color:var(--text-primary); letter-spacing: 0.3px;">${match.team2}</div>
+            <div class="esports-players-row">
+              ${p2Html}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="odds-layout" style="position: relative; z-index: 2;">
+        ${oddsHtml}
       </div>
     `;
     container.appendChild(div);
@@ -1193,6 +1389,11 @@ window.selectBetodds = function(matchId, teamIndex, odds, teamName) {
   const match = db.matches.find(m => m.id === matchId);
   if (!match) return;
 
+  if (match.status === 'finished' || match.isFrozen) {
+    showToast("Прийом ставок на цей матч завершено!", "error");
+    return;
+  }
+
   activeBet = {
     matchId: match.id,
     teamIndex: teamIndex,
@@ -1201,23 +1402,25 @@ window.selectBetodds = function(matchId, teamIndex, odds, teamName) {
     matchDisplay: `${match.team1} vs ${match.team2}`
   };
 
-  // Toggle slip card displays (GGBet-style right panel card)
-  document.getElementById('betslip-empty-state').style.display = 'none';
-  const activeSlip = document.getElementById('active-betslip-panel');
-  activeSlip.style.display = 'block';
+  const user = db.users.find(u => u.username.toLowerCase() === db.currentUser.toLowerCase());
+  const balance = user ? user.balance : 0;
 
-  document.getElementById('slip-match-teams-txt').innerText = activeBet.matchDisplay;
-  document.getElementById('slip-pick-team-txt').innerText = activeBet.teamName;
-  document.getElementById('slip-odds-txt').innerText = activeBet.odds.toFixed(2);
+  // Clear hidden inputs for safety
+  document.getElementById('bet-modal-tour-id').value = "";
+  document.getElementById('bet-modal-match-id').value = match.id;
+  document.getElementById('bet-modal-team-id').value = teamIndex; // store teamIndex in team-id
 
-  const amountInput = document.getElementById('betslip-amount-input');
+  document.getElementById('bet-modal-team-name').innerText = activeBet.teamName;
+  document.getElementById('bet-modal-odds').innerText = 'x' + activeBet.odds.toFixed(2);
+  document.getElementById('bet-modal-odds').dataset.odds = activeBet.odds;
+  document.getElementById('bet-modal-balance').innerText = balance;
+
+  const amountInput = document.getElementById('bet-modal-amount');
   amountInput.value = "";
-  document.getElementById('slip-est-win-txt').innerText = "0 монет";
+  amountInput.max = balance;
+  document.getElementById('bet-modal-payout').innerText = "0 🪙";
 
-  amountInput.oninput = () => {
-    const val = parseFloat(amountInput.value) || 0;
-    document.getElementById('slip-est-win-txt').innerText = `${Math.round(val * activeBet.odds)} монет`;
-  };
+  openModal('bet-modal');
 };
 
 // Clear Bet Selection
@@ -1231,8 +1434,16 @@ window.clearBetslip = function() {
 function placeBetslipBet() {
   if (!activeBet) return;
   const db = getDB();
-  const user = db.users.find(u => u.username === db.currentUser);
+  const user = db.users.find(u => u.username.toLowerCase() === db.currentUser.toLowerCase());
   if (!user) return;
+
+  // Double-check match is not finished or frozen (type-safe check)
+  const match = db.matches.find(m => String(m.id) === String(activeBet.matchId));
+  if (!match || match.status === 'finished' || match.isFrozen) {
+    showToast("Прийом ставок на цей матч закритий!", "error");
+    clearBetslip();
+    return;
+  }
 
   const amt = parseFloat(document.getElementById('betslip-amount-input').value);
 
@@ -1266,6 +1477,7 @@ function placeBetslipBet() {
     date: new Date().toLocaleString()
   };
 
+  user.betHistory = user.betHistory || [];
   user.betHistory.unshift(record);
   saveDB(db);
 
@@ -1277,7 +1489,7 @@ function placeBetslipBet() {
 // Promo submit handler in betting lobby
 function handlePromoSubmit() {
   const db = getDB();
-  const user = db.users.find(u => u.username === db.currentUser);
+  const user = db.users.find(u => u.username.toLowerCase() === db.currentUser.toLowerCase());
   if (!user) return;
 
   const input = document.getElementById('betslip-promo-input');
@@ -1726,34 +1938,93 @@ function renderProfileDashboard() {
     });
   }
 
-  // Deposits History List
-  const depsContainer = document.getElementById('deposits-history-list');
-  depsContainer.innerHTML = "";
+  // Combine depositHistory and withdrawHistory into Transactions History List
+  const transactions = [];
 
-  if (user.depositHistory.length === 0) {
-    depsContainer.innerHTML = `<div style="text-align:center; color:var(--text-secondary); padding:20px;">Історія поповнень пуста</div>`;
-  } else {
-    user.depositHistory.forEach(dep => {
-      const item = document.createElement('div');
-      item.className = "history-item";
-      item.style.display = "flex";
-      item.style.justifyContent = "space-between";
-      item.style.borderBottom = "1px solid var(--border-color)";
-      item.style.padding = "10px 8px";
-      item.style.fontSize = "12px";
-
-      item.innerHTML = `
-        <div>
-          <div style="font-weight: 800;">Поповнення рахунку</div>
-          <div style="font-size: 11px; color:var(--text-secondary); margin-top:2px;">${dep.date}</div>
-        </div>
-        <div style="text-align:right;">
-          <span style="color:var(--success); font-weight:800;">+${dep.amount} 🪙</span>
-          <div style="font-size:10px; color:var(--text-secondary); margin-top:2px;">${dep.method}</div>
-        </div>
-      `;
-      depsContainer.appendChild(item);
+  (user.depositHistory || []).forEach(dep => {
+    transactions.push({
+      type: 'deposit',
+      date: dep.date,
+      amount: dep.amount,
+      method: dep.method,
+      status: 'approved'
     });
+  });
+
+  (user.withdrawHistory || []).forEach(w => {
+    transactions.push({
+      type: 'withdraw',
+      date: w.date,
+      amount: w.amount,
+      method: w.method,
+      status: w.status
+    });
+  });
+
+  // Sort by date descending (safely parsing strings or sorting by string as fallback)
+  transactions.sort((a, b) => {
+    const da = Date.parse(a.date) || 0;
+    const db = Date.parse(b.date) || 0;
+    return db - da;
+  });
+
+  const depsContainer = document.getElementById('deposits-history-list');
+  if (depsContainer) {
+    depsContainer.innerHTML = "";
+
+    const btnDeps = document.getElementById('btn-tab-deposits');
+    if (btnDeps) {
+      btnDeps.innerText = "Транзакції";
+    }
+
+    if (transactions.length === 0) {
+      depsContainer.innerHTML = `<div style="text-align:center; color:var(--text-secondary); padding:20px;">Історія транзакцій порожня</div>`;
+    } else {
+      transactions.forEach(tx => {
+        const item = document.createElement('div');
+        item.className = "history-item";
+        item.style.display = "flex";
+        item.style.justifyContent = "space-between";
+        item.style.borderBottom = "1px solid var(--border-color)";
+        item.style.padding = "10px 8px";
+        item.style.fontSize = "12px";
+
+        if (tx.type === 'deposit') {
+          item.innerHTML = `
+            <div>
+              <div style="font-weight: 800; color: white;">Поповнення рахунку</div>
+              <div style="font-size: 11px; color:var(--text-secondary); margin-top:2px;">${tx.date}</div>
+            </div>
+            <div style="text-align:right;">
+              <span style="color:var(--success); font-weight:800;">+${tx.amount} 🪙</span>
+              <div style="font-size:10px; color:var(--text-secondary); margin-top:2px;">${tx.method}</div>
+            </div>
+          `;
+        } else {
+          let statusColor = "var(--text-secondary)";
+          let statusText = "В обробці";
+          if (tx.status === 'approved') {
+            statusColor = "var(--success)";
+            statusText = "Виплачено";
+          } else if (tx.status === 'rejected') {
+            statusColor = "var(--error)";
+            statusText = "Відхилено (Повернено)";
+          }
+
+          item.innerHTML = `
+            <div>
+              <div style="font-weight: 800; color: white;">Виведення коштів</div>
+              <div style="font-size: 11px; color:var(--text-secondary); margin-top:2px;">${tx.date}</div>
+            </div>
+            <div style="text-align:right;">
+              <span style="color:var(--cs-orange); font-weight:800;">-${tx.amount} 🪙</span>
+              <div style="font-size:10px; color:${statusColor}; margin-top:2px; font-weight:700;">${statusText} (${tx.method})</div>
+            </div>
+          `;
+        }
+        depsContainer.appendChild(item);
+      });
+    }
   }
 }
 
@@ -2452,7 +2723,7 @@ function renderMyBetsPage() {
   const activeBets = history.filter(b => b.status === 'В грі').length;
   const totalWon = history.reduce((acc, b) => acc + (b.payout || 0), 0);
   
-  const settledBets = history.filter(b => b.status === 'Виграш' || b.status === 'Програш');
+  const settledBets = history.filter(b => b.status === 'Виграш' || b.status === 'Програш' || b.status === 'Анульовано');
   const wonBets = history.filter(b => b.status === 'Виграш');
   const winRate = settledBets.length > 0 ? Math.round((wonBets.length / settledBets.length) * 100) : 0;
 
@@ -2482,7 +2753,7 @@ function renderMyBetsPage() {
     filtered = history.filter(b => b.status === 'В грі');
   } else {
     // "Розраховані"
-    filtered = history.filter(b => b.status === 'Виграш' || b.status === 'Програш');
+    filtered = history.filter(b => b.status === 'Виграш' || b.status === 'Програш' || b.status === 'Анульовано');
   }
 
   if (filtered.length === 0) {
@@ -2500,6 +2771,7 @@ function renderMyBetsPage() {
     let statusClass = "badge-in-game";
     if (bet.status === "Виграш") statusClass = "badge-win";
     if (bet.status === "Програш") statusClass = "badge-loss";
+    if (bet.status === "Анульовано") statusClass = "badge-cancelled";
 
     let payoutDisplay = "";
     let payoutClass = "";
@@ -2510,6 +2782,9 @@ function renderMyBetsPage() {
     } else if (bet.status === "Виграш") {
       payoutDisplay = `+${bet.payout} 🪙`;
       payoutClass = "win";
+    } else if (bet.status === "Анульовано") {
+      payoutDisplay = `Повернуто ${bet.payout || bet.amount} 🪙`;
+      payoutClass = "";
     } else {
       payoutDisplay = "0 🪙";
     }
@@ -2810,6 +3085,67 @@ function renderTournamentBettingPortal(tourId) {
   const user = db.currentUser ? db.users.find(u => u.username === db.currentUser) : null;
   const frozen = isTournamentBettingFrozen(tour);
 
+  if (tour.status === "completed") {
+    // Find final match winner to display
+    let winnerTeam = "Невідомо";
+    if (tour.brackets && tour.brackets.rounds && tour.brackets.rounds.length > 0) {
+      const lastRound = tour.brackets.rounds[tour.brackets.rounds.length - 1];
+      const finalMatch = lastRound.matches[0];
+      if (finalMatch && finalMatch.winner) {
+        winnerTeam = finalMatch.winner;
+      }
+    }
+
+    // Check if the current user had a bet on this tournament
+    const userBet = user ? (user.betHistory || []).find(b => b.type === 'tournament' && b.tourId === tourId) : null;
+
+    let betResultHtml = "";
+    if (userBet) {
+      const isWinner = userBet.selectedTeam.toLowerCase() === winnerTeam.toLowerCase();
+      const statusText = isWinner ? "ВИГРАШ" : "ПРОГРАШ";
+      const statusColor = isWinner ? "#26a17b" : "#ef4444";
+      const payoutText = isWinner ? `🎉 Ви виграли <strong style="color:var(--cs-orange); font-size:18px;">${Math.round(userBet.amount * userBet.odds)} 🪙</strong>!` : `На жаль, ваша ставка не зіграла.`;
+      
+      betResultHtml = `
+        <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); border-radius:12px; padding:20px; text-align:center; display:flex; flex-direction:column; gap:12px; max-width:500px; width:100%;">
+          <div style="font-size:11px; text-transform:uppercase; color:var(--text-secondary); letter-spacing:0.5px;">Ваша ставка на переможця</div>
+          <div style="font-size:18px; font-weight:900; color:white;">${userBet.selectedTeam} (x${userBet.odds.toFixed(2)})</div>
+          <div style="font-size:12px; color:var(--text-secondary);">Сума ставки: <strong style="color:white;">${userBet.amount} 🪙</strong></div>
+          <div style="margin:10px 0; padding:10px; border-radius:8px; background:rgba(${isWinner ? '38,161,123' : '239,68,68'}, 0.08); border:1px solid rgba(${isWinner ? '38,161,123' : '239,68,68'}, 0.15); color:${statusColor}; font-weight:800; font-size:13px; text-transform:uppercase;">
+            ${statusText}
+          </div>
+          <div style="font-size:13px; color:var(--text-secondary);">${payoutText}</div>
+        </div>
+      `;
+    } else {
+      betResultHtml = `
+        <div style="color:var(--text-secondary); font-size:12px; text-align:center; background:rgba(255,255,255,0.01); border:1px solid rgba(255,255,255,0.03); border-radius:10px; padding:16px; width:100%; max-width:500px;">
+          ℹ️ Ви не робили ставок на переможця цього турніру.
+        </div>
+      `;
+    }
+
+    container.innerHTML = `
+      <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:25px; padding:40px 10px; background:linear-gradient(135deg, rgba(14,15,26,0.95) 0%, rgba(19,21,37,0.95) 100%); border-radius:16px; border:1px solid rgba(255,90,0,0.08); box-shadow:0 10px 30px rgba(0,0,0,0.25); width:100%;">
+        <div style="text-align:center;">
+          <div style="font-size:50px; line-height:1; margin-bottom:15px;">🏆</div>
+          <h2 style="font-size:24px; font-weight:900; color:white; text-transform:uppercase; letter-spacing:0.5px; margin:0 0 8px 0;">Турнір завершено!</h2>
+          <div style="font-size:13px; color:var(--text-secondary);">Всі результати розраховано та виплачено гравцям.</div>
+        </div>
+
+        <div style="background:rgba(255,90,0,0.05); border:1px solid rgba(255,90,0,0.15); border-radius:12px; padding:16px 24px; text-align:center; display:flex; align-items:center; gap:15px; box-shadow:0 4px 15px rgba(255,90,0,0.03); width: 100%; max-width: 500px; justify-content: center;">
+          <div style="font-size:11px; text-transform:uppercase; color:var(--text-secondary); letter-spacing:0.5px; text-align:center;">
+            <div>Офіційний переможець</div>
+            <div style="font-size:22px; font-weight:900; color:var(--cs-orange); margin-top:4px; text-transform:uppercase;">${winnerTeam.toUpperCase()}</div>
+          </div>
+        </div>
+
+        ${betResultHtml}
+      </div>
+    `;
+    return;
+  }
+
   if (teamObjects.length === 0) {
     container.innerHTML = `<div style="text-align:center; color:var(--text-secondary); padding:30px; font-size:12px;">Команди до цього турніру ще не додані</div>`;
     return;
@@ -2942,6 +3278,7 @@ window.submitBetModalForm = function(event) {
   event.preventDefault();
   const db = getDB();
   const tourId = document.getElementById('bet-modal-tour-id').value;
+  const matchId = document.getElementById('bet-modal-match-id') ? document.getElementById('bet-modal-match-id').value : '';
   const teamId = document.getElementById('bet-modal-team-id').value;
   const teamName = document.getElementById('bet-modal-team-name').innerText;
   const odds = parseFloat(document.getElementById('bet-modal-odds').dataset.odds) || 0;
@@ -2949,14 +3286,7 @@ window.submitBetModalForm = function(event) {
   const amountInput = document.getElementById('bet-modal-amount');
   const amount = parseInt(amountInput.value, 10);
   
-  const tour = db.tournaments.find(t => t.id === tourId);
-  if (!tour) {
-    showToast('Турнір не знайдено!', 'error');
-    closeModal('bet-modal');
-    return;
-  }
-
-  const user = db.users.find(u => u.username === db.currentUser);
+  const user = db.users.find(u => u.username.toLowerCase() === db.currentUser.toLowerCase());
   if (!user) {
     showToast('Увійдіть в акаунт для ставки!', 'error');
     closeModal('bet-modal');
@@ -2973,33 +3303,78 @@ window.submitBetModalForm = function(event) {
     return;
   }
 
-  user.balance -= amount;
-  if (!user.betHistory) user.betHistory = [];
-  const tourName = tour.name || 'Турнір';
-  user.betHistory.push({
-    id: 'tb_' + Date.now(),
-    type: 'tournament',
-    tourId,
-    teamId,
-    matchDisplay: `🏆 ${tourName}`,
-    selectedTeam: teamName,
-    odds,
-    amount,
-    date: new Date().toLocaleString('uk-UA'),
-    status: 'В грі',
-    payout: 0
-  });
+  if (amount > 10000) {
+    showToast('Максимальна ставка обмежена до 10 000 монет!', 'error');
+    return;
+  }
 
-  saveDB(db);
-  closeModal('bet-modal');
-  showToast(`Ставку ${amount} 🪙 на "${teamName}" (x${odds}) прийнято!`, 'success');
-  renderTournamentBettingPortal(tourId);
+  if (matchId) {
+    // ── LOBBY MATCH BET ──
+    const match = db.matches.find(m => String(m.id) === String(matchId));
+    if (!match || match.status === 'finished' || match.isFrozen) {
+      showToast("Прийом ставок на цей матч закритий!", "error");
+      closeModal('bet-modal');
+      return;
+    }
+
+    user.balance -= amount;
+    user.betHistory = user.betHistory || [];
+    user.betHistory.unshift({
+      id: 'lb_' + Date.now(),
+      type: 'lobby',
+      matchId: match.id,
+      matchDisplay: `${match.team1} vs ${match.team2}`,
+      selectedTeam: teamName,
+      teamIndex: parseInt(teamId, 10),
+      amount: amount,
+      odds: odds,
+      status: "В грі",
+      date: new Date().toLocaleString('uk-UA')
+    });
+
+    saveDB(db);
+    closeModal('bet-modal');
+    showToast(`Ставку ${amount} 🪙 на "${teamName}" (x${odds}) прийнято!`, 'success');
+    renderPageContent();
+
+  } else {
+    // ── TOURNAMENT MATCH BET ──
+    const tour = db.tournaments.find(t => t.id === tourId);
+    if (!tour) {
+      showToast('Турнір не знайдено!', 'error');
+      closeModal('bet-modal');
+      return;
+    }
+
+    user.balance -= amount;
+    user.betHistory = user.betHistory || [];
+    const tourName = tour.name || 'Турнір';
+    user.betHistory.push({
+      id: 'tb_' + Date.now(),
+      type: 'tournament',
+      tourId,
+      teamId,
+      matchDisplay: `🏆 ${tourName}`,
+      selectedTeam: teamName,
+      odds,
+      amount,
+      date: new Date().toLocaleString('uk-UA'),
+      status: 'В грі',
+      payout: 0
+    });
+
+    saveDB(db);
+    closeModal('bet-modal');
+    showToast(`Ставку ${amount} 🪙 на "${teamName}" (x${odds}) прийнято!`, 'success');
+    renderTournamentBettingPortal(tourId);
+  }
 };
 
 // SVG vibrant color hash team initials logo generator
 function generateTeamLogoSVG(teamName) {
   if (!teamName || teamName === "Очікується") {
-    return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 30 30"><rect width="30" height="30" fill="%232c3040" rx="6"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="900" fill="%234f566f">?</text></svg>`;
+    const fallbackSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 30 30"><rect width="30" height="30" fill="%232c3040" rx="6"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="900" fill="%234f566f">?</text></svg>`;
+    return `data:image/svg+xml;utf8,${encodeURIComponent(fallbackSvg)}`;
   }
   
   let hash = 0;
@@ -3246,7 +3621,190 @@ window.openRosterModalComparison = function(team1Name, team2Name) {
   openModal('roster-modal');
 };
 
-// Show withdraw limit notification
+// Show withdraw modal or notice based on balance
 window.showWithdrawNotice = function() {
-  showToast('Мінімальна сума виводу від 2000 монет!', 'warning');
+  const db = getDB();
+  if (!db.currentUser) {
+    showToast('Будь ласка, авторизуйтесь!', 'error');
+    return;
+  }
+  const user = db.users.find(u => u.username === db.currentUser);
+  if (!user) return;
+
+  if (user.balance < 2000) {
+    showToast('Мінімальна сума виводу від 2000 монет!', 'warning');
+  } else {
+    openWithdrawModal();
+  }
+};
+
+// Open the glassmorphic withdrawal modal (dynamic injection if missing)
+window.openWithdrawModal = function() {
+  let modal = document.getElementById('withdraw-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'withdraw-modal';
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="modal-content" style="max-width: 440px;">
+        <button class="modal-close" onclick="closeModal('withdraw-modal')">&times;</button>
+        <div class="modal-title">Вивести кошти</div>
+        
+        <div style="background: rgba(255, 90, 0, 0.06); padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(255, 90, 0, 0.2); font-size: 12px; color: var(--text-secondary); text-align: center; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: inset 0 0 8px rgba(255, 90, 0, 0.05);">
+          🪙 <span style="color: var(--text-primary); font-weight: 800;">КУРС ВАЛЮТИ:</span> 1 монета = 1 гривня (UAH)
+        </div>
+
+        <div class="payment-tabs">
+          <button class="payment-tab-btn active" id="withdraw-tab-card" onclick="switchWithdrawTab('card')">
+            <span style="font-size: 14px;">💳</span> Карта Visa/MC
+          </button>
+          <button class="payment-tab-btn" id="withdraw-tab-usdt" onclick="switchWithdrawTab('usdt')">
+            <span style="font-size: 14px;">🟢</span> USDT TRC20
+          </button>
+        </div>
+
+        <!-- Visa/MC Form -->
+        <div id="withdraw-card-panel" class="payment-method-details active">
+          <form id="withdraw-card-form" onsubmit="submitWithdrawForm(event, 'Visa/Mastercard')">
+            <div class="form-group">
+              <label for="withdraw-card-number">Номер карти</label>
+              <input type="text" id="withdraw-card-number" class="form-input" placeholder="XXXX XXXX XXXX XXXX" required pattern="\\d{16}" title="Введіть 16 цифр карти без пробілів">
+            </div>
+            <div class="form-group" style="margin-top: 12px;">
+              <label for="withdraw-card-holder">ПІБ отримувача</label>
+              <input type="text" id="withdraw-card-holder" class="form-input" placeholder="Ім'я та Прізвище отримувача" required>
+            </div>
+            <div class="form-group" style="margin-top: 12px;">
+              <label for="withdraw-card-amount">Сума виведення (монет)</label>
+              <input type="number" id="withdraw-card-amount" class="form-input" placeholder="Мін. 2000 монет" min="2000" required style="color: var(--text-primary);">
+            </div>
+            <button type="submit" class="btn" style="width: 100%; margin-top: 15px; padding: 12px;">СТВОРІТИ ЗАПИТ НА ВИВЕДЕННЯ</button>
+          </form>
+        </div>
+
+        <!-- USDT TRC20 Form -->
+        <div id="withdraw-usdt-panel" class="payment-method-details">
+          <form id="withdraw-usdt-form" onsubmit="submitWithdrawForm(event, 'USDT TRC20')">
+            <div class="form-group">
+              <label for="withdraw-usdt-address">USDT TRC20 Адреса</label>
+              <input type="text" id="withdraw-usdt-address" class="form-input" placeholder="T..." required minlength="34" maxlength="34" pattern="T[a-zA-Z0-9]{33}" title="Адреса повинна починатися з 'T' та мати довжину 34 символи">
+            </div>
+            <div class="form-group" style="margin-top: 12px;">
+              <label for="withdraw-usdt-amount">Сума виведення (монет)</label>
+              <input type="number" id="withdraw-usdt-amount" class="form-input" placeholder="Мін. 2000 монет" min="2000" required style="color: var(--text-primary);">
+            </div>
+            <button type="submit" class="btn" style="width: 100%; margin-top: 15px; padding: 12px;">СТВОРІТИ ЗАПИТ НА ВИВЕДЕННЯ</button>
+          </form>
+        </div>
+
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+
+  // Set max limits based on current user balance
+  const db = getDB();
+  const user = db.users.find(u => u.username.toLowerCase() === db.currentUser.toLowerCase());
+  if (user) {
+    const cardAmt = document.getElementById('withdraw-card-amount');
+    const usdtAmt = document.getElementById('withdraw-usdt-amount');
+    if (cardAmt) {
+      cardAmt.max = user.balance;
+      cardAmt.placeholder = `Мін. 2000, макс. ${user.balance}`;
+    }
+    if (usdtAmt) {
+      usdtAmt.max = user.balance;
+      usdtAmt.placeholder = `Мін. 2000, макс. ${user.balance}`;
+    }
+  }
+
+  openModal('withdraw-modal');
+};
+
+// Switch tabs inside the withdrawal modal
+window.switchWithdrawTab = function(method) {
+  document.getElementById('withdraw-tab-card').classList.remove('active');
+  document.getElementById('withdraw-tab-usdt').classList.remove('active');
+  document.getElementById('withdraw-card-panel').classList.remove('active');
+  document.getElementById('withdraw-usdt-panel').classList.remove('active');
+
+  document.getElementById(`withdraw-tab-${method}`).classList.add('active');
+  document.getElementById(`withdraw-${method}-panel`).classList.add('active');
+};
+
+// Submit withdrawal form
+window.submitWithdrawForm = async function(event, method) {
+  event.preventDefault();
+  const db = getDB();
+  if (!db.currentUser) return;
+  const user = db.users.find(u => u.username.toLowerCase() === db.currentUser.toLowerCase());
+  if (!user) return;
+
+  const isUSDT = method === 'USDT TRC20';
+  const amountInputId = isUSDT ? 'withdraw-usdt-amount' : 'withdraw-card-amount';
+  const detailsInputId = isUSDT ? 'withdraw-usdt-address' : 'withdraw-card-number';
+  
+  const amount = parseFloat(document.getElementById(amountInputId).value);
+  const details = document.getElementById(detailsInputId).value.trim();
+
+  if (isNaN(amount) || amount < 2000) {
+    showToast("Мінімальна сума виведення становить 2000 монет!", "error");
+    return;
+  }
+
+  if (amount > user.balance) {
+    showToast("Недостатньо монет на балансі!", "error");
+    return;
+  }
+
+  if (!details) {
+    showToast("Вкажіть реквізити для виплати!", "error");
+    return;
+  }
+
+  // Deduct from balance immediately to avoid double spend
+  user.balance -= amount;
+
+  // Record in user withdrawHistory
+  user.withdrawHistory = user.withdrawHistory || [];
+  const withdrawId = "with_" + Date.now();
+  const withdrawItem = {
+    id: withdrawId,
+    amount: amount,
+    method: method,
+    details: details,
+    date: new Date().toLocaleString(),
+    status: "pending"
+  };
+  user.withdrawHistory.push(withdrawItem);
+
+  // Record in global cloud pendingWithdrawals
+  db.pendingWithdrawals = db.pendingWithdrawals || [];
+  db.pendingWithdrawals.push({
+    id: withdrawId,
+    username: user.username,
+    amount: amount,
+    method: method,
+    details: details,
+    date: withdrawItem.date,
+    status: "pending"
+  });
+
+  showToast("Створення запиту на виведення...", "success");
+  
+  // Save DB and sync with cloud (will push both global pending list and dedicated user key)
+  await saveDB(db);
+
+  // Clear inputs
+  document.getElementById(amountInputId).value = "";
+  document.getElementById(detailsInputId).value = "";
+  if (!isUSDT) {
+    document.getElementById('withdraw-card-holder').value = "";
+  }
+
+  closeModal('withdraw-modal');
+  showToast("Запит на виплату надіслано оператору!", "success");
+
+  // Re-render UI
+  renderPageContent();
 };

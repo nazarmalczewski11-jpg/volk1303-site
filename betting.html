@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>VOLK 1303 | Ставки на Кіберспорт</title>
-  <link rel="stylesheet" href="style.css?v=2.0">
+  <link rel="stylesheet" href="style.css?v=4.0">
   <script src="smoke-bg.js"></script>
 </head>
 <body>
@@ -109,11 +109,14 @@
       </div>
 
       <!-- Live Matches Grid -->
-      <div class="card">
-        <div class="section-title">
-          <span>АКТИВНІ МАТЧІ</span>
+      <div class="card" style="border: 1px solid rgba(255, 90, 0, 0.15); background: linear-gradient(180deg, rgba(20, 24, 33, 0.95) 0%, rgba(11, 14, 20, 0.98) 100%);">
+        <div class="section-title" style="border-bottom: 1px solid rgba(255, 90, 0, 0.15); background: rgba(255, 90, 0, 0.02); padding: 18px 24px;">
+          <span style="background: linear-gradient(90deg, #fff 30%, var(--cs-orange) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 16px; letter-spacing: 1px; font-weight: 900; display: flex; align-items: center; gap: 8px;">
+            <span style="color: var(--cs-orange); filter: drop-shadow(0 0 8px var(--cs-orange));">⚡</span> СТАВКИ НА МАТЧІ
+          </span>
+          <span class="rank-badge-inline" style="background: linear-gradient(135deg, var(--cs-orange) 0%, #e05500 100%); color: #fff; font-size: 10px; font-weight: 900; box-shadow: 0 0 10px rgba(255, 90, 0, 0.35); text-shadow: 0 1px 2px rgba(0,0,0,0.5);">LIVE & PREMATCH</span>
         </div>
-        <div id="live-matches-list" class="matches-list">
+        <div id="live-matches-list" class="matches-list" style="padding: 24px;">
           <!-- Filled by JS -->
         </div>
       </div>
@@ -141,54 +144,11 @@
         <span style="font-weight: 800; font-size:12px; color: var(--cs-orange); margin-top: 8px; text-transform:uppercase; letter-spacing:0.5px;">VOLK 1303 BETTING</span>
       </div>
 
-      <!-- Slide-Out Bet Slip Panel -->
-      <div class="betslip-wrapper">
-        <div class="betslip-tabs">
-          <button class="betslip-tab active">Ординар</button>
-          <button class="betslip-tab" style="opacity: 0.5; cursor: not-allowed;" disabled>Експрес</button>
-        </div>
-
-        <div class="betslip-content" id="betslip-content-panel">
-          <!-- Default empty state -->
-          <div class="betslip-empty" id="betslip-empty-state">
-            Оберіть коефіцієнт у списку матчів, щоб додати ставку в купон
-          </div>
-
-          <!-- Active slip selector (hidden initially) -->
-          <div id="active-betslip-panel" style="display: none;">
-            <div class="slip-match-item">
-              <button class="slip-match-close" onclick="clearBetslip()">&times;</button>
-              <div class="slip-match-header" id="slip-match-header-txt">Counter-Strike 2</div>
-              <div class="slip-match-teams" id="slip-match-teams-txt">Team 1 vs Team 2</div>
-              <div class="slip-match-pick-row">
-                <span>Ваш вибір: <strong id="slip-pick-team-txt" class="slip-match-pick-team">Team 1</strong></span>
-                <span>кэф <strong id="slip-odds-txt" style="color:var(--cs-orange);">1.85</strong></span>
-              </div>
-            </div>
-
-            <div class="slip-calculator">
-              <form id="betslip-form">
-                <div class="form-group" style="margin-bottom:10px;">
-                  <label for="betslip-amount-input">Сума ставки (монет)</label>
-                  <input type="number" id="betslip-amount-input" class="form-input" placeholder="Макс. 10 000 монет" required min="1" step="1">
-                </div>
-                <button type="submit" class="btn" style="width: 100%; padding: 12px; margin-top:5px;">ЗРОБИТИ СТАВКУ</button>
-              </form>
-              
-              <div class="slip-calc-row" style="margin-top:5px;">
-                <span>Можливий виграш:</span>
-                <span id="slip-est-win-txt" class="slip-calc-win">0 монет</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <!-- Quick Deposit promo widget -->
       <div class="card" style="padding: 15px;">
         <div class="section-title" style="font-size:12px;">Промокоди</div>
         <form id="betslip-promo-form" class="form-group" style="margin-bottom:0; display:flex; flex-direction:row; gap:8px;">
-          <input type="text" id="betslip-promo-input" class="form-input" placeholder="Код (н-р: VOLCHARA20)" required style="flex:1; padding: 8px 12px; font-size:13px;">
+          <input type="text" id="betslip-promo-input" class="form-input" placeholder="" required style="flex:1; padding: 8px 12px; font-size:13px;">
           <button type="submit" class="btn" style="padding: 8px 14px;">ОК</button>
         </form>
       </div>
@@ -270,6 +230,51 @@
     </div>
   </div>
 
+  <!-- Bet Modal -->
+  <div id="bet-modal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 400px; border-color: var(--cs-orange); box-shadow: 0 0 25px rgba(255, 90, 0, 0.25);">
+      <button class="modal-close" onclick="closeModal('bet-modal')">&times;</button>
+      <div style="text-align: center; margin-bottom: 20px;">
+        <img src="assets/wolf_logo.png" alt="Logo" style="width: 50px; height: 50px; filter: drop-shadow(0 0 10px rgba(255, 90, 0, 0.4));">
+        <div class="modal-title" style="margin-top: 10px; font-size: 20px; font-weight: 900; color: white;">Зробити ставку</div>
+      </div>
+      
+      <div style="display: flex; flex-direction: column; gap: 15px;">
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); padding: 15px; border-radius: 10px; display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">Команда:</span>
+            <strong id="bet-modal-team-name" style="color: white; font-size: 15px;">-</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">Коефіцієнт:</span>
+            <strong id="bet-modal-odds" style="color: var(--cs-orange); font-size: 15px;">x0.00</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px; margin-top: 4px;">
+            <span style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">Ваш баланс:</span>
+            <span style="color: white; font-weight: 800; font-size: 13px;">🪙 <span id="bet-modal-balance">-</span></span>
+          </div>
+        </div>
+
+        <form id="bet-modal-form" onsubmit="submitBetModalForm(event)">
+          <input type="hidden" id="bet-modal-tour-id">
+          <input type="hidden" id="bet-modal-match-id">
+          <input type="hidden" id="bet-modal-team-id">
+          <div class="form-group">
+            <label for="bet-modal-amount" style="display: block; margin-bottom: 6px; font-size: 12px; color: var(--text-secondary);">Сума ставки (монет)</label>
+            <input type="number" id="bet-modal-amount" class="form-input" placeholder="Введіть суму ставки" required min="1" oninput="calculateBetModalPayout()">
+          </div>
+          
+          <div style="margin-top: 12px; background: rgba(38,161,123,0.06); border: 1px solid rgba(38,161,123,0.15); padding: 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 11px; color: #26A17B; text-transform: uppercase; font-weight: 700;">Можливий виграш:</span>
+            <strong id="bet-modal-payout" style="color: #26A17B; font-size: 15px;">0 🪙</strong>
+          </div>
+
+          <button type="submit" class="btn" style="width: 100%; margin-top: 20px; padding: 12px; font-weight: 900; letter-spacing: 0.5px;">ПІДТВЕРДИТИ СТАВКУ</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
 
 
   <!-- Rules Modal -->
@@ -304,6 +309,6 @@
     </div>
   </footer>
 
-  <script src="app.js?v=3.4"></script>
+  <script src="app.js?v=7.0"></script>
 </body>
 </html>
