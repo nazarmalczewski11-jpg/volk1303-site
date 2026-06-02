@@ -3586,16 +3586,26 @@ window.removePlayerFromSlotTeam = function(teamId, username) {
 let activeEditorTournamentId = null;
 
 // Open Visual Match Bracket Editor Card for selected tournament
+// Open Visual Match Bracket Editor Card for selected tournament
 window.openBracketEditorCard = function(tourId) {
   const db = getDB();
-  const tour = db.tournaments.find(t => t.id === tourId);
+  if (!db) return;
+  const tour = (db.tournaments || []).filter(Boolean).find(t => t.id === tourId);
   if (!tour) return;
 
   activeEditorTournamentId = tourId;
-  document.getElementById('admin-editor-tournament-name').innerText = tour.name;
+  const titleEl = document.getElementById('admin-editor-tournament-name');
+  if (titleEl) titleEl.innerText = tour.name;
   
   const container = document.getElementById('admin-bracket-matches-container');
+  if (!container) return;
   container.innerHTML = "";
+
+  const editorCard = document.getElementById('admin-bracket-editor-card');
+  if (editorCard) {
+    editorCard.style.display = "block";
+    editorCard.scrollIntoView({ behavior: 'smooth' });
+  }
 
   if (!tour.brackets || !tour.brackets.rounds) {
     container.innerHTML = `<span style="color:var(--text-secondary); text-align:center; display:block; padding:10px;">Сітку не згенеровано.</span>`;
@@ -3619,12 +3629,17 @@ window.openBracketEditorCard = function(tourId) {
     container.appendChild(roundDiv);
     
     const mContainer = roundDiv.querySelector(`#round-matches-list-${rIndex}`);
-    round.matches.forEach((match, mIndex) => {
+    if (!mContainer) return;
+
+    (round.matches || []).forEach((match, mIndex) => {
       const matchCard = document.createElement('div');
       matchCard.style.background = "#14151e";
       matchCard.style.border = "1px solid var(--border-color)";
       matchCard.style.padding = "15px";
       matchCard.style.borderRadius = "8px";
+
+      const teamList1 = (db.teams || []).filter(t => t && t.name).map(t => `<option value="${t.name}" ${match.team1 === t.name ? 'selected' : ''}>${t.name}</option>`).join('');
+      const teamList2 = (db.teams || []).filter(t => t && t.name).map(t => `<option value="${t.name}" ${match.team2 === t.name ? 'selected' : ''}>${t.name}</option>`).join('');
 
       matchCard.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid rgba(255,255,255,0.03); padding-bottom:6px;">
@@ -3643,14 +3658,14 @@ window.openBracketEditorCard = function(tourId) {
             <label style="font-size:10px; margin-bottom:4px;">Команда 1</label>
             <select id="m-team1-${rIndex}-${mIndex}" class="form-input" style="padding:6px; font-size:12px;">
               <option value="Очікується" ${match.team1 === 'Очікується' ? 'selected' : ''}>Очікується</option>
-              ${db.teams.map(t => `<option value="${t.name}" ${match.team1 === t.name ? 'selected' : ''}>${t.name}</option>`).join('')}
+              ${teamList1}
             </select>
           </div>
           <div class="form-group" style="margin-bottom:0;">
             <label style="font-size:10px; margin-bottom:4px;">Команда 2</label>
             <select id="m-team2-${rIndex}-${mIndex}" class="form-input" style="padding:6px; font-size:12px;">
               <option value="Очікується" ${match.team2 === 'Очікується' ? 'selected' : ''}>Очікується</option>
-              ${db.teams.map(t => `<option value="${t.name}" ${match.team2 === t.name ? 'selected' : ''}>${t.name}</option>`).join('')}
+              ${teamList2}
             </select>
           </div>
         </div>
@@ -3688,9 +3703,6 @@ window.openBracketEditorCard = function(tourId) {
       mContainer.appendChild(matchCard);
     });
   });
-
-  document.getElementById('admin-bracket-editor-card').style.display = "block";
-  document.getElementById('admin-bracket-editor-card').scrollIntoView({ behavior: 'smooth' });
 };
 
 // Close Bracket Editor Card panel
@@ -3703,19 +3715,30 @@ window.closeBracketEditorCard = function() {
 window.saveBracketMatchAdmin = function(rIndex, mIndex) {
   if (!activeEditorTournamentId) return;
   const db = getDB();
-  const tour = db.tournaments.find(t => t.id === activeEditorTournamentId);
-  if (!tour) return;
+  if (!db) return;
+  const tour = (db.tournaments || []).filter(Boolean).find(t => t.id === activeEditorTournamentId);
+  if (!tour || !tour.brackets || !tour.brackets.rounds) return;
 
   const round = tour.brackets.rounds[rIndex];
+  if (!round || !round.matches) return;
   const match = round.matches[mIndex];
+  if (!match) return;
 
   // Get inputs
-  const team1 = document.getElementById(`m-team1-${rIndex}-${mIndex}`).value;
-  const team2 = document.getElementById(`m-team2-${rIndex}-${mIndex}`).value;
-  const score1 = parseInt(document.getElementById(`m-score1-${rIndex}-${mIndex}`).value, 10) || 0;
-  const score2 = parseInt(document.getElementById(`m-score2-${rIndex}-${mIndex}`).value, 10) || 0;
-  let status = document.getElementById(`m-status-${rIndex}-${mIndex}`).value;
-  const time = document.getElementById(`m-time-${rIndex}-${mIndex}`).value;
+  const team1El = document.getElementById(`m-team1-${rIndex}-${mIndex}`);
+  const team2El = document.getElementById(`m-team2-${rIndex}-${mIndex}`);
+  const score1El = document.getElementById(`m-score1-${rIndex}-${mIndex}`);
+  const score2El = document.getElementById(`m-score2-${rIndex}-${mIndex}`);
+  const statusEl = document.getElementById(`m-status-${rIndex}-${mIndex}`);
+  const timeEl = document.getElementById(`m-time-${rIndex}-${mIndex}`);
+  const winnerSelectEl = document.getElementById(`m-winner-${rIndex}-${mIndex}`);
+
+  const team1 = team1El ? team1El.value : "Очікується";
+  const team2 = team2El ? team2El.value : "Очікується";
+  const score1 = score1El ? (parseInt(score1El.value, 10) || 0) : 0;
+  const score2 = score2El ? (parseInt(score2El.value, 10) || 0) : 0;
+  let status = statusEl ? statusEl.value : "upcoming";
+  const time = timeEl ? timeEl.value : "";
 
   // Auto-finish if either score reaches 13 or more
   if (score1 >= 13 || score2 >= 13) {
@@ -3756,7 +3779,7 @@ window.saveBracketMatchAdmin = function(rIndex, mIndex) {
 
   // Settle Winner if finished
   if (status === "finished") {
-    const winnerSelect = document.getElementById(`m-winner-${rIndex}-${mIndex}`).value;
+    const winnerSelect = winnerSelectEl ? winnerSelectEl.value : "Очікується";
     
     // Auto-winner check by score threshold 13
     if (score1 >= 13 && score1 > score2) {
