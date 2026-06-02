@@ -1018,7 +1018,11 @@ function renderDashboardMetrics(db) {
   if (usersVal) usersVal.innerText = db.users.length;
 
   const matchesVal = document.getElementById('metric-total-matches');
-  if (matchesVal) matchesVal.innerText = db.matches.length;
+  if (matchesVal) {
+    const activeTournaments = (db.tournaments || []).filter(t => t.status === 'active').length;
+    const activeLobbyMatches = (db.matches || []).filter(m => m.status === 'live' || m.status === 'active').length;
+    matchesVal.innerText = activeTournaments + activeLobbyMatches;
+  }
 }
 
 // Compile and render Terminal Ops log
