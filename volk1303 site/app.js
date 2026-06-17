@@ -2090,6 +2090,11 @@ function renderProfileDashboard() {
     const currentLevel = Math.floor(totalXp / 100) + 1;
     currentLvlEl.innerText = `Поточний рівень: ${currentLevel}`;
     
+    const badgeEl = document.getElementById('rewards-level-badge');
+    if (badgeEl) {
+      badgeEl.innerText = currentLevel;
+    }
+    
     if (nextLvlDescEl) {
       nextLvlDescEl.innerText = `Нагорода за ${currentLevel + 1} рівень: +5% до бонусу депозиту або 100 Vcoins`;
     }
@@ -2105,7 +2110,7 @@ function renderProfileDashboard() {
       
       if (unclaimed.length > 0) {
         claimBtnEl.removeAttribute('disabled');
-        claimBtnEl.className = "btn btn-primary py-2.5 px-5 text-xs font-bold rounded-lg cursor-pointer";
+        claimBtnEl.className = "btn btn-primary py-2.5 px-5 text-xs font-black rounded-lg cursor-pointer";
         claimBtnEl.style.opacity = "1";
         claimBtnEl.style.background = "linear-gradient(135deg, var(--cs-orange) 0%, #ff5500 100%)";
         claimBtnEl.innerText = `Забрати нагороду (+${unclaimed.length * 100} 🪙)`;
@@ -2130,36 +2135,38 @@ function renderProfileDashboard() {
       faceitContainer.innerHTML = `
         <div style="display:flex; flex-direction:column; gap:10px;">
           <div style="display:flex; justify-content:space-between; align-items:center;">
-            <strong style="color:white; font-size:14px;">${user.linkedFaceitName}</strong>
-            <span class="rank-badge-inline" style="background-color:#ff5500; color:white; border-color:#ff5500; font-size:11px;">LVL ${user.faceitLevel || 6}</span>
+            <strong style="color:white; font-size:14px; font-family:'Tektur', sans-serif;">${user.linkedFaceitName}</strong>
+            <span style="background: linear-gradient(135deg, #ff5500 0%, #ff7300 100%); color: white; padding: 4px 10px; border-radius: 6px; font-weight: 800; font-size: 11px; letter-spacing: 0.5px; font-family: 'Tektur', sans-serif; box-shadow: 0 0 10px rgba(255, 85, 0, 0.2);">LVL ${user.faceitLevel || 6}</span>
           </div>
           
-          <div class="xp-container" style="padding:10px; border-radius:6px; background-color:var(--bg-card); border:1px solid var(--border-color);">
-            <div class="xp-header" style="font-size:10px; margin-bottom:4px;">
-              <span>XP до наступного рівня</span>
-              <span>${user.faceitElo || 1550} / 1700 ELO</span>
+          <div class="xp-container" style="padding:10px; border-radius:8px; background-color:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.05);">
+            <div class="xp-header" style="font-size:10px; margin-bottom:6px; display:flex; justify-content:space-between; font-family:'Tektur', sans-serif;">
+              <span>XP до наступного ELO рівня</span>
+              <span style="font-weight:700; color:white;">${user.faceitElo || 1550} / 1700 ELO</span>
             </div>
-            <div class="xp-bar" style="height:6px; background-color:var(--bg-darker); border-radius:4px; overflow:hidden;">
+            <div class="xp-bar" style="height:6px; background-color:rgba(255,255,255,0.05); border-radius:4px; overflow:hidden;">
               <div class="xp-fill" style="width: 75%; background:#ff5500; height:100%;"></div>
             </div>
           </div>
 
-          <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:6px; text-align:center; font-size:11px; margin-top:5px;">
-            <div style="background:var(--bg-input); padding:6px; border-radius:4px;">
-              <div style="color:var(--text-secondary); font-size:9px;">K/D RATIO</div>
-              <strong style="color:white;">${user.faceitKD || '1.18'}</strong>
+          <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; text-align:center; font-size:11px; margin-top:5px;">
+            <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.05); padding:8px 6px; border-radius:8px;">
+              <div style="color:var(--text-secondary); font-size:10px; font-family:'Tektur', sans-serif; font-weight:700; letter-spacing:0.5px;">K/D RATIO</div>
+              <strong style="color:white; font-size:15px; font-family:'Russo One', sans-serif; display:block; margin-top:4px;">${user.faceitKD || '1.18'}</strong>
             </div>
-            <div style="background:var(--bg-input); padding:6px; border-radius:4px;">
-              <div style="color:var(--text-secondary); font-size:9px;">WINRATE</div>
-              <strong style="color:white;">${user.faceitWinrate || '54%'}</strong>
+            <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.05); padding:8px 6px; border-radius:8px;">
+              <div style="color:var(--text-secondary); font-size:10px; font-family:'Tektur', sans-serif; font-weight:700; letter-spacing:0.5px;">WINRATE</div>
+              <strong style="color:white; font-size:15px; font-family:'Russo One', sans-serif; display:block; margin-top:4px;">${user.faceitWinrate || '54%'}</strong>
             </div>
-            <div style="background:var(--bg-input); padding:6px; border-radius:4px;">
-              <div style="color:var(--text-secondary); font-size:9px;">HEADSHOT %</div>
-              <strong style="color:white;">${user.faceitHS || '48%'}</strong>
+            <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.05); padding:8px 6px; border-radius:8px;">
+              <div style="color:var(--text-secondary); font-size:10px; font-family:'Tektur', sans-serif; font-weight:700; letter-spacing:0.5px;">HEADSHOT %</div>
+              <strong style="color:white; font-size:15px; font-family:'Russo One', sans-serif; display:block; margin-top:4px;">${user.faceitHS || '48%'}</strong>
             </div>
           </div>
 
-          <button class="btn btn-danger" onclick="unlinkFaceit()" style="width:100%; padding:6px; font-size:9px; margin-top:8px;">Відв'язати акаунт</button>
+          <button class="btn btn-secondary" onclick="unlinkFaceit()" style="width:100%; padding:10px; font-size:11px; font-weight:800; border:1px solid rgba(255,74,74,0.2); color:#ff4a4a; background:rgba(255,74,74,0.02); margin-top:10px; letter-spacing:0.5px; font-family:'Tektur', sans-serif;">
+            ВІДВ'ЯЗАТИ АКАУНТ
+          </button>
         </div>
       `;
     } else {
@@ -4639,7 +4646,8 @@ function renderAchievements(user) {
       xp: 100,
       coins: 100,
       color: "#26a17b",
-      badgeColor: "rgba(38, 161, 123, 0.05) rgba(38, 161, 123, 0.3)"
+      badgeColor: "rgba(38, 161, 123, 0.05) rgba(38, 161, 123, 0.3)",
+      icon: `<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2v20M2 12h20M12 12m-6 0a6 6 0 1 0 12 0 6 6 0 1 0-12 0"></path></svg>`
     },
     {
       id: "five_wins",
@@ -4651,7 +4659,8 @@ function renderAchievements(user) {
       xp: 250,
       coins: 250,
       color: "#FFA500",
-      badgeColor: "rgba(255, 165, 0, 0.05) rgba(255, 165, 0, 0.3)"
+      badgeColor: "rgba(255, 165, 0, 0.05) rgba(255, 165, 0, 0.3)",
+      icon: `<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>`
     },
     {
       id: "tour_win",
@@ -4663,7 +4672,8 @@ function renderAchievements(user) {
       xp: 500,
       coins: 500,
       color: "#c79847",
-      badgeColor: "rgba(199, 152, 71, 0.05) rgba(199, 152, 71, 0.3)"
+      badgeColor: "rgba(199, 152, 71, 0.05) rgba(199, 152, 71, 0.3)",
+      icon: `<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v13m0-13V6a2 2 0 1 1 2 2h-2zm0 0V5a2 2 0 1 0-2 2h2zm0 13H9m3 0h3M7 8a4 4 0 0 1 4-4h2a4 4 0 0 1 4 4v2H7V8z"></path></svg>`
     },
     {
       id: "king_vcoin",
@@ -4675,7 +4685,8 @@ function renderAchievements(user) {
       xp: 1000,
       coins: 1000,
       color: "#ff5500",
-      badgeColor: "rgba(255, 85, 0, 0.05) rgba(255, 85, 0, 0.3)"
+      badgeColor: "rgba(255, 85, 0, 0.05) rgba(255, 85, 0, 0.3)",
+      icon: `<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 0 0 1.946-.806 3.42 3.42 0 0 1 4.438 0 3.42 3.42 0 0 0 1.946.806 3.42 3.42 0 0 1 3.138 3.138 3.42 3.42 0 0 0 .806 1.946 3.42 3.42 0 0 1 0 4.438 3.42 3.42 0 0 0-.806 1.946 3.42 3.42 0 0 1-3.138 3.138 3.42 3.42 0 0 0-1.946.806 3.42 3.42 0 0 1-4.438 0 3.42 3.42 0 0 0-1.946-.806 3.42 3.42 0 0 1-3.138-3.138z"></path></svg>`
     }
   ];
 
@@ -4683,14 +4694,14 @@ function renderAchievements(user) {
     const card = document.createElement('div');
     const claimed = (user.claimedAchievements || []).includes(ach.id);
     
-    card.className = "p-4 rounded-xl border flex flex-col transition-all duration-300 bg-black/25";
+    card.className = "achievement-card";
     
     let buttonHTML = "";
     if (ach.completed && !claimed) {
       card.style.background = "rgba(255, 165, 0, 0.04)";
       card.style.borderColor = "rgba(255, 165, 0, 0.25)";
       buttonHTML = `
-        <button class="btn btn-primary w-full py-2 text-xs font-black rounded-lg cursor-pointer" 
+        <button class="btn btn-primary w-full py-2.5 text-xs font-black rounded-lg cursor-pointer" 
                 style="background: linear-gradient(135deg, var(--cs-orange) 0%, #ff5500 100%); border:none; margin-top: 14px; font-family: 'Tektur', sans-serif; letter-spacing: 0.5px;" 
                 onclick="claimAchievement('${ach.id}')">
           Забрати досягнення (+${ach.coins} 🪙)
@@ -4701,14 +4712,14 @@ function renderAchievements(user) {
       card.style.background = colors[0];
       card.style.borderColor = colors[1];
       buttonHTML = `
-        <button class="btn w-full py-2 text-xs font-black rounded-lg cursor-not-allowed" 
+        <button class="btn w-full py-2.5 text-xs font-black rounded-lg cursor-not-allowed" 
                 style="background: rgba(38, 161, 123, 0.06); border: 1px solid rgba(38, 161, 123, 0.35); color: #3cd0a1; margin-top: 14px; font-family: 'Tektur', sans-serif; letter-spacing: 0.5px;" disabled>
           Забрано 🏆
         </button>
       `;
     } else {
       buttonHTML = `
-        <button class="btn w-full py-2 text-xs font-black rounded-lg cursor-not-allowed" 
+        <button class="btn w-full py-2.5 text-xs font-black rounded-lg cursor-not-allowed" 
                 style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.3); margin-top: 14px; font-family: 'Tektur', sans-serif; letter-spacing: 0.5px;" disabled>
           Не виконано
         </button>
@@ -4716,15 +4727,24 @@ function renderAchievements(user) {
     }
 
     card.innerHTML = `
-      <div>
-        <h4 class="text-xs font-black text-[#FFF5E0] uppercase tracking-wider mb-1" style="font-family: 'Tektur', sans-serif;">${ach.title}</h4>
-        <p class="text-[10px] text-gray-400 leading-normal mb-2.5">${ach.desc}</p>
-        <div class="w-full bg-zinc-800 rounded-full h-1.5 mb-2">
-          <div class="h-1.5 rounded-full" style="width: ${ach.progressPct}%; background: ${ach.color};"></div>
+      <div class="flex flex-col flex-1">
+        <div class="flex gap-3 items-start mb-3">
+          <div class="achievement-icon-wrapper" style="background: ${ach.color}15; border: 1px solid ${ach.color}30; color: ${ach.color};">
+            ${ach.icon}
+          </div>
+          <div class="min-w-0 flex-1">
+            <h4 class="text-xs font-black text-[#FFF5E0] uppercase tracking-wider mb-0.5" style="font-family: 'Tektur', sans-serif;">${ach.title}</h4>
+            <p class="text-[10px] text-gray-400 leading-normal">${ach.desc}</p>
+          </div>
         </div>
-        <div class="flex justify-between items-center text-[9px] font-bold text-gray-400">
-          <span>Прогрес: ${ach.progress}</span>
-          <span class="text-white">🏆 ${ach.xp} XP</span>
+        <div class="mt-auto">
+          <div class="w-full bg-zinc-800/80 rounded-full h-1.5 mb-2">
+            <div class="h-1.5 rounded-full" style="width: ${ach.progressPct}%; background: ${ach.color};"></div>
+          </div>
+          <div class="flex justify-between items-center text-[9px] font-bold text-gray-400">
+            <span>Прогрес: ${ach.progress}</span>
+            <span class="text-white flex items-center gap-1"><span class="material-icons-outlined text-[10px]">emoji_events</span> ${ach.xp} XP</span>
+          </div>
         </div>
       </div>
       ${buttonHTML}

@@ -3761,3 +3761,80 @@ footer {
   border-color: var(--cs-orange);
   box-shadow: 0 0 15px rgba(255, 90, 0, 0.25);
 }
+
+/* ==========================================================================
+   PROFILE PAGE HOTFIXES (VISUAL AND ALIGNMENT CORRECTIONS)
+   ========================================================================== */
+
+/* 1. Profile activity lists (Transactions & Recent Bets) */
+.profile-activity-item {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  padding: 10px 14px !important;
+  background-color: rgba(0, 0, 0, 0.2) !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+  border-radius: 8px !important;
+  margin-bottom: 8px !important;
+  transition: all 0.2s ease !important;
+}
+
+.profile-activity-item:hover {
+  background-color: rgba(255, 255, 255, 0.02) !important;
+  border-color: rgba(255, 165, 0, 0.15) !important;
+}
+
+.profile-activity-status {
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: 50% !important;
+  flex-shrink: 0 !important;
+}
+
+/* 2. Achievement cards layouts */
+.achievement-card {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: space-between !important;
+  min-height: 180px !important;
+  padding: 16px !important;
+  background: rgba(13, 14, 18, 0.8) !important;
+  border: 1px solid rgba(255, 255, 255, 0.04) !important;
+  border-radius: 12px !important;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  box-sizing: border-box !important;
+}
+
+.achievement-card:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4) !important;
+}
+
+.achievement-icon-wrapper {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: 8px !important;
+  flex-shrink: 0 !important;
+}
+
+/* 3. Level Block fixes */
+.level-reward-card {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 20px !important;
+  width: 100% !important;
+}
+
+@media (max-width: 768px) {
+  .level-reward-card {
+    flex-direction: column !important;
+    text-align: center !important;
+    gap: 16px !important;
+  }
+}
+

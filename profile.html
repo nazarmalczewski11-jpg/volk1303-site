@@ -61,36 +61,36 @@
   <div id="toast-container" class="toast-container"></div>
 
   <!-- Shared Header -->
-  <header class="sticky top-0 z-50 w-full bg-[#12131a]/95 backdrop-blur-md border-b border-[#30363d] py-3 px-4 md:px-8 flex items-center justify-between">
-    <a href="betting.html" class="logo-link flex items-center gap-2">
-      <div class="logo-img-wrapper w-9 h-9">
-        <img src="assets/wolf_logo.png" alt="Wolf Logo" class="w-full h-full object-contain">
+  <header>
+    <a href="betting.html" class="logo-link">
+      <div class="logo-img-wrapper">
+        <img src="assets/wolf_logo.png" alt="Wolf Logo">
       </div>
-      <div class="logo-text text-xl font-black tracking-wider uppercase text-white">VOLK<span class="text-[#FFA500]">1303</span></div>
+      <div class="logo-text">VOLK<span>1303</span></div>
     </a>
 
-    <nav class="flex gap-4">
+    <nav>
       <a href="betting.html" class="nav-link">Трансляція</a>
       <a href="tournament.html" class="nav-link">Турніри</a>
       <a href="my-bets.html" class="nav-link">Мої ставки</a>
       <a href="profile.html" class="nav-link active">Профіль</a>
     </nav>
 
-    <div class="header-user-panel flex items-center gap-4">
-      <div class="user-balance px-4 py-1.5 rounded-full border border-[#FFA500]/30 bg-[#FFA500]/5 flex items-center gap-2 text-sm font-extrabold text-white">
+    <div class="header-user-panel">
+      <div class="user-balance">
         🪙 <span id="header-balance-value" class="balance-coins">0</span> Монет
       </div>
-      <button id="header-withdraw-btn" class="btn btn-secondary py-1.5 px-4 text-xs font-bold" onclick="showWithdrawNotice()">Вивести</button>
-      <button id="header-deposit-btn" class="btn py-1.5 px-4 text-xs font-bold">Поповнити</button>
-      <button class="btn btn-secondary py-1.5 px-4 text-xs font-bold" onclick="logoutUser()">Вихід</button>
+      <button id="header-withdraw-btn" class="btn btn-secondary" onclick="showWithdrawNotice()">Вивести</button>
+      <button id="header-deposit-btn" class="btn">Поповнити</button>
+      <button class="btn btn-secondary" onclick="logoutUser()">Вихід</button>
     </div>
   </header>
 
   <main class="w-full max-w-full px-4 md:px-10 py-10 box-border">
-    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 xl:gap-8 items-start">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 xl:gap-8 items-start">
       
       <!-- Left Column: Profile Card & Faceit Integration -->
-      <div class="lg:col-span-1 space-y-6">
+      <div class="lg:col-span-4 space-y-6">
         
         <!-- Profile Card -->
         <div class="card p-6 flex flex-col items-center text-center border border-[#c79847]/15 rounded-2xl bg-[#0a0b0f]/85 shadow-2xl relative">
@@ -101,7 +101,7 @@
  
           <!-- Avatar -->
           <div class="w-28 h-28 rounded-full border-[2.5px] border-[#FFA500] shadow-[0_0_20px_rgba(255,165,0,0.15)] overflow-hidden mt-2 bg-[#0a0b0f]">
-            <img id="profile-avatar-img" src="assets/wolf_logo.png" alt="Avatar" class="w-full h-full object-cover">
+            <img id="profile-avatar-img" src="assets/profile2.jpg" alt="Avatar" class="w-full h-full object-cover">
           </div>
 
           <!-- Nickname -->
@@ -146,7 +146,7 @@
       </div>
 
       <!-- Right Column: Stats Bar & Main Grid Content -->
-      <div class="lg:col-span-3 space-y-6">
+      <div class="lg:col-span-8 space-y-6">
         
         <!-- Statistics Bar -->
         <div class="bets-stats-bar profile-stats-bar bg-[#0a0b0f]/85 border border-[#c79847]/15 py-6 px-8 rounded-2xl shadow-xl flex flex-wrap gap-6 items-center justify-between">
@@ -307,18 +307,25 @@
             </div>
 
             <!-- Rewards Card -->
-            <div class="card p-5 border border-white/5 rounded-2xl bg-[#0a0b0f]/85 flex flex-col md:flex-row items-center justify-between gap-4 shadow-2xl">
-              <div class="flex flex-col text-left">
-                <span class="text-[9px] font-bold text-[#8b949e] uppercase" style="font-family: 'Tektur', sans-serif;">Рівень</span>
-                <span class="text-xl font-black text-white" style="font-family: 'Russo One', sans-serif;" id="rewards-current-level">Поточний рівень: 12</span>
+            <div class="card p-5 border border-white/5 rounded-2xl bg-[#0a0b0f]/85 shadow-2xl">
+              <div class="level-reward-card">
+                <div class="flex items-center gap-4 flex-1 text-left">
+                  <!-- Level Badge Circle -->
+                  <div class="w-12 h-12 rounded-full bg-gradient-to-br from-[#FFA500]/20 to-[#ff5500]/20 border border-[#FFA500]/40 flex items-center justify-center text-[#FFA500] font-black text-lg shadow-[0_0_15px_rgba(255,165,0,0.15)] flex-shrink-0" style="font-family: 'Russo One', sans-serif;" id="rewards-level-badge">
+                    1
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <div class="text-[9px] font-bold text-[#8b949e] uppercase tracking-wider" style="font-family: 'Tektur', sans-serif;">Ваш прогрес рівня</div>
+                    <h3 class="text-base font-black text-[#FFF5E0] uppercase tracking-wide mt-0.5" style="font-family: 'Tektur', sans-serif;" id="rewards-current-level">Поточний рівень: 1</h3>
+                    <p class="text-xs text-gray-400 font-semibold mt-1" id="rewards-next-reward-desc">Нагорода за 2 рівень: +5% до бонусу депозиту або 100 Vcoins</p>
+                  </div>
+                </div>
+                <div class="flex-shrink-0">
+                  <button class="btn btn-secondary opacity-50 cursor-not-allowed py-2.5 px-5 text-xs font-black rounded-lg" style="font-family: 'Tektur', sans-serif; min-width: 160px;" id="rewards-claim-btn" disabled>
+                    Забрати нагороду
+                  </button>
+                </div>
               </div>
-              <div class="flex-1 md:px-5 text-center md:text-left">
-                <span class="text-[9px] font-bold text-[#8b949e] uppercase block mb-1" style="font-family: 'Tektur', sans-serif;">Наступна ціль</span>
-                <span class="text-xs text-gray-300 font-semibold" id="rewards-next-reward-desc">Нагорода за 13 рівень: +5% до бонусу депозиту або 100 Vcoins</span>
-              </div>
-              <button class="btn btn-secondary opacity-50 cursor-not-allowed py-2.5 px-5 text-xs font-bold rounded-lg" style="font-family: 'Tektur', sans-serif;" id="rewards-claim-btn" disabled>
-                Забрати нагороду
-              </button>
             </div>
 
           </div>
