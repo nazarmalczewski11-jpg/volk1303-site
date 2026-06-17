@@ -1,5 +1,5 @@
 /* Import Rubik Mono One, Rubik, Outfit & Roboto Mono Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Rubik+Mono+One&family=Rubik:wght@300;400;500;700&family=Outfit:wght@300;400;600;800;900&family=Roboto+Mono:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Rubik+Mono+One&family=Rubik:wght@300;400;500;700&family=Outfit:wght@300;400;600;800;900&family=Roboto+Mono:wght@400;700&family=Russo+One&family=Tektur:wght@400;500;600;700;800;900&display=swap');
 
 :root {
   --bg-darker: #0b0e14;
@@ -36,17 +36,13 @@ strong, b, h1, h2, h3, h4, h5, h6, button, .btn, .section-title, .logo-text, .pr
 }
 
 body {
-  background-color: var(--bg-darker);
+  background-color: #0b0e14;
   color: var(--text-primary);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   overflow-x: hidden;
-  background-image:
-    linear-gradient(to bottom, rgba(11,14,20,0.88) 0%, rgba(11,14,20,0.80) 40%, rgba(11,14,20,0.92) 100%),
-    url('assets/cs_abstract_bg.png');
-  background-size: cover;
-  background-position: center top;
+  background: radial-gradient(circle at top, #161924 0%, #0b0e14 100%);
   background-attachment: fixed;
 }
 
@@ -559,7 +555,7 @@ nav {
   justify-content: center;
   align-items: center;
   height: 100%;
-  min-height: 280px;
+  min-height: 220px;
   background: radial-gradient(circle, rgba(12, 13, 18, 0.6) 0%, rgba(12, 13, 18, 0.9) 100%), url('assets/stream_offline_bg.jpg') no-repeat center;
   background-size: cover;
   padding: 40px;
@@ -1633,13 +1629,15 @@ nav {
 
 /* Footer styling */
 footer {
-  background-color: rgba(6, 7, 10, 0.95);
-  border-top: 1px solid var(--border-color);
-  padding: 25px 4%;
+  background: linear-gradient(to top, rgba(10, 11, 15, 0.95) 0%, rgba(10, 11, 15, 0.4) 60%, transparent 100%) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 30px 4% 35px 4%;
   font-size: 12px;
   color: var(--text-secondary);
   line-height: 1.5;
   margin-top: auto;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .footer-inner {
@@ -3208,4 +3206,558 @@ footer {
   }
 }
 
+/* ==========================================================================
+   VOLK1303 MY BETS PAGE STYLES (ENLARGED & LEFT-ALIGNED)
+   ========================================================================== */
 
+.page-title-wrapper-bets {
+  text-align: left;
+  margin-top: 15px;
+  margin-bottom: 20px;
+}
+
+.page-subtitle-bets {
+  font-family: 'Tektur', sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--cs-orange);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 8px;
+}
+
+.page-title-bets {
+  font-family: 'Russo One', sans-serif;
+  font-size: 56px;
+  font-weight: 900;
+  letter-spacing: 1.2px;
+  background: linear-gradient(to bottom, #FFF5E0 15%, #C2A572 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin: 0 0 12px 0;
+  text-transform: uppercase;
+  font-style: oblique 8deg;
+}
+
+.page-description-bets {
+  font-family: 'Tektur', sans-serif;
+  font-size: 16px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  max-width: 700px;
+  margin: 0;
+}
+
+.bets-stats-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(10, 11, 15, 0.75);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1.5px solid rgba(199, 152, 71, 0.25);
+  border-radius: 14px;
+  padding: 24px 35px;
+  margin-top: 10px;
+  margin-bottom: 12px;
+  width: 100%;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.02);
+}
+
+.bets-stats-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.bets-stats-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+}
+
+.bets-stats-icon .material-icons,
+.bets-stats-icon .material-icons-outlined,
+.bets-stats-icon .material-symbols-outlined {
+  font-size: 38px;
+  color: #CBB07E;
+}
+
+.bets-stats-icon.gold-trophy .material-icons-outlined,
+.bets-stats-icon.gold-crosshair .material-icons-outlined,
+.bets-stats-icon.gold-chart .material-icons-outlined,
+.bets-stats-icon.gold-coins .material-icons-outlined {
+  background: linear-gradient(to bottom, #FFF5E0 15%, #E58A12 100%);
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  display: inline-block;
+}
+
+.bets-stats-icon.green-trophy .material-symbols-outlined {
+  background: linear-gradient(to bottom, #d4ff80 15%, #26A17B 100%);
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  display: inline-block;
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 48;
+}
+
+.bets-stats-icon.red-skull .material-symbols-outlined {
+  background: linear-gradient(to bottom, #ff7b90 15%, #FF4A4A 100%);
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  display: inline-block;
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 48;
+}
+
+.bets-stats-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bets-stats-label {
+  font-family: 'Tektur', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.bets-stats-value {
+  font-family: 'Russo One', sans-serif;
+  font-size: 26px;
+  font-weight: 600;
+  color: #FFF5E0;
+  line-height: 1.1;
+}
+
+.bets-stats-value.success-val {
+  color: #26a17b;
+}
+
+.bets-stats-value.danger-val {
+  color: #FF4A4A;
+}
+
+.bets-stats-divider {
+  width: 1px;
+  height: 48px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.bets-dashboard-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  margin-top: 0px;
+  margin-bottom: 40px;
+  width: 100%;
+}
+
+.bets-dashboard-card {
+  background: rgba(10, 11, 15, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1.5px solid rgba(199, 152, 71, 0.15);
+  border-radius: 16px;
+  padding: 28px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.02);
+  min-height: 340px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.bets-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: 14px;
+}
+
+.bets-card-title {
+  font-family: 'Tektur', sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  color: #CBB07E;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0;
+}
+
+.bets-timeframe-filters {
+  display: flex;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.bets-timeframe-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-family: 'Tektur', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-transform: uppercase;
+}
+
+.bets-timeframe-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.bets-timeframe-btn.active {
+  color: #0b0e14;
+  background: #E58A12;
+  box-shadow: 0 2px 6px rgba(229, 138, 18, 0.3);
+}
+
+.bets-chart-container {
+  flex: 1;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 220px;
+}
+
+.bets-table-container {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 240px;
+  flex: 1;
+}
+
+.bets-table-container::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.bets-table-container::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+}
+
+.bets-table-container::-webkit-scrollbar-thumb {
+  background: rgba(229, 154, 46, 0.4);
+  border-radius: 4px;
+}
+
+.bets-table-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(229, 154, 46, 0.6);
+}
+
+.bets-mini-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Tektur', sans-serif;
+  font-size: 13px;
+}
+
+.bets-mini-table th {
+  text-align: left;
+  padding: 12px 10px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.bets-mini-table td {
+  padding: 12px 10px;
+  color: white;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  vertical-align: middle;
+}
+
+.bets-mini-table tr:last-child td {
+  border-bottom: none;
+}
+
+.badge-mini-win {
+  color: #26a17b;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.badge-mini-loss {
+  color: #FF4A4A;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.badge-mini-pending {
+  color: #E58A12;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.badge-mini-cancelled {
+  color: #718096;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+@media (max-width: 1024px) {
+  .bets-stats-bar {
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: center;
+    padding: 20px;
+  }
+  .bets-stats-divider {
+    display: none;
+  }
+  .bets-dashboard-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Restored Profile gold text colors to match My Bets styling */
+.profile-grid,
+.profile-grid .profile-username,
+.profile-grid .profile-email,
+.profile-grid .section-title,
+.profile-grid .profile-stat-label,
+.profile-grid .profile-stat-value {
+  color: #CBB07E !important;
+}
+/* ==========================================================================
+   VOLK1303 PREMIUM HORIZONTAL TOURNAMENT CARD LAYOUT
+   ========================================================================== */
+
+.tournament-card {
+  background: rgba(10, 11, 15, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1.5px solid rgba(199, 152, 71, 0.15);
+  border-radius: 16px;
+  padding: 0 !important;
+  margin-bottom: 20px;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s ease, box-shadow 0.3s ease;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.02);
+  overflow: hidden;
+}
+
+.tournament-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--cs-orange);
+  box-shadow: 0 15px 35px rgba(255, 90, 0, 0.08), 0 10px 30px rgba(0, 0, 0, 0.6);
+}
+
+.tournament-card-main {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  align-items: stretch;
+}
+
+.card-map-preview {
+  width: 200px;
+  align-self: stretch;
+  overflow: hidden;
+  flex-shrink: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.card-map-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s ease;
+}
+
+.tournament-card:hover .card-map-preview img {
+  transform: scale(1.05);
+}
+
+.card-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 24px 12px 24px 24px;
+}
+
+.card-right-side {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 24px 24px 12px;
+}
+
+.btn-details {
+  background: rgba(255, 90, 0, 0.1) !important;
+  color: var(--cs-orange) !important;
+  border: 1.5px solid rgba(255, 90, 0, 0.3) !important;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-family: 'Tektur', sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-details:hover {
+  background: rgba(255, 90, 0, 0.2) !important;
+  border-color: var(--cs-orange) !important;
+  box-shadow: 0 0 12px rgba(255, 90, 0, 0.2);
+  color: white !important;
+}
+
+.tournament-details-panel {
+  padding: 0 24px 24px 24px;
+}
+
+.card-title {
+  font-family: 'Russo One', sans-serif;
+  font-size: 22px;
+  font-weight: 900;
+  color: #FFF5E0;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-badge {
+  font-family: 'Tektur', sans-serif;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 4px 12px;
+  border-radius: 20px;
+  letter-spacing: 0.5px;
+}
+
+.card-details-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px 20px;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 14px 20px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.02);
+}
+
+.detail-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.detail-item i {
+  font-size: 16px;
+  color: var(--cs-orange);
+  width: 20px;
+  text-align: center;
+}
+
+.detail-label {
+  font-family: 'Tektur', sans-serif;
+  font-size: 9px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  display: block;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+}
+
+.detail-value {
+  font-family: 'Tektur', sans-serif;
+  font-size: 13px;
+  color: white;
+  font-weight: 700;
+}
+
+@media (max-width: 900px) {
+  .tournament-card-main {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .card-map-preview {
+    width: 100%;
+    height: 200px;
+    aspect-ratio: auto;
+    border-right: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+  .card-info {
+    padding: 20px 24px;
+  }
+  .card-right-side {
+    padding: 12px 24px 24px 24px;
+    justify-content: flex-start;
+  }
+  .tournament-details-panel {
+    padding: 0 20px 20px 20px;
+  }
+  .card-details-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .card-details-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Vertical Bracket Layout Styles */
+.bracket-canvas-vertical {
+  display: flex;
+  flex-direction: column;
+  gap: 60px;
+  align-items: center;
+  position: relative;
+  min-width: max-content;
+  padding: 40px 20px;
+  margin: 0 auto;
+}
+
+.bracket-round-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-around;
+  width: 100%;
+  gap: 40px;
+  position: relative;
+}
+
+.bracket-match-node-vertical {
+  background: #11131c;
+  background-size: cover;
+  background-position: center;
+  border: 1.5px solid var(--border-color);
+  border-radius: 10px;
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.bracket-match-node-vertical:hover {
+  border-color: var(--cs-orange);
+  box-shadow: 0 5px 15px rgba(255, 90, 0, 0.15);
+}
+
+.bracket-match-node-vertical.active-live {
+  border-color: var(--cs-orange);
+  box-shadow: 0 0 15px rgba(255, 90, 0, 0.25);
+}

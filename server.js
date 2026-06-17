@@ -82,7 +82,7 @@ app.use(express.static(__dirname));
 // Routes
 
 // 1. GET key value
-app.get('/:key', async (req, res) => {
+const handleGetKey = async (req, res) => {
   const { key } = req.params;
   
   if (usePostgres) {
@@ -107,10 +107,10 @@ app.get('/:key', async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     res.send(db[key]);
   }
-});
+};
 
 // 2. POST (Upsert) key value
-app.post('/:key', async (req, res) => {
+const handlePostKey = async (req, res) => {
   const { key } = req.params;
   let bodyValue = req.body;
   
@@ -139,7 +139,13 @@ app.post('/:key', async (req, res) => {
     writeJsonDb(db);
     res.send('OK');
   }
-});
+};
+
+app.get('/api/:key', handleGetKey);
+app.get('/:key', handleGetKey);
+
+app.post('/api/:key', handlePostKey);
+app.post('/:key', handlePostKey);
 
 // 3. Health check route
 app.get('/', (req, res) => {
@@ -150,3 +156,4 @@ app.get('/', (req, res) => {
 app.listen(port, () => {
   console.log(`Server is running on port ${port} in ${usePostgres ? 'PostgreSQL' : 'Local JSON'} mode`);
 });
+

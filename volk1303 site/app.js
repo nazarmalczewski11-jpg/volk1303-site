@@ -4,6 +4,15 @@ const CLOUD_BUCKET = (window.location.hostname === 'localhost' || window.locatio
   ? 'http://localhost:10000/'
   : 'https://volk-backend.onrender.com/';
 
+window.isValidTournament = function(t) {
+  if (!t || !t.id || !t.name) return false;
+  const name = t.name.trim().toLowerCase();
+  const testNames = ["fsdf", "blbl", "fdkfok", "test tournament"];
+  if (name.length < 3 || testNames.includes(name)) return false;
+  if (!t.format || !t.map) return false;
+  return true;
+};
+
 let isSyncing = false;
 let openTournamentDetailsIds = {};
 let activeTournamentTabs = {};
@@ -151,7 +160,7 @@ async function syncWithCloud() {
                   bet.status = isWinner ? "Виграш" : "Програш";
                   bet.payout = isWinner ? Math.round(bet.amount * bet.odds) : 0;
                   if (isWinner) {
-                    u.balance = (u.balance || 0) + bet.payout;
+                    u.unclaimedBalance = (u.unclaimedBalance || 0) + bet.payout;
                   }
                   betsSettledRetrospectively = true;
                   dbChanged = true;
@@ -358,6 +367,29 @@ function getDB() {
       db.currentUser = 'admin';
       dbUpdated = true;
     }
+
+    // Filter out phantom bets (FSDF or deleted tournaments)
+    db.users.forEach(user => {
+      if (user.betHistory && Array.isArray(user.betHistory)) {
+        const oldLen = user.betHistory.length;
+        user.betHistory = user.betHistory.filter(bet => {
+          if (!bet) return false;
+          if (bet.selectedTeam && bet.selectedTeam.toUpperCase() === 'FSDF') {
+            return false;
+          }
+          if (bet.type === 'tournament') {
+            const tourExists = db.tournaments.some(t => String(t.id) === String(bet.tourId));
+            if (!tourExists) {
+              return false;
+            }
+          }
+          return true;
+        });
+        if (user.betHistory.length !== oldLen) {
+          dbUpdated = true;
+        }
+      }
+    });
 
     if (dbUpdated) {
       localStorage.setItem(DB_KEY, JSON.stringify(db)); // Save immediately!
@@ -838,50 +870,28 @@ function renderPageContent() {
     // Start Spectator Live Chat simulation
     startChatSimulation();
     
-    // Aggregate standard matches and active tournament matches
-    const allMatches = [...(db.matches || [])];
-    (db.tournaments || []).forEach(tour => {
-      if (tour.status === 'active' && tour.brackets && tour.brackets.rounds) {
-        tour.brackets.rounds.forEach(round => {
-          (round.matches || []).forEach(match => {
-            if (match.status === 'live' || match.status === 'upcoming') {
-              const t1 = (db.teams || []).find(t => t.name === match.team1);
-              const t2 = (db.teams || []).find(t => t.name === match.team2);
-              const p1 = t1 ? (t1.players || []) : [];
-              const p2 = t2 ? (t2.players || []) : [];
-
-              // Retrieve team coefficients from the admin panel settings
-              const teamOdds = tour.teamOdds || {};
-              const odds1 = (t1 && teamOdds[t1.id] !== undefined) ? teamOdds[t1.id] : 2.5;
-              const odds2 = (t2 && teamOdds[t2.id] !== undefined) ? teamOdds[t2.id] : 2.5;
-
-              allMatches.push({
-                id: match.id,
-                isTournamentMatch: true,
-                tournamentId: tour.id,
-                tournamentName: tour.name,
-                team1: match.team1,
-                team2: match.team2,
-                players1: p1,
-                players2: p2,
-                score1: match.score1 || 0,
-                score2: match.score2 || 0,
-                status: match.status,
-                coef1: odds1,
-                coef2: odds2
-              });
-            }
-          });
-        });
-      }
-    });
-
-    // Filter matches: show all live, prematch, and upcoming matches (tabs removed)
-    const filteredMatches = allMatches.filter(m => {
-      return m.status === 'live' || m.status === 'prematch' || m.status === 'upcoming';
-    });
-
-    renderBettingMatches(filteredMatches);
+    const container = document.getElementById('live-matches-list');
+    if (container) {
+      container.innerHTML = "";
+      
+      // Render active & upcoming tournaments (only active, upcoming, or completed less than 10 mins ago)
+      const tournaments = (db.tournaments || []).filter(t => {
+        if (!window.isValidTournament(t)) return false;
+        if (t.status === 'completed') {
+          if (!t.completedAt) return false;
+          const diffMs = Date.now() - new Date(t.completedAt).getTime();
+          return diffMs < 10 * 60 * 1000; // 10 minutes
+        }
+        return true;
+      });
+      renderTournamentsList(container, tournaments);
+      
+      // Filter standard matches (only standard matches, prematch or live or upcoming)
+      const standardMatches = (db.matches || []).filter(m => {
+        return m.status === 'live' || m.status === 'prematch' || m.status === 'upcoming';
+      });
+      renderBettingMatches(standardMatches, false);
+    }
     renderLiveMatchStats(db);
     renderDailyQuests();
     renderSkinsShop();
@@ -920,7 +930,7 @@ function handleLoginSubmit() {
 
   // Find by username OR email
   const user = db.users.find(u =>
-    u.username === inputVal || u.email.toLowerCase() === inputVal
+    u.username.toLowerCase() === inputVal || u.email.toLowerCase() === inputVal
   );
 
   if (!user) {
@@ -977,6 +987,11 @@ async function handleRegisterSubmit() {
   const originalBtnText = submitBtn.innerText;
   submitBtn.disabled = true;
   submitBtn.innerText = "ПЕРЕВІРКА ДАНИХ...";
+
+  // Ensure register URL query param is present so checkAuthGate doesn't redirect user during modal
+  if (!window.location.search.includes('register')) {
+    window.history.replaceState(null, '', window.location.pathname + '?register=1');
+  }
 
   let latestUsers = [];
   try {
@@ -1348,13 +1363,17 @@ function getTeamEmoji(teamName) {
 }
 
 // Render list of active/upcoming matches in lobby (Premium CS2 Horizontal Layout)
-function renderBettingMatches(matches) {
+function renderBettingMatches(matches, clearContainer = true) {
   const container = document.getElementById('live-matches-list');
   if (!container) return;
-  container.innerHTML = "";
+  if (clearContainer) {
+    container.innerHTML = "";
+  }
 
   if (matches.length === 0) {
-    container.innerHTML = `<div style="color:var(--text-secondary); text-align:center; padding: 30px; font-weight: 600; grid-column: span 4;">На даний момент активних матчів немає в лінії</div>`;
+    if (container.children.length === 0) {
+      container.innerHTML = `<div style="color:var(--text-secondary); text-align:center; padding: 30px; font-weight: 600; grid-column: span 4;">На даний момент активних матчів немає в лінії</div>`;
+    }
     return;
   }
 
@@ -1383,12 +1402,20 @@ function renderBettingMatches(matches) {
       const betOnTeam1 = userBets.find(b => b.type === "tournament" && b.tourId === match.tournamentId && b.selectedTeam.toLowerCase() === match.team1.toLowerCase());
       const betOnTeam2 = userBets.find(b => b.type === "tournament" && b.tourId === match.tournamentId && b.selectedTeam.toLowerCase() === match.team2.toLowerCase());
 
+      const tour = db.tournaments.find(t => t.id === match.tournamentId);
+      const matchMap = match.map || (tour ? tour.map : 'de_mirage');
+      const mapFile = getMapFilename(matchMap);
+
       const card = document.createElement('div');
       card.className = "tournament-match-horizontal-card";
       card.style.width = "100%";
       card.innerHTML = `
-        <div style="background: linear-gradient(135deg, rgba(22, 27, 34, 0.95) 0%, rgba(15, 20, 28, 0.98) 100%); border: 1px solid var(--cs-orange); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 16px; box-shadow: 0 4px 20px rgba(255, 90, 0, 0.08); width: 100%; box-sizing: border-box;">
+        <div style="position: relative; background: linear-gradient(135deg, rgba(22, 27, 34, 0.72) 0%, rgba(15, 20, 28, 0.80) 100%), url('assets/maps/${mapFile}.png'); background-size: cover; background-position: center; border: 1px solid var(--cs-orange); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 16px; box-shadow: 0 4px 20px rgba(255, 90, 0, 0.08); width: 100%; box-sizing: border-box;">
           
+          <!-- Top Left: Map Name -->
+          <div style="position: absolute; top: 12px; left: 15px; background: rgba(11, 14, 20, 0.85); border: 1px solid rgba(255, 90, 0, 0.45); border-radius: 6px; padding: 4px 10px; font-size: 10px; color: white; font-weight: 800; font-family: monospace; letter-spacing: 0.5px; text-transform: uppercase; display: flex; align-items: center; gap: 6px;">
+            🗺️ ${matchMap}
+          </div>
           <!-- Center: Tournament Name & Subtitle -->
           <div style="text-align: center; border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 10px; display: flex; flex-direction: column; gap: 5px;">
             <span style="font-size: 16px; color: var(--cs-orange); font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px;">🏆 ${match.tournamentName}</span>
@@ -1439,7 +1466,6 @@ function renderBettingMatches(matches) {
           <!-- Bet placement button -->
           <div style="display: flex; justify-content: center; margin-top: 5px;">
             ${(() => {
-              const tour = db.tournaments.find(t => t.id === match.tournamentId);
               const isFrozenTour = isTournamentBettingFrozen(tour);
               if (isFrozenTour) {
                 return `
@@ -1449,7 +1475,7 @@ function renderBettingMatches(matches) {
                 `;
               } else {
                 return `
-                  <button onclick="openTourMatchBetModal('${match.tournamentId}', '${match.team1}', '${match.team2}')" style="background: var(--cs-orange); border: 1px solid var(--cs-orange); color: white; padding: 10px 32px; font-size: 13px; font-weight: 900; border-radius: 6px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; transition: all 0.2s; box-shadow: 0 0 10px rgba(255, 90, 0, 0.15);" onmouseover="this.style.background='#e05500'" onmouseout="this.style.background='var(--cs-orange)'">
+                  <button onclick="openTourMatchBetModal('${match.tournamentId}', '${match.team1}', '${match.team2}', '${matchMap}')" style="background: var(--cs-orange); border: 1px solid var(--cs-orange); color: white; padding: 10px 32px; font-size: 13px; font-weight: 900; border-radius: 6px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; transition: all 0.2s; box-shadow: 0 0 10px rgba(255, 90, 0, 0.15);" onmouseover="this.style.background='#e05500'" onmouseout="this.style.background='var(--cs-orange)'">
                     🎰 ПОСТАВИТИ
                   </button>
                 `;
@@ -1565,16 +1591,16 @@ window.selectBetodds = function(matchId, teamIndex, odds, teamName) {
   const eyeL = document.getElementById('wolf-eye-l');
   const eyeR = document.getElementById('wolf-eye-r');
   if (eyeL && eyeR) {
-    eyeL.classList.remove('wolf-eyes-glowing');
-    eyeR.classList.remove('wolf-eyes-glowing');
+    eyeL.classList.remove('active-glow');
+    eyeR.classList.remove('active-glow');
     void eyeL.offsetWidth; // Trigger reflow
-    eyeL.classList.add('wolf-eyes-glowing');
-    eyeR.classList.add('wolf-eyes-glowing');
+    eyeL.classList.add('active-glow');
+    eyeR.classList.add('active-glow');
     
     // Stop eyes glow after 2 seconds
     setTimeout(() => {
-      eyeL.classList.remove('wolf-eyes-glowing');
-      eyeR.classList.remove('wolf-eyes-glowing');
+      eyeL.classList.remove('active-glow');
+      eyeR.classList.remove('active-glow');
     }, 2000);
   }
 
@@ -1620,6 +1646,14 @@ window.selectBetodds = function(matchId, teamIndex, odds, teamName) {
   amountInput.value = "";
   amountInput.max = balance;
   document.getElementById('bet-modal-payout').innerText = "0 🪙";
+
+  const betModalContent = document.querySelector('#bet-modal .modal-content');
+  if (betModalContent) {
+    const mapFile = getMapFilename(match.map);
+    betModalContent.style.backgroundImage = `linear-gradient(to bottom, rgba(11, 14, 20, 0.88) 0%, rgba(11, 14, 20, 0.96) 100%), url('assets/maps/${mapFile}.png')`;
+    betModalContent.style.backgroundSize = 'cover';
+    betModalContent.style.backgroundPosition = 'center';
+  }
 
   openModal('bet-modal');
 };
@@ -1736,6 +1770,20 @@ function handlePromoSubmit() {
   saveDB(db);
 
   showToast(`Промокод активовано! Нараховано +${reward} 🪙 на ваш баланс.`, "success");
+  
+  // Activate glowing eyes
+  const eyeL = document.getElementById('wolf-eye-l');
+  const eyeR = document.getElementById('wolf-eye-r');
+  if (eyeL && eyeR) {
+    eyeL.classList.add('active-glow');
+    eyeR.classList.add('active-glow');
+    
+    setTimeout(() => {
+      eyeL.classList.remove('active-glow');
+      eyeR.classList.remove('active-glow');
+    }, 6000); // Glow for 6 seconds
+  }
+
   input.value = "";
   renderPageContent();
 }
@@ -1962,13 +2010,25 @@ function renderProfileDashboard() {
   const user = db.users.find(u => u.username === db.currentUser);
   if (!user) return;
 
-  // Identity cards
-  document.getElementById('prof-username').innerText = user.username.toUpperCase();
-  document.getElementById('prof-email').innerText = user.email;
+  // Render user avatar
+  const avatarEl = document.getElementById('profile-avatar-img');
+  if (avatarEl) {
+    avatarEl.src = user.avatar || 'assets/wolf_logo.png';
+  }
 
-  // Values boxes
-  document.getElementById('prof-balance').innerText = `${user.balance} 🪙`;
-  document.getElementById('prof-bonus').innerText = `+${user.bonusPercent || 0}%`;
+  // Identity cards
+  const usernameEl = document.getElementById('prof-username');
+  if (usernameEl) usernameEl.innerText = user.username.toUpperCase();
+  
+  const emailEl = document.getElementById('prof-email');
+  if (emailEl) emailEl.innerText = user.email;
+
+  // Values boxes (support both legacy and new layouts)
+  const balanceEl = document.getElementById('prof-balance') || document.getElementById('stats-profile-balance');
+  if (balanceEl) balanceEl.innerText = `${user.balance} 🪙`;
+
+  const bonusEl = document.getElementById('prof-bonus') || document.getElementById('stats-profile-bonus');
+  if (bonusEl) bonusEl.innerText = `+${user.bonusPercent || 0}%`;
 
   // Calculate Rank XP
   const totalBetsCount = user.betHistory.length;
@@ -2009,15 +2069,57 @@ function renderProfileDashboard() {
       const needed = nextRank.minXp - currentRank.minXp;
       const progress = totalXp - currentRank.minXp;
       const pct = Math.min(Math.round((progress / needed) * 100), 100);
-      xpCurrent.innerText = totalXp;
-      xpNext.innerText = nextRank.minXp;
-      xpPercent.innerText = `${pct}%`;
-      xpFill.style.width = `${pct}%`;
+      if (xpCurrent) xpCurrent.innerText = totalXp;
+      if (xpNext) xpNext.innerText = nextRank.minXp;
+      if (xpPercent) xpPercent.innerText = `${pct}%`;
+      if (xpFill) xpFill.style.width = `${pct}%`;
     } else {
-      xpCurrent.innerText = totalXp;
-      xpNext.innerText = "MAX";
-      xpPercent.innerText = "100%";
-      xpFill.style.width = "100%";
+      if (xpCurrent) xpCurrent.innerText = totalXp;
+      if (xpNext) xpNext.innerText = "MAX";
+      if (xpPercent) xpPercent.innerText = "100%";
+      if (xpFill) xpFill.style.width = "100%";
+    }
+  }
+
+  // Update level rewards card
+  const currentLvlEl = document.getElementById('rewards-current-level');
+  const nextLvlDescEl = document.getElementById('rewards-next-reward-desc');
+  const claimBtnEl = document.getElementById('rewards-claim-btn');
+  
+  if (currentLvlEl) {
+    const currentLevel = Math.floor(totalXp / 100) + 1;
+    currentLvlEl.innerText = `Поточний рівень: ${currentLevel}`;
+    
+    if (nextLvlDescEl) {
+      nextLvlDescEl.innerText = `Нагорода за ${currentLevel + 1} рівень: +5% до бонусу депозиту або 100 Vcoins`;
+    }
+    
+    if (claimBtnEl) {
+      if (!user.claimedLevels) user.claimedLevels = [];
+      const unclaimed = [];
+      for (let l = 2; l <= currentLevel; l++) {
+        if (!user.claimedLevels.includes(l)) {
+          unclaimed.push(l);
+        }
+      }
+      
+      if (unclaimed.length > 0) {
+        claimBtnEl.removeAttribute('disabled');
+        claimBtnEl.className = "btn btn-primary py-2.5 px-5 text-xs font-bold rounded-lg cursor-pointer";
+        claimBtnEl.style.opacity = "1";
+        claimBtnEl.style.background = "linear-gradient(135deg, var(--cs-orange) 0%, #ff5500 100%)";
+        claimBtnEl.innerText = `Забрати нагороду (+${unclaimed.length * 100} 🪙)`;
+        claimBtnEl.onclick = function() {
+          window.claimLevelReward();
+        };
+      } else {
+        claimBtnEl.setAttribute('disabled', 'true');
+        claimBtnEl.className = "btn btn-secondary opacity-50 cursor-not-allowed py-2.5 px-5 text-xs font-bold rounded-lg";
+        claimBtnEl.style.opacity = "0.5";
+        claimBtnEl.style.background = "";
+        claimBtnEl.innerText = "Забрати нагороду";
+        claimBtnEl.onclick = null;
+      }
     }
   }
 
@@ -2094,60 +2196,97 @@ function renderProfileDashboard() {
   const betsSpent = user.betHistory.reduce((acc, c) => acc + c.amount, 0);
   const betsPayout = user.betHistory.reduce((acc, c) => acc + (c.payout || 0), 0);
   const profitVal = betsPayout - betsSpent;
-
-  const profitDisplay = document.getElementById('prof-stat-net-profit');
-  profitDisplay.innerText = `${profitVal > 0 ? '+' : ''}${profitVal} 🪙`;
-  profitDisplay.style.color = profitVal >= 0 ? 'var(--success)' : 'var(--error)';
-
   const totalDep = user.depositHistory.reduce((acc, c) => acc + c.amount, 0);
-  document.getElementById('prof-stat-total-deposits').innerText = `${totalDep} 🪙`;
-  document.getElementById('prof-stat-total-bets').innerText = `${user.betHistory.length}`;
 
-  // Bets History List
-  const betsContainer = document.getElementById('bets-history-list');
-  betsContainer.innerHTML = "";
-
-  if (user.betHistory.length === 0) {
-    betsContainer.innerHTML = `<div style="text-align:center; color:var(--text-secondary); padding:20px;">Історія ставок пуста</div>`;
-  } else {
-    user.betHistory.forEach(bet => {
-      let colorClass = "status-in-game";
-      let payoutDisplay = "";
-
-      if (bet.status === "Виграш") {
-        colorClass = "status-won";
-        payoutDisplay = ` • Виграш: +${bet.payout} 🪙`;
-      } else if (bet.status === "Програш") {
-        colorClass = "status-lost";
-      }
-
-      const item = document.createElement('div');
-      item.className = "history-item";
-      item.style.display = "flex";
-      item.style.justifyContent = "space-between";
-      item.style.borderBottom = "1px solid var(--border-color)";
-      item.style.padding = "10px 8px";
-      item.style.fontSize = "12px";
-
-      item.innerHTML = `
-        <div>
-          <div style="font-weight: 800;">${bet.matchDisplay}</div>
-          <div style="font-size: 11px; color:var(--text-secondary); margin-top:2px;">
-            Ставка на: ${bet.selectedTeam} (кэф ${bet.odds.toFixed(2)}) • ${bet.date}
-          </div>
-        </div>
-        <div style="text-align:right;">
-          <span style="font-weight:800; color:white;">${bet.amount} 🪙</span>
-          <div class="${colorClass}" style="font-size:11px; font-weight:800; margin-top:2px;">
-            ${bet.status.toUpperCase()}${payoutDisplay}
-          </div>
-        </div>
-      `;
-      betsContainer.appendChild(item);
-    });
+  // Update legacy stats boxes if present
+  const profitDisplay = document.getElementById('prof-stat-net-profit');
+  if (profitDisplay) {
+    profitDisplay.innerText = `${profitVal > 0 ? '+' : ''}${profitVal} 🪙`;
+    profitDisplay.style.color = profitVal >= 0 ? 'var(--success)' : 'var(--error)';
   }
 
-  // Combine depositHistory and withdrawHistory into Transactions History List
+  const totalDepDisplay = document.getElementById('prof-stat-total-deposits');
+  if (totalDepDisplay) totalDepDisplay.innerText = `${totalDep} 🪙`;
+
+  const totalBetsDisplay = document.getElementById('prof-stat-total-bets');
+  if (totalBetsDisplay) totalBetsDisplay.innerText = `${user.betHistory.length}`;
+
+  // Update new stats bar elements if present
+  const barProfit = document.getElementById('stats-profile-profit');
+  if (barProfit) {
+    barProfit.innerText = `${profitVal > 0 ? '+' : ''}${profitVal} 🪙`;
+    barProfit.style.color = profitVal >= 0 ? '#26a17b' : '#ff4a4a';
+  }
+
+  const barDeposited = document.getElementById('stats-profile-deposited');
+  if (barDeposited) barDeposited.innerText = `${totalDep} 🪙`;
+
+  const barWon = document.getElementById('stats-profile-won');
+  if (barWon) barWon.innerText = `${betsPayout} 🪙`;
+
+  // Update mini stats inside ЗАГАЛЬНА СТАТИСТИКА if present
+  const miniTotal = document.getElementById('mini-stat-total');
+  if (miniTotal) miniTotal.innerText = totalBetsCount;
+
+  const wonBetsCount = user.betHistory.filter(b => b.status === "Виграш").length;
+  const lostBetsCount = user.betHistory.filter(b => b.status === "Програш").length;
+  const winrate = totalBetsCount > 0 ? Math.round((wonBetsCount / totalBetsCount) * 100) : 0;
+
+  const miniWon = document.getElementById('mini-stat-won');
+  if (miniWon) miniWon.innerText = wonBetsCount;
+
+  const miniLost = document.getElementById('mini-stat-lost');
+  if (miniLost) miniLost.innerText = lostBetsCount;
+
+  const miniWinrate = document.getElementById('mini-stat-winrate');
+  if (miniWinrate) miniWinrate.innerText = `${winrate}%`;
+
+  // Bets History List if present
+  const betsContainer = document.getElementById('bets-history-list');
+  if (betsContainer) {
+    betsContainer.innerHTML = "";
+    if (user.betHistory.length === 0) {
+      betsContainer.innerHTML = `<div style="text-align:center; color:var(--text-secondary); padding:20px;">Історія ставок пуста</div>`;
+    } else {
+      user.betHistory.forEach(bet => {
+        let colorClass = "status-in-game";
+        let payoutDisplay = "";
+
+        if (bet.status === "Виграш") {
+          colorClass = "status-won";
+          payoutDisplay = ` • Виграш: +${bet.payout} 🪙`;
+        } else if (bet.status === "Програш") {
+          colorClass = "status-lost";
+        }
+
+        const item = document.createElement('div');
+        item.className = "history-item";
+        item.style.display = "flex";
+        item.style.justifyContent = "space-between";
+        item.style.borderBottom = "1px solid var(--border-color)";
+        item.style.padding = "10px 8px";
+        item.style.fontSize = "12px";
+
+        item.innerHTML = `
+          <div>
+            <div style="font-weight: 800;">${bet.matchDisplay}</div>
+            <div style="font-size: 11px; color:var(--text-secondary); margin-top:2px;">
+              Ставка на: ${bet.selectedTeam} (кэф ${(bet.odds || 1).toFixed(2)}) • ${bet.date}
+            </div>
+          </div>
+          <div style="text-align:right;">
+            <span style="font-weight:800; color:white;">${bet.amount} 🪙</span>
+            <div class="${colorClass}" style="font-size:11px; font-weight:800; margin-top:2px;">
+              ${bet.status.toUpperCase()}${payoutDisplay}
+            </div>
+          </div>
+        `;
+        betsContainer.appendChild(item);
+      });
+    }
+  }
+
+  // Combine depositHistory, pendingDeposits and withdrawHistory into Transactions History List
   const transactions = [];
 
   (user.depositHistory || []).forEach(dep => {
@@ -2160,6 +2299,18 @@ function renderProfileDashboard() {
     });
   });
 
+  (db.pendingDeposits || []).forEach(p => {
+    if (p.username && p.username.toLowerCase() === db.currentUser.toLowerCase()) {
+      transactions.push({
+        type: 'deposit',
+        date: p.date,
+        amount: p.amount,
+        method: p.method,
+        status: 'pending'
+      });
+    }
+  });
+
   (user.withdrawHistory || []).forEach(w => {
     transactions.push({
       type: 'withdraw',
@@ -2170,71 +2321,127 @@ function renderProfileDashboard() {
     });
   });
 
-  // Sort by date descending (safely parsing strings or sorting by string as fallback)
+  // Sort by date descending
   transactions.sort((a, b) => {
     const da = Date.parse(a.date) || 0;
     const db = Date.parse(b.date) || 0;
     return db - da;
   });
 
-  const depsContainer = document.getElementById('deposits-history-list');
-  if (depsContainer) {
-    depsContainer.innerHTML = "";
-
-    const btnDeps = document.getElementById('btn-tab-deposits');
-    if (btnDeps) {
-      btnDeps.innerText = "Транзакції";
-    }
-
+  const txContainer = document.getElementById('profile-transactions-list');
+  if (txContainer) {
     if (transactions.length === 0) {
-      depsContainer.innerHTML = `<div style="text-align:center; color:var(--text-secondary); padding:20px;">Історія транзакцій порожня</div>`;
+      txContainer.innerHTML = `<div style="text-align: center; color: var(--text-secondary); font-size: 12px; padding: 20px 0;">Транзакцій ще немає</div>`;
     } else {
-      transactions.forEach(tx => {
-        const item = document.createElement('div');
-        item.className = "history-item";
-        item.style.display = "flex";
-        item.style.justifyContent = "space-between";
-        item.style.borderBottom = "1px solid var(--border-color)";
-        item.style.padding = "10px 8px";
-        item.style.fontSize = "12px";
+      txContainer.innerHTML = transactions.map(tx => {
+        let typeText = "";
+        let typeColor = "";
+        let statusText = "";
+        let statusColor = "";
+        let amountSign = "";
 
         if (tx.type === 'deposit') {
-          item.innerHTML = `
-            <div>
-              <div style="font-weight: 800; color: white;">Поповнення рахунку</div>
-              <div style="font-size: 11px; color:var(--text-secondary); margin-top:2px;">${tx.date}</div>
-            </div>
-            <div style="text-align:right;">
-              <span style="color:var(--success); font-weight:800;">+${tx.amount} 🪙</span>
-              <div style="font-size:10px; color:var(--text-secondary); margin-top:2px;">${tx.method}</div>
-            </div>
-          `;
-        } else {
-          let statusColor = "var(--text-secondary)";
-          let statusText = "В обробці";
-          if (tx.status === 'approved') {
-            statusColor = "var(--success)";
-            statusText = "Виплачено";
-          } else if (tx.status === 'rejected') {
-            statusColor = "var(--error)";
-            statusText = "Відхилено (Повернено)";
+          typeText = "Поповнення";
+          typeColor = "#26a17b";
+          amountSign = "+";
+          
+          if (tx.status === 'pending') {
+            statusText = "В обробці";
+            statusColor = "#ffaa00";
+          } else {
+            statusText = "Успішно";
+            statusColor = "#26a17b";
           }
+        } else {
+          typeText = "Виведення";
+          typeColor = "#ff4a4a";
+          amountSign = "-";
 
-          item.innerHTML = `
-            <div>
-              <div style="font-weight: 800; color: white;">Виведення коштів</div>
-              <div style="font-size: 11px; color:var(--text-secondary); margin-top:2px;">${tx.date}</div>
-            </div>
-            <div style="text-align:right;">
-              <span style="color:var(--cs-orange); font-weight:800;">-${tx.amount} 🪙</span>
-              <div style="font-size:10px; color:${statusColor}; margin-top:2px; font-weight:700;">${statusText} (${tx.method})</div>
-            </div>
-          `;
+          if (tx.status === 'pending') {
+            statusText = "В обробці";
+            statusColor = "#ffaa00";
+          } else if (tx.status === 'approved' || tx.status === 'success') {
+            statusText = "Виплачено";
+            statusColor = "#26a17b";
+          } else {
+            statusText = "Відхилено";
+            statusColor = "#ff4a4a";
+          }
         }
-        depsContainer.appendChild(item);
+
+        let methodDisplay = tx.method;
+        if (methodDisplay === "USDT TRC20" || methodDisplay === "TRC20") methodDisplay = "TRC20";
+        if (methodDisplay === "MONOBANKA" || methodDisplay === "Visa/Mastercard") methodDisplay = "МОНОБАНК";
+
+        return `
+          <div class="profile-activity-item" style="margin-bottom: 8px; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1;">
+              <div class="profile-activity-status" style="background:${typeColor}; box-shadow: 0 0 6px ${typeColor}55;"></div>
+              <div style="min-width: 0; flex: 1;">
+                <div style="font-family:'Tektur', sans-serif; font-size:11px; font-weight:700; color:#FFF5E0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                  ${typeText} (${methodDisplay})
+                </div>
+                <div style="font-family:'Tektur', sans-serif; font-size:9px; color:var(--text-secondary); margin-top:2px;">
+                  ${tx.date} • <span style="color:${statusColor}; font-weight:700;">${statusText}</span>
+                </div>
+              </div>
+            </div>
+            <div style="font-family:'Russo One', sans-serif; font-size:12px; font-weight:900; color:${typeColor}; white-space:nowrap; margin-left: 8px;">
+              ${amountSign}${tx.amount} 🪙
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  }
+
+  // Recent Activity (last 3 bets)
+  const activityContainer = document.getElementById('profile-recent-activity');
+  if (activityContainer) {
+    activityContainer.innerHTML = "";
+    const recentBets = [...user.betHistory].reverse().slice(0, 3);
+    if (recentBets.length === 0) {
+      activityContainer.innerHTML = `<div style="text-align: center; color: var(--text-secondary); font-size: 12px; padding: 20px 0;">Ставок ще немає</div>`;
+    } else {
+      recentBets.forEach(bet => {
+        let statusText = "В грі";
+        let statusColor = "#ffaa00";
+        if (bet.status === "Виграш") {
+          statusText = "Виграш";
+          statusColor = "#26a17b";
+        } else if (bet.status === "Програш") {
+          statusText = "Програш";
+          statusColor = "#ff4a4a";
+        }
+
+        const div = document.createElement('div');
+        div.className = "profile-activity-item";
+        div.style.marginBottom = "8px";
+        div.style.display = "flex";
+        div.style.justifyContent = "space-between";
+        div.style.alignItems = "center";
+        
+        div.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1;">
+            <div class="profile-activity-status" style="background:${statusColor}; box-shadow: 0 0 6px ${statusColor}55;"></div>
+            <div style="min-width: 0; flex: 1;">
+              <div style="font-family:'Tektur', sans-serif; font-size:11px; font-weight:700; color:#FFF5E0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                ${bet.matchDisplay}
+              </div>
+              <div style="font-family:'Tektur', sans-serif; font-size:9px; color:var(--text-secondary); margin-top:2px;">
+                ${bet.selectedTeam} (${(bet.odds || 1).toFixed(2)}) • <span style="color:${statusColor}; font-weight:700;">${statusText}</span>
+              </div>
+            </div>
+          </div>
+          <div style="font-family:'Russo One', sans-serif; font-size:12px; font-weight:900; color:white; white-space:nowrap; margin-left: 8px;">
+            ${bet.amount} 🪙
+          </div>
+        `;
+        activityContainer.appendChild(div);
       });
     }
   }
+  renderAchievements(user);
 }
 
 // ============================================================================
@@ -2776,6 +2983,39 @@ window.unlinkFaceit = function() {
   renderPageContent();
 };
 
+window.claimLevelReward = function() {
+  const db = getDB();
+  const user = db.users.find(u => u.username === db.currentUser);
+  if (!user) return;
+
+  const totalBetsCount = user.betHistory.length;
+  const totalDuelsCount = user.betHistory.filter(b => b.matchDisplay && b.matchDisplay.includes("1v1")).length;
+  const totalXp = (totalBetsCount * 20) + (totalDuelsCount * 15);
+  const currentLevel = Math.floor(totalXp / 100) + 1;
+
+  if (!user.claimedLevels) user.claimedLevels = [];
+
+  const unclaimed = [];
+  for (let l = 2; l <= currentLevel; l++) {
+    if (!user.claimedLevels.includes(l)) {
+      unclaimed.push(l);
+    }
+  }
+
+  if (unclaimed.length === 0) {
+    showToast("У вас немає доступних нагород для отримання!", "error");
+    return;
+  }
+
+  const rewardAmount = unclaimed.length * 100;
+  user.balance = (user.balance || 0) + rewardAmount;
+  user.claimedLevels = [...user.claimedLevels, ...unclaimed];
+
+  saveDB(db);
+  showToast(`Вітаємо! Ви отримали ${rewardAmount} Vcoin за рівні: ${unclaimed.join(', ')}!`, "success");
+  renderPageContent();
+};
+
 // 5. Daily Quests checklist
 const DAILY_QUESTS = [
   {
@@ -2984,6 +3224,11 @@ function renderMyBetsPage() {
   const wonBets = history.filter(b => b.status === 'Виграш');
   const winRate = settledBets.length > 0 ? Math.round((wonBets.length / settledBets.length) * 100) : 0;
 
+  const wonBetsCount = wonBets.length;
+  const lostBetsCount = history.filter(b => b.status === 'Програш').length;
+  const totalSpent = history.reduce((acc, b) => acc + b.amount, 0);
+  const profitVal = totalWon - totalSpent;
+
   // Update Stats UI
   const totalEl = document.getElementById('stats-total-bets');
   if (totalEl) totalEl.innerText = totalBets;
@@ -2991,11 +3236,20 @@ function renderMyBetsPage() {
   const activeEl = document.getElementById('stats-active-bets');
   if (activeEl) activeEl.innerText = activeBets;
   
-  const wonEl = document.getElementById('stats-total-won');
-  if (wonEl) wonEl.innerText = `${totalWon} 🪙`;
+  const wonEl = document.getElementById('stats-won-bets');
+  if (wonEl) wonEl.innerText = wonBetsCount;
+
+  const lostEl = document.getElementById('stats-lost-bets');
+  if (lostEl) lostEl.innerText = lostBetsCount;
   
   const rateEl = document.getElementById('stats-win-rate');
   if (rateEl) rateEl.innerText = `${winRate}%`;
+
+  const profitEl = document.getElementById('stats-profit');
+  if (profitEl) {
+    profitEl.innerText = `${profitVal > 0 ? '+' : ''}${profitVal}`;
+    profitEl.style.color = profitVal >= 0 ? '#26a17b' : '#ff4a4a';
+  }
 
   // 2. Render Cards List
   const container = document.getElementById('my-bets-container');
@@ -3091,7 +3345,7 @@ function renderMyBetsPage() {
         </div>
         <div class="bet-detail-item">
           <span class="bet-detail-label">Коефіцієнт</span>
-          <span class="bet-detail-value">x${bet.odds.toFixed(2)}</span>
+          <span class="bet-detail-value">x${(bet.odds || 1).toFixed(2)}</span>
         </div>
         <div class="bet-detail-item">
           <span class="bet-detail-label">Сума ставки</span>
@@ -3116,54 +3370,15 @@ function renderMyBetsPage() {
 // ==========================================
 
 // Render tournaments grouped by active, upcoming, and completed categories
-let activeTournamentTab = 'active';
+let activeTournamentTab = 'all';
 
 window.switchTournamentTab = function(tab) {
   activeTournamentTab = tab;
   renderTournamentsPortal();
 };
 
-window.renderTournamentsPortal = function() {
-  const container = document.getElementById('tournaments-portal-list');
-  if (!container) return;
-
-  // Update active tab buttons active classes on the page
-  const tabBtns = document.querySelectorAll('.tournament-tab-btn');
-  tabBtns.forEach(btn => {
-    if (btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(`'${activeTournamentTab}'`)) {
-      btn.classList.add('active');
-    } else {
-      btn.classList.remove('active');
-    }
-  });
-
-  const db = getDB();
-  const tournaments = db.tournaments || [];
-
-  container.innerHTML = "";
-
-  // Filter tournaments by tab
-  const filtered = tournaments.filter(t => t.status === activeTournamentTab);
-
-  if (filtered.length === 0) {
-    let emptyMsg = "На даний момент немає активних турнірів.";
-    if (activeTournamentTab === 'upcoming') {
-      emptyMsg = "На даний момент немає майбутніх турнірів.";
-    } else if (activeTournamentTab === 'completed') {
-      emptyMsg = "Немає завершених турнірів.";
-    }
-
-    container.innerHTML = `
-      <div class="card" style="background:rgba(255,255,255,0.01); border-style:dashed; padding:40px; text-align:center; width: 100%;">
-        <span style="font-size:24px;">🏆</span>
-        <div style="font-weight:900; font-size:14px; margin-top:10px; color:white;">ТУРНІРИ ВІДСУТНІ</div>
-        <p style="font-size:11px; color:var(--text-secondary); max-width:400px; margin:8px auto 0 auto; line-height:1.5;">
-          ${emptyMsg}
-        </p>
-      </div>
-    `;
-    return;
-  }
+window.renderTournamentsList = function(container, filtered) {
+  if (!container || !filtered) return;
 
   filtered.forEach(tour => {
     const card = document.createElement('div');
@@ -3180,48 +3395,86 @@ window.renderTournamentsPortal = function() {
       statusText = "Завершений";
     }
 
+    const mapFileName = getMapFilename(tour.map) + '.png';
+    const fallbackImgSrc = `assets/maps/${mapFileName}`;
+    const tourImgSrc = (tour.image && tour.image.trim() !== '') ? tour.image : fallbackImgSrc;
+
     const regCount = tour.registeredTeams ? tour.registeredTeams.length : 0;
-    const formattedDate = tour.datetime ? tour.datetime.replace('T', ' ') : "-";
+    
+    let formattedDate = tour.datetime || "";
+    try {
+      if (tour.datetime) {
+        const d = new Date(tour.datetime);
+        if (!isNaN(d.getTime())) {
+          formattedDate = d.toLocaleString('uk-UA', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+        }
+      }
+    } catch(e) {
+      console.error(e);
+    }
 
     card.innerHTML = `
-      <div class="tournament-card-header">
-        <div class="tournament-title-area">
-          <span class="tournament-card-title">${tour.name}</span>
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span class="tournament-status-pill ${statusClass}">${statusText}</span>
-            <span style="font-size:11px; color:var(--text-secondary); font-family:monospace;">Початок: ${formattedDate}</span>
+      <div class="tournament-card-main">
+        <div class="card-map-preview">
+          <img src="${tourImgSrc}" alt="${tour.name}" onerror="this.src='${fallbackImgSrc}'">
+        </div>
+        
+        <div class="card-info">
+          <div class="card-header-row" style="display:flex; flex-direction:column; gap:6px; margin-bottom:24px; align-items: flex-start;">
+            <h3 class="card-title">${tour.name}</h3>
+            <div style="display:flex; align-items:center; gap:12px;">
+              <span class="status-badge ${statusClass}">${statusText}</span>
+              <span class="start-date" style="font-size:12px; color:#718096; font-family:'Rajdhani', sans-serif;">Початок: ${formattedDate}</span>
+            </div>
+          </div>
+          
+          <div class="card-details-grid">
+            <div class="detail-item">
+              <i class="fa-solid fa-users"></i>
+              <div>
+                <span class="detail-label">Учасники</span>
+                <span class="detail-value">${regCount} / ${tour.maxTeams} команд</span>
+              </div>
+            </div>
+            <div class="detail-item">
+              <i class="fa-solid fa-crosshairs"></i>
+              <div>
+                <span class="detail-label">Формат</span>
+                <span class="detail-value">${tour.format} Competitive</span>
+              </div>
+            </div>
+            <div class="detail-item">
+              <i class="fa-solid fa-coins"></i>
+              <div>
+                <span class="detail-label">Призовий фонд</span>
+                <span class="detail-value">${tour.prizePool}</span>
+              </div>
+            </div>
+            <div class="detail-item">
+              <i class="fa-solid fa-trophy"></i>
+              <div>
+                <span class="detail-label">Проведення</span>
+                <span class="detail-value" style="text-transform: capitalize;">${tour.system} Elimination</span>
+              </div>
+            </div>
           </div>
         </div>
-        <div class="prize-pool-badge">
-          🪙 <span>${tour.prizePool}</span> монет
+        
+        <div class="card-right-side">
+          <button class="btn-details" onclick="toggleTournamentDetails('${tour.id}')" id="toggle-btn-${tour.id}">
+            ${openTournamentDetailsIds[tour.id] ? '❌ ЗАКРИТИ ДЕТАЛІ' : 'Деталі та сітка <i class="fa-solid fa-chevron-right"></i>'}
+          </button>
         </div>
-      </div>
-
-      <div class="tournament-info-grid">
-        <div class="info-grid-item">
-          <span class="info-item-label">Учасники</span>
-          <span class="info-item-value">${regCount} / ${tour.maxTeams} команд</span>
-        </div>
-        <div class="info-grid-item">
-          <span class="info-item-label">Формат</span>
-          <span class="info-item-value">${tour.format} Competitive</span>
-        </div>
-        <div class="info-grid-item">
-          <span class="info-item-label">Карта</span>
-          <span class="info-item-value">${tour.map}</span>
-        </div>
-        <div class="info-grid-item">
-          <span class="info-item-label">Проведення</span>
-          <span class="info-item-value" style="text-transform: capitalize;">${tour.system} elimination</span>
-        </div>
-      </div>
-
-      <div style="display:flex; justify-content:flex-end;">
-        <button class="btn" style="margin-bottom:0; font-size:11px; padding:8px 16px; font-weight:800;" onclick="toggleTournamentDetails('${tour.id}')" id="toggle-btn-${tour.id}">${openTournamentDetailsIds[tour.id] ? '❌ ЗАКРИТИ ДЕТАЛІ' : '🏆 ДЕТАЛІ ТА СІТКА'}</button>
       </div>
 
       <!-- Hidden details and Brackets Canvas tabs pane -->
-      <div class="tournament-details-panel" id="details-panel-${tour.id}" style="display:${openTournamentDetailsIds[tour.id] ? 'block' : 'none'}; border-top:1px solid rgba(255,255,255,0.05); padding-top:15px; margin-top:10px;">
+      <div class="tournament-details-panel" id="details-panel-${tour.id}" style="display:${openTournamentDetailsIds[tour.id] ? 'block' : 'none'}; border-top:1px solid rgba(255,255,255,0.05); padding-top:15px; margin-top:15px;">
         <div class="details-tabs-bar">
           <button class="details-tab-btn active" id="tab-btn-info-${tour.id}" onclick="switchTournamentDetailTab('${tour.id}', 'info')">ℹ️ Інформація</button>
           <button class="details-tab-btn" id="tab-btn-rules-${tour.id}" onclick="switchTournamentDetailTab('${tour.id}', 'rules')">📜 Правила</button>
@@ -3280,29 +3533,112 @@ window.renderTournamentsPortal = function() {
 
     // If it was already open, restore active tab rendering!
     if (openTournamentDetailsIds[tour.id]) {
-      const lastActiveTab = activeTournamentTabs[tour.id] || 'info';
+      let defaultTab = 'info';
+      let totalMatches = 0;
+      if (tour.brackets && tour.brackets.rounds) {
+        tour.brackets.rounds.forEach(r => {
+          if (r.matches) totalMatches += r.matches.length;
+        });
+      }
+      if (totalMatches > 1) {
+        defaultTab = 'bracket';
+      }
+      const lastActiveTab = activeTournamentTabs[tour.id] || defaultTab;
       switchTournamentDetailTab(tour.id, lastActiveTab);
     }
   });
 };
 
-// Toggle expanded tournament details view
+window.renderTournamentsPortal = function() {
+  const container = document.getElementById('tournaments-portal-list');
+  if (!container) return;
+
+  // Update active tab buttons active classes on the page
+  const tabBtns = document.querySelectorAll('.tournament-tab-btn');
+  tabBtns.forEach(btn => {
+    if (btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(`'${activeTournamentTab}'`)) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+
+  const db = getDB();
+  const allTournaments = db.tournaments || [];
+
+  // Filter completed tournaments older than 10 minutes
+  const tournaments = allTournaments.filter(t => {
+    if (!window.isValidTournament(t)) return false;
+    if (t.status === 'completed') {
+      if (!t.completedAt) return false;
+      const diffMs = Date.now() - new Date(t.completedAt).getTime();
+      return diffMs < 10 * 60 * 1000; // 10 minutes
+    }
+    return true;
+  });
+
+  container.innerHTML = "";
+
+  // Filter tournaments by tab
+  const filtered = activeTournamentTab === 'all' 
+    ? tournaments 
+    : tournaments.filter(t => t.status === activeTournamentTab);
+
+  if (filtered.length === 0) {
+    let emptyMsg = "На даний момент немає активних турнірів.";
+    if (activeTournamentTab === 'all') {
+      emptyMsg = "Не знайдено жодного турніру.";
+    } else if (activeTournamentTab === 'upcoming') {
+      emptyMsg = "На даний момент немає майбутніх турнірів.";
+    } else if (activeTournamentTab === 'completed') {
+      emptyMsg = "Немає завершених турнірів.";
+    }
+
+    container.innerHTML = `
+      <div class="card" style="background:rgba(255,255,255,0.01); border-style:dashed; padding:40px; text-align:center; width: 100%;">
+        <span style="font-size:24px;">🏆</span>
+        <div style="font-weight:900; font-size:14px; margin-top:10px; color:white;">ТУРНІРИ ВІДСУТНІ</div>
+        <p style="font-size:11px; color:var(--text-secondary); max-width:400px; margin:8px auto 0 auto; line-height:1.5;">
+          ${emptyMsg}
+        </p>
+      </div>
+    `;
+    return;
+  }
+
+  renderTournamentsList(container, filtered);
+};
+
+// Toggle expanded tournament details view with smooth sliding animation
 window.toggleTournamentDetails = function(tourId) {
   const panel = document.getElementById(`details-panel-${tourId}`);
   const btn = document.getElementById(`toggle-btn-${tourId}`);
   if (!panel || !btn) return;
 
+  const db = getDB();
+  const tour = db.tournaments.find(t => t.id === tourId);
+
   if (panel.style.display === "none") {
-    panel.style.display = "block";
-    btn.innerText = "❌ ЗАКРИТИ ДЕТАЛІ";
+    btn.innerHTML = '❌ ЗАКРИТИ ДЕТАЛІ';
     openTournamentDetailsIds[tourId] = true;
     
-    // Initialize to last active tab or info tab
-    const lastActiveTab = activeTournamentTabs[tourId] || 'info';
+    // Initialize to last active tab or bracket/info tab
+    let defaultTab = 'info';
+    let totalMatches = 0;
+    if (tour && tour.brackets && tour.brackets.rounds) {
+      tour.brackets.rounds.forEach(r => {
+        if (r.matches) totalMatches += r.matches.length;
+      });
+    }
+    if (totalMatches > 1) {
+      defaultTab = 'bracket';
+    }
+    const lastActiveTab = activeTournamentTabs[tourId] || defaultTab;
     switchTournamentDetailTab(tourId, lastActiveTab);
+    panel.style.display = "block";
   } else {
     panel.style.display = "none";
-    btn.innerText = "🏆 ДЕТАЛІ ТА СІТКА";
+    btn.innerHTML = 'Деталі та сітка <i class="fa-solid fa-chevron-right"></i>';
     delete openTournamentDetailsIds[tourId];
   }
 };
@@ -3390,7 +3726,7 @@ function renderTournamentBettingPortal(tourId) {
       betResultHtml = `
         <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); border-radius:12px; padding:20px; text-align:center; display:flex; flex-direction:column; gap:12px; max-width:500px; width:100%;">
           <div style="font-size:11px; text-transform:uppercase; color:var(--text-secondary); letter-spacing:0.5px;">Ваша ставка на переможця</div>
-          <div style="font-size:18px; font-weight:900; color:white;">${userBet.selectedTeam} (x${userBet.odds.toFixed(2)})</div>
+          <div style="font-size:18px; font-weight:900; color:white;">${userBet.selectedTeam} (x${(userBet.odds || 1).toFixed(2)})</div>
           <div style="font-size:12px; color:var(--text-secondary);">Сума ставки: <strong style="color:white;">${userBet.amount} 🪙</strong></div>
           <div style="margin:10px 0; padding:10px; border-radius:8px; background:rgba(${isWinner ? '38,161,123' : '239,68,68'}, 0.08); border:1px solid rgba(${isWinner ? '38,161,123' : '239,68,68'}, 0.15); color:${statusColor}; font-weight:800; font-size:13px; text-transform:uppercase;">
             ${statusText}
@@ -3512,8 +3848,23 @@ function renderTournamentBettingPortal(tourId) {
   `;
 }
 
+// Helper to resolve map name to locally downloaded map screenshot filename
+function getMapFilename(mapName) {
+  if (!mapName) return 'de_mirage';
+  const name = mapName.toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (name.includes('mirage')) return 'de_mirage';
+  if (name.includes('dust')) return 'de_dust2';
+  if (name.includes('inferno')) return 'de_inferno';
+  if (name.includes('nuke')) return 'de_nuke';
+  if (name.includes('ancient')) return 'de_ancient';
+  if (name.includes('anubis')) return 'de_anubis';
+  if (name.includes('train')) return 'de_train';
+  if (name.includes('cache')) return 'de_cache';
+  return 'de_mirage'; // default fallback
+}
+
 // Modal to choose which tournament team to bet on
-window.openTourMatchBetModal = function(tourId, team1Name, team2Name) {
+window.openTourMatchBetModal = function(tourId, team1Name, team2Name, matchMapName) {
   const db = getDB();
   const tour = db.tournaments.find(t => t.id === tourId);
   if (!tour) {
@@ -3544,6 +3895,10 @@ window.openTourMatchBetModal = function(tourId, team1Name, team2Name) {
   const modalContent = document.querySelector('#tournament-bet-match-modal .modal-content');
   if (modalContent) {
     modalContent.style.maxWidth = '580px';
+    const mapFile = getMapFilename(matchMapName || tour.map);
+    modalContent.style.backgroundImage = `linear-gradient(to bottom, rgba(11, 14, 20, 0.88) 0%, rgba(11, 14, 20, 0.96) 100%), url('assets/maps/${mapFile}.png')`;
+    modalContent.style.backgroundSize = 'cover';
+    modalContent.style.backgroundPosition = 'center';
   }
 
   function buildModalTeamBetCard(team, defaultName, defaultId, odds) {
@@ -3606,7 +3961,7 @@ window.openTourMatchBetModal = function(tourId, team1Name, team2Name) {
             }).join('')}
             ${players.length > 5 ? `<span style="background:#1e293b; color:var(--text-secondary); padding:2px 5px; border-radius:3px; font-size:9px;">+${players.length-5}</span>` : ''}
           </div>` : ''}
-        <button onclick="closeModal('tournament-bet-match-modal'); placeTournamentBet('${tourId}', '${team.id}', '${team.name}', ${odds})" style="${btnStyle}" ${btnDisabledAttr}>
+        <button onclick="closeModal('tournament-bet-match-modal'); placeTournamentBet('${tourId}', '${team.id}', '${team.name}', ${odds}, '${matchMapName || ''}')" style="${btnStyle}" ${btnDisabledAttr}>
           ${btnText}
         </button>
       </div>
@@ -3625,7 +3980,7 @@ window.openTourMatchBetModal = function(tourId, team1Name, team2Name) {
 };
 
 // Handle placing tournament team bet on client side
-window.placeTournamentBet = function(tourId, teamId, teamName, odds) {
+window.placeTournamentBet = function(tourId, teamId, teamName, odds, matchMapName) {
   const db = getDB();
   const tour = db.tournaments.find(t => t.id === tourId);
   if (!tour) {
@@ -3660,6 +4015,14 @@ window.placeTournamentBet = function(tourId, teamId, teamName, odds) {
   amountInput.value = "";
   amountInput.max = balance;
   document.getElementById('bet-modal-payout').innerText = "0 🪙";
+
+  const betModalContent = document.querySelector('#bet-modal .modal-content');
+  if (betModalContent) {
+    const mapFile = getMapFilename(matchMapName || tour.map);
+    betModalContent.style.backgroundImage = `linear-gradient(to bottom, rgba(11, 14, 20, 0.88) 0%, rgba(11, 14, 20, 0.96) 100%), url('assets/maps/${mapFile}.png')`;
+    betModalContent.style.backgroundSize = 'cover';
+    betModalContent.style.backgroundPosition = 'center';
+  }
 
   openModal('bet-modal');
 };
@@ -3900,9 +4263,11 @@ function renderVisualBracketPortal(tourId) {
       const team1WinnerClass = (match.status === "finished" && match.winner === match.team1) ? "winner" : (match.status === "finished" ? "loser" : "");
       const team2WinnerClass = (match.status === "finished" && match.winner === match.team2) ? "winner" : (match.status === "finished" ? "loser" : "");
 
+      const matchMap = match.map || tour.map || 'de_mirage';
+
       node.innerHTML = `
         <div class="match-node-header">
-          <span class="match-node-time">${match.time ? match.time.replace('T', ' ') : 'Час не вказано'}</span>
+          <span class="match-node-time">${match.time ? match.time.replace('T', ' ') : 'Час не вказано'} · <strong style="color:var(--cs-orange); font-family:monospace; font-size:8px;">${matchMap}</strong></span>
           ${statusBadge}
         </div>
         
@@ -4215,3 +4580,188 @@ window.submitWithdrawForm = async function(event, method) {
   // Re-render UI
   renderPageContent();
 };
+
+window.claimWinnings = async function() {
+  const db = getDB();
+  if (!db || !db.currentUser) return;
+  const user = db.users.find(u => u.username.toLowerCase() === db.currentUser.toLowerCase());
+  if (!user) return;
+  const unclaimed = user.unclaimedBalance || 0;
+  if (unclaimed <= 0) {
+    showToast("⚠️ У вас немає накопиченого виграшу для виведення!", "warning");
+    return;
+  }
+  user.balance = (user.balance || 0) + unclaimed;
+  user.unclaimedBalance = 0;
+  
+  showToast("Зарахування коштів...", "success");
+  await saveDB(db);
+  showToast(`🎉 Виграш ${unclaimed} 🪙 успішно зараховано на баланс!`, "success");
+  
+  // Re-render UI
+  if (typeof renderPageContent === 'function') {
+    renderPageContent();
+  }
+  // If my-bets page is active, refresh the chart and active bets list
+  if (window.refreshMyBetsPage) {
+    window.refreshMyBetsPage();
+  }
+};
+
+function renderAchievements(user) {
+  const container = document.getElementById('achievements-showcase-container');
+  if (!container) return;
+  container.innerHTML = "";
+
+  const history = user.betHistory || [];
+  const balance = parseFloat(user.balance) || 0;
+
+  // Calculate stats for achievements
+  const totalBets = history.length;
+  const hasFirstBet = totalBets >= 1;
+
+  const totalWins = history.filter(b => b.status === "Виграш").length;
+  const hasFiveWins = totalWins >= 5;
+
+  const tourWins = history.filter(b => b.type === 'tournament' && b.status === "Виграш").length;
+  const hasTourWin = tourWins >= 1;
+
+  const hasFiveThousand = balance >= 5000;
+
+  const ACHIEVEMENTS_DATA = [
+    {
+      id: "first_bet",
+      title: "Перша кров",
+      desc: "Зроби свою першу ставку на сайті",
+      completed: hasFirstBet,
+      progress: `${Math.min(totalBets, 1)}/1`,
+      progressPct: hasFirstBet ? 100 : 0,
+      xp: 100,
+      coins: 100,
+      color: "#26a17b",
+      badgeColor: "rgba(38, 161, 123, 0.05) rgba(38, 161, 123, 0.3)"
+    },
+    {
+      id: "five_wins",
+      title: "Капер-Початківець",
+      desc: "Виграй 5 ставок на сайті",
+      completed: hasFiveWins,
+      progress: `${Math.min(totalWins, 5)}/5`,
+      progressPct: Math.min((totalWins / 5) * 100, 100),
+      xp: 250,
+      coins: 250,
+      color: "#FFA500",
+      badgeColor: "rgba(255, 165, 0, 0.05) rgba(255, 165, 0, 0.3)"
+    },
+    {
+      id: "tour_win",
+      title: "Аналітик Мейджору",
+      desc: "Вгадай переможця турніру",
+      completed: hasTourWin,
+      progress: `${Math.min(tourWins, 1)}/1`,
+      progressPct: hasTourWin ? 100 : 0,
+      xp: 500,
+      coins: 500,
+      color: "#c79847",
+      badgeColor: "rgba(199, 152, 71, 0.05) rgba(199, 152, 71, 0.3)"
+    },
+    {
+      id: "king_vcoin",
+      title: "Король Vcoin",
+      desc: "Накопич 5000 монет на балансі",
+      completed: hasFiveThousand,
+      progress: `${Math.round(balance)}/5000`,
+      progressPct: Math.min((balance / 5000) * 100, 100),
+      xp: 1000,
+      coins: 1000,
+      color: "#ff5500",
+      badgeColor: "rgba(255, 85, 0, 0.05) rgba(255, 85, 0, 0.3)"
+    }
+  ];
+
+  ACHIEVEMENTS_DATA.forEach(ach => {
+    const card = document.createElement('div');
+    const claimed = (user.claimedAchievements || []).includes(ach.id);
+    
+    card.className = "p-4 rounded-xl border flex flex-col transition-all duration-300 bg-black/25";
+    
+    let buttonHTML = "";
+    if (ach.completed && !claimed) {
+      card.style.background = "rgba(255, 165, 0, 0.04)";
+      card.style.borderColor = "rgba(255, 165, 0, 0.25)";
+      buttonHTML = `
+        <button class="btn btn-primary w-full py-2 text-xs font-black rounded-lg cursor-pointer" 
+                style="background: linear-gradient(135deg, var(--cs-orange) 0%, #ff5500 100%); border:none; margin-top: 14px; font-family: 'Tektur', sans-serif; letter-spacing: 0.5px;" 
+                onclick="claimAchievement('${ach.id}')">
+          Забрати досягнення (+${ach.coins} 🪙)
+        </button>
+      `;
+    } else if (ach.completed && claimed) {
+      const colors = ach.badgeColor.split(' ');
+      card.style.background = colors[0];
+      card.style.borderColor = colors[1];
+      buttonHTML = `
+        <button class="btn w-full py-2 text-xs font-black rounded-lg cursor-not-allowed" 
+                style="background: rgba(38, 161, 123, 0.06); border: 1px solid rgba(38, 161, 123, 0.35); color: #3cd0a1; margin-top: 14px; font-family: 'Tektur', sans-serif; letter-spacing: 0.5px;" disabled>
+          Забрано 🏆
+        </button>
+      `;
+    } else {
+      buttonHTML = `
+        <button class="btn w-full py-2 text-xs font-black rounded-lg cursor-not-allowed" 
+                style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.3); margin-top: 14px; font-family: 'Tektur', sans-serif; letter-spacing: 0.5px;" disabled>
+          Не виконано
+        </button>
+      `;
+    }
+
+    card.innerHTML = `
+      <div>
+        <h4 class="text-xs font-black text-[#FFF5E0] uppercase tracking-wider mb-1" style="font-family: 'Tektur', sans-serif;">${ach.title}</h4>
+        <p class="text-[10px] text-gray-400 leading-normal mb-2.5">${ach.desc}</p>
+        <div class="w-full bg-zinc-800 rounded-full h-1.5 mb-2">
+          <div class="h-1.5 rounded-full" style="width: ${ach.progressPct}%; background: ${ach.color};"></div>
+        </div>
+        <div class="flex justify-between items-center text-[9px] font-bold text-gray-400">
+          <span>Прогрес: ${ach.progress}</span>
+          <span class="text-white">🏆 ${ach.xp} XP</span>
+        </div>
+      </div>
+      ${buttonHTML}
+    `;
+    container.appendChild(card);
+  });
+}
+
+window.claimAchievement = function(achId) {
+  const db = getDB();
+  const user = db.users.find(u => u.username === db.currentUser);
+  if (!user) return;
+
+  user.claimedAchievements = user.claimedAchievements || [];
+  if (user.claimedAchievements.includes(achId)) return;
+
+  const ACHIEVEMENTS_REWARDS = {
+    first_bet: { coins: 100, name: "Перша кров" },
+    five_wins: { coins: 250, name: "Капер-Початківець" },
+    tour_win: { coins: 500, name: "Аналітик Мейджору" },
+    king_vcoin: { coins: 1000, name: "Король Vcoin" }
+  };
+
+  const reward = ACHIEVEMENTS_REWARDS[achId];
+  if (!reward) return;
+
+  user.balance = (user.balance || 0) + reward.coins;
+  user.claimedAchievements.push(achId);
+  saveDB(db);
+  showToast(`Досягнення "${reward.name}" забрано! +${reward.coins} 🪙`, "success");
+  
+  // Also push user update to server
+  fetch(CLOUD_BUCKET + 'user_' + user.username.toLowerCase(), {
+    method: 'POST',
+    body: JSON.stringify(user)
+  }).catch(e => console.error("Error pushing user after achievement claim:", e));
+
+  renderPageContent();
+}
+

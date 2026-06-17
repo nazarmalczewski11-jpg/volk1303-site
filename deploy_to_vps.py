@@ -57,8 +57,11 @@ def main():
         ssh.connect(HOST, port=PORT, username=USER, password=PASSWORD, timeout=15)
         print("З'єднання успішно встановлено!")
 
-        # 1. Backup old dist folder if exists
-        backup_cmd = f"if [ -d \"{REMOTE_DIST}\" ]; then mv \"{REMOTE_DIST}\" \"{REMOTE_DIST}_backup_$(date +%Y%m%d_%H%M%S)\"; fi"
+        # 1. Backup old dist folder and database if exists
+        backup_cmd = (
+            f"if [ -d \"{REMOTE_DIST}\" ]; then mv \"{REMOTE_DIST}\" \"{REMOTE_DIST}_backup_$(date +%Y%m%d_%H%M%S)\"; fi; "
+            f"if [ -f \"/var/www/volk1303/kv_store.json\" ]; then cp \"/var/www/volk1303/kv_store.json\" \"/var/www/volk1303/kv_store.json.bak_$(date +%Y%m%d_%H%M%S)\"; fi"
+        )
         print(f"Створення резервної копії старої версії: {backup_cmd}")
         stdin, stdout, stderr = ssh.exec_command(backup_cmd)
         stdout.read()
@@ -88,31 +91,57 @@ def main():
             else:
                 print(f"Увага: локальний файл {filename} не знайдено!")
 
-        # Upload assets
-        for filename in files_to_upload_assets:
-            local_path = os.path.join(LOCAL_ASSETS, filename)
-            remote_path = f"{REMOTE_ASSETS}/{filename}"
+        # Upload backend files
+        backend_files = ["server.js", "kv_store.json"]
+        for filename in backend_files:
+            local_path = os.path.join(LOCAL_DIR, filename)
+            remote_path = f"/var/www/volk1303/{filename}"
             if os.path.exists(local_path):
-                print(f"Завантаження асету: {filename} -> {remote_path}")
+                print(f"Завантаження бекенд-файлу: {filename} -> {remote_path}")
                 sftp.put(local_path, remote_path)
             else:
-                print(f"Увага: локальний асет {filename} не знайдено!")
+                print(f"Увага: локальний бекенд-файл {filename} не знайдено!")
+
+        # Upload assets recursively
+        def upload_dir_recursive(local_path, remote_path):
+            try:
+                sftp.mkdir(remote_path)
+                print(f"Створено директорію на сервері: {remote_path}")
+            except IOError:
+                pass  # Directory already exists
+            
+            for item in os.listdir(local_path):
+                l_item = os.path.join(local_path, item)
+                r_item = f"{remote_path}/{item}"
+                if os.path.isdir(l_item):
+                    upload_dir_recursive(l_item, r_item)
+                else:
+                    print(f"Завантаження асету: {item} -> {r_item}")
+                    sftp.put(l_item, r_item)
+
+        print("Рекурсивне завантаження асетів...")
+        upload_dir_recursive(LOCAL_ASSETS, REMOTE_ASSETS)
 
         sftp.close()
         print("SFTP завантаження завершено!")
 
-        # 4. Restart Nginx
+        # 4. Restart services
         print("Перевірка конфігурації Nginx...")
         stdin, stdout, stderr = ssh.exec_command("nginx -t")
         nginx_t_err = stderr.read().decode('utf-8', errors='replace')
         print(nginx_t_err.strip())
 
+        print("Перезапуск бекенд-сервісу (volk-api.service)...")
+        stdin, stdout, stderr = ssh.exec_command("systemctl restart volk-api")
+        stdout.read()
+        
         print("Перезапуск веб-сервера Nginx...")
         stdin, stdout, stderr = ssh.exec_command("systemctl restart nginx")
         stdout.read()
         
         print("\nДеплой успішно виконано!")
-        print("Ваш сайт доступний за посиланням: https://volk1303.online")
+        print("Основний сайт: https://volk1303.online")
+        print("Панель адміністратора: https://volk1303.online/admin.html")
 
     except Exception as e:
         print(f"Помилка під час деплою: {e}")

@@ -4,6 +4,15 @@ const CLOUD_BUCKET = (window.location.hostname === 'localhost' || window.locatio
   ? 'http://localhost:10000/'
   : 'https://volk-backend.onrender.com/';
 
+window.isValidTournament = function(t) {
+  if (!t || !t.id || !t.name) return false;
+  const name = t.name.trim().toLowerCase();
+  const testNames = ["fsdf", "blbl", "fdkfok", "test tournament"];
+  if (name.length < 3 || testNames.includes(name)) return false;
+  if (!t.format || !t.map) return false;
+  return true;
+};
+
 let isSyncing = false;
 let activePushes = 0;
 
@@ -215,6 +224,7 @@ async function syncWithCloud() {
             // Auto mark tournament as completed in db if not done yet
             if (tour.status !== 'completed') {
               tour.status = 'completed';
+              tour.completedAt = new Date().toISOString();
               dbChanged = true;
             }
             db.users.forEach(u => {
@@ -225,7 +235,7 @@ async function syncWithCloud() {
                   bet.status = isWinner ? "Виграш" : "Програш";
                   bet.payout = isWinner ? Math.round(bet.amount * bet.odds) : 0;
                   if (isWinner) {
-                    u.balance = (u.balance || 0) + bet.payout;
+                    u.unclaimedBalance = (u.unclaimedBalance || 0) + bet.payout;
                   }
                   betsSettledRetrospectively = true;
                   dbChanged = true;
@@ -449,6 +459,29 @@ function getDB() {
       dbUpdated = true;
     }
 
+    // Filter out phantom bets (FSDF or deleted tournaments)
+    db.users.forEach(user => {
+      if (user.betHistory && Array.isArray(user.betHistory)) {
+        const oldLen = user.betHistory.length;
+        user.betHistory = user.betHistory.filter(bet => {
+          if (!bet) return false;
+          if (bet.selectedTeam && bet.selectedTeam.toUpperCase() === 'FSDF') {
+            return false;
+          }
+          if (bet.type === 'tournament') {
+            const tourExists = db.tournaments.some(t => String(t.id) === String(bet.tourId));
+            if (!tourExists) {
+              return false;
+            }
+          }
+          return true;
+        });
+        if (user.betHistory.length !== oldLen) {
+          dbUpdated = true;
+        }
+      }
+    });
+
     if (dbUpdated) {
       localStorage.setItem(DB_KEY, JSON.stringify(db)); // Save immediately!
     }
@@ -467,9 +500,7 @@ function saveDB(db) {
 }
 
 window.logoutUser = function() {
-  const db = getDB();
-  db.currentUser = null;
-  saveDB(db);
+  sessionStorage.removeItem('volk_admin_authorized');
   checkAdminAuth();
 };
 
@@ -512,13 +543,11 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function checkAdminAuth() {
-  const db = getDB();
   const overlay = document.getElementById('admin-login-overlay');
   const urlParams = new URLSearchParams(window.location.search);
 
-  if (urlParams.has('logout') && db) {
-    db.currentUser = null;
-    saveDB(db);
+  if (urlParams.has('logout')) {
+    sessionStorage.removeItem('volk_admin_authorized');
     // Clear URL query parameter without reloading page
     window.history.replaceState({}, document.title, window.location.pathname);
   } else if (urlParams.has('reload')) {
@@ -526,7 +555,9 @@ function checkAdminAuth() {
     window.history.replaceState({}, document.title, window.location.pathname);
   }
 
-  if (!db || db.currentUser !== 'admin') {
+  const isAdminAuthorized = sessionStorage.getItem('volk_admin_authorized') === 'true';
+
+  if (!isAdminAuthorized) {
     if (overlay) {
       overlay.style.display = 'flex';
     }
@@ -560,6 +591,15 @@ function setupAdminListeners() {
     removeCoinsForm.addEventListener('submit', (e) => {
       e.preventDefault();
       adjustUserBalanceAdmin('remove');
+    });
+  }
+
+  // Faceit update form
+  const updateFaceitForm = document.getElementById('admin-update-faceit-form');
+  if (updateFaceitForm) {
+    updateFaceitForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      updateUserFaceitAdmin();
     });
   }
 
@@ -670,30 +710,7 @@ function handleAdminLoginSubmit() {
       };
     }
     
-    db.currentUser = 'admin';
-    
-    // Make sure the admin user profile exists inside db
-    let adminUser = db.users.find(u => u.username === 'admin');
-    if (!adminUser) {
-      adminUser = {
-        email: "admin@volk.com",
-        username: "admin",
-        password: "111111",
-        balance: 1000,
-        bonusPercent: 0,
-        hasSpunWheel: true,
-        usedPromos: [],
-        depositHistory: [{ amount: 1000, method: "MONOBANKA", date: "2026-05-30 20:00" }],
-        betHistory: [],
-        claimedQuests: [],
-        skinsInventory: []
-      };
-      db.users.push(adminUser);
-    } else {
-      adminUser.password = "111111";
-    }
-
-    saveDB(db);
+    sessionStorage.setItem('volk_admin_authorized', 'true');
     showToast("Вхід виконано успішно!", "success");
     checkAdminAuth();
   } else {
@@ -734,7 +751,7 @@ async function handleUserSearchAdmin() {
   }
 
   if (!user) {
-    user = db.users.find(u => u.username === nick);
+    user = db.users.find(u => u.username.toLowerCase() === nick.toLowerCase());
   }
 
   const details = document.getElementById('searched-user-info');
@@ -754,15 +771,24 @@ async function handleUserSearchAdmin() {
     <div><strong>Електронна пошта:</strong> ${user.email}</div>
     <div><strong>Поточний баланс:</strong> <strong style="color:var(--cs-orange);">${user.balance} 🪙</strong></div>
     <div><strong>Депозит Бонус:</strong> +${user.bonusPercent || 0}%</div>
+    <div><strong>FACEIT:</strong> ${user.linkedFaceitName ? `${user.linkedFaceitName} (LVL ${user.faceitLevel || 1}, ELO ${user.faceitElo || 0})` : 'не прив\'язано'}</div>
   `;
   controls.style.display = 'block';
+
+  // Prepopulate Faceit fields
+  const faceitNickInput = document.getElementById('admin-faceit-nick');
+  const faceitLvlInput = document.getElementById('admin-faceit-lvl');
+  const faceitEloInput = document.getElementById('admin-faceit-elo');
+  if (faceitNickInput) faceitNickInput.value = user.linkedFaceitName || "";
+  if (faceitLvlInput) faceitLvlInput.value = user.faceitLevel || "";
+  if (faceitEloInput) faceitEloInput.value = user.faceitElo || "";
 }
 
 // Adjust User Balance (Points dispensing)
 function adjustUserBalanceAdmin(action) {
   if (!searchedUserNick) return;
   const db = getDB();
-  const user = db.users.find(u => u.username === searchedUserNick);
+  const user = db.users.find(u => u.username.toLowerCase() === searchedUserNick.toLowerCase());
   if (!user) return;
 
   let amt = 0;
@@ -955,7 +981,8 @@ function checkNewRegistrations(db) {
 // Render Admin Panels
 function renderAdminPanel() {
   const db = getDB();
-  if (!db || db.currentUser !== 'admin') return;
+  const isAdminAuthorized = sessionStorage.getItem('volk_admin_authorized') === 'true';
+  if (!db || !isAdminAuthorized) return;
 
   // Track and notify about new registrations in real-time
   checkNewRegistrations(db);
@@ -963,7 +990,7 @@ function renderAdminPanel() {
   // Header display
   const adminName = document.getElementById('sidebar-admin-username');
   if (adminName) {
-    adminName.innerText = db.currentUser.toUpperCase();
+    adminName.innerText = "ADMIN";
   }
 
   // Prepopulate twitch settings
@@ -993,6 +1020,7 @@ function renderAdminPanel() {
   renderAdminPendingWithdrawals(db.pendingWithdrawals || []);
   renderAdminTournamentsList(db.tournaments || []);
   renderTournamentBettingTab();
+  renderAdminQuests(db);
   
   if (typeof renderDatabaseTab === 'function') {
     renderDatabaseTab();
@@ -1195,7 +1223,7 @@ function renderTournamentBettingTab() {
       console.warn("Database not loaded.");
       return;
     }
-    const tournaments = (db.tournaments || []).filter(Boolean);
+    const tournaments = (db.tournaments || []).filter(t => window.isValidTournament(t));
     console.log(`Found ${tournaments.length} active tournaments for betting.`);
 
     if (tournaments.length === 0) {
@@ -1227,6 +1255,7 @@ function renderTournamentBettingTab() {
           </div>
           <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
             <span style="font-size:11px; background:rgba(255,255,255,0.05); padding:4px 10px; border-radius:20px; color:var(--text-secondary);">${teamCount} команд</span>
+            <button onclick="event.stopPropagation(); deleteTournamentAdmin('${tour.id}');" class="btn btn-danger" style="padding:4px 10px; font-size:11px; font-weight:800; background:var(--error); border:none; border-radius:6px; color:white; cursor:pointer;">Видалити ❌</button>
             <span id="betting-chevron-${tour.id}" style="color:var(--cs-orange); font-size:14px; transition:transform 0.2s;">▼</span>
           </div>
         </div>
@@ -1544,7 +1573,7 @@ window.settleMatchPayouts = function(id, winningTeamIdx) {
         if (bet.teamIndex === winningTeamIdx) {
           bet.status = "Виграш";
           bet.payout = Math.round(bet.amount * bet.odds);
-          user.balance += bet.payout;
+          user.unclaimedBalance = (user.unclaimedBalance || 0) + bet.payout;
         } else {
           bet.status = "Програш";
           bet.payout = 0;
@@ -1603,6 +1632,7 @@ window.switchAdminTab = function(tabId) {
     'deposits-verify': 'Верифікація депозитів Monobank',
     'database': 'База Даних (Логи та Активність)',
     'promocodes': 'Центр керування промокодами',
+    'quests': 'Керування щоденними квестами',
     'stream': 'Налаштування стріму Twitch'
   };
   
@@ -2382,7 +2412,7 @@ window.approveDepositAdmin = async function(depositId) {
     return;
   }
 
-  const user = db.users.find(u => u.username === deposit.username);
+  const user = db.users.find(u => u.username.toLowerCase() === deposit.username.toLowerCase());
   if (!user) {
     showToast(`Користувача ${deposit.username} не знайдено!`, "error");
     return;
@@ -2982,10 +3012,22 @@ window.saveTournamentAdmin = function() {
     const tour = db.tournaments.find(t => t.id === id);
     if (!tour) return;
 
+    if (status === 'completed') {
+      const lastRound = tour.brackets && tour.brackets.rounds ? tour.brackets.rounds[tour.brackets.rounds.length - 1] : null;
+      const finalMatch = lastRound && lastRound.matches ? lastRound.matches[0] : null;
+      if (!finalMatch || finalMatch.status !== 'finished' || !finalMatch.winner) {
+        showToast('⚠️ Неможливо завершити турнір: фінальний матч ще не зіграно або немає переможця!', 'error');
+        return;
+      }
+    }
+
     tour.name = name;
     tour.format = format;
     tour.map = map;
     tour.status = status;
+    if (status === 'completed' && !tour.completedAt) {
+      tour.completedAt = new Date().toISOString();
+    }
     
     // If maximum teams changed, initialize new brackets
     if (parseInt(tour.maxTeams, 10) !== parseInt(maxTeams, 10) || tour.system !== system) {
@@ -3051,10 +3093,21 @@ window.deleteTournamentAdmin = async function(tourId) {
 };
 
 // Render administrative tournaments table list
-function renderAdminTournamentsList(tournaments) {
+function renderAdminTournamentsList(allTournaments) {
   const tbody = document.getElementById('admin-tournaments-tbody');
   if (!tbody) return;
   tbody.innerHTML = "";
+
+  // Filter completed tournaments older than 10 minutes
+  const tournaments = (allTournaments || []).filter(t => {
+    if (!window.isValidTournament(t)) return false;
+    if (t.status === 'completed') {
+      if (!t.completedAt) return false;
+      const diffMs = Date.now() - new Date(t.completedAt).getTime();
+      return diffMs < 10 * 60 * 1000; // 10 minutes
+    }
+    return true;
+  });
 
   if (tournaments.length === 0) {
     tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-secondary); padding: 25px;">Створіть свій перший турнір за допомогою кнопки вище!</td></tr>`;
@@ -3112,13 +3165,25 @@ function renderAdminTournamentsList(tournaments) {
   });
 }
 
-// Quick status change directly from table dropdown (no modal, no percent validation)
 window.quickChangeTourStatus = function(tourId, newStatus) {
   const db = getDB();
   const tour = (db.tournaments || []).find(t => t.id === tourId);
   if (!tour) return;
 
+  if (newStatus === 'completed') {
+    const lastRound = tour.brackets && tour.brackets.rounds ? tour.brackets.rounds[tour.brackets.rounds.length - 1] : null;
+    const finalMatch = lastRound && lastRound.matches ? lastRound.matches[0] : null;
+    if (!finalMatch || finalMatch.status !== 'finished' || !finalMatch.winner) {
+      showToast('⚠️ Неможливо завершити турнір: фінальний матч ще не зіграно або немає переможця!', 'error');
+      renderAdminPanel();
+      return;
+    }
+  }
+
   tour.status = newStatus;
+  if (newStatus === 'completed' && !tour.completedAt) {
+    tour.completedAt = new Date().toISOString();
+  }
   tour.lastModified = Date.now() + 1; // +1 to guarantee it's newer than cloud
   saveDB(db);
 
@@ -3754,7 +3819,7 @@ window.openBracketEditorCard = function(tourId, skipScroll = false) {
       matchCard.style.borderRadius = "8px";
 
       const regTeamIds = tour.registeredTeams || [];
-      const tourTeams = (db.teams || []).filter(t => t && t.name && regTeamIds.includes(t.id));
+      const tourTeams = (db.teams || []).filter(t => t && t.name && (!tour.format || t.format === tour.format));
       const teamList1 = tourTeams.map(t => `<option value="${t.name}" ${match.team1 === t.name ? 'selected' : ''}>${t.name}</option>`).join('');
       const teamList2 = tourTeams.map(t => `<option value="${t.name}" ${match.team2 === t.name ? 'selected' : ''}>${t.name}</option>`).join('');
 
@@ -3815,14 +3880,28 @@ window.openBracketEditorCard = function(tourId, skipScroll = false) {
           </select>
         </div>
 
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; align-items:flex-end;">
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:12px;">
           <div class="form-group" style="margin-bottom:0;">
             <label style="font-size:10px; margin-bottom:4px;">Час початку</label>
             <input type="datetime-local" id="m-time-${rIndex}-${mIndex}" class="form-input" value="${match.time || ''}" style="padding:5px 8px; font-size:11px;">
           </div>
-          <div style="display:flex; gap:8px;">
-            <button class="btn" style="flex:1; padding:7px 12px; font-size:11px; margin-bottom:0;" onclick="saveBracketMatchAdmin(${rIndex}, ${mIndex})">Зберегти матч</button>
+          <div class="form-group" style="margin-bottom:0;">
+            <label style="font-size:10px; margin-bottom:4px; display:block;">🗺️ Карта матчу</label>
+            <select id="m-map-${rIndex}-${mIndex}" class="form-input" style="padding:6px; font-size:11px; background:#0c0d12; height:32px;">
+              <option value="de_mirage" ${match.map === 'de_mirage' || !match.map ? 'selected' : ''}>de_mirage</option>
+              <option value="de_dust2" ${match.map === 'de_dust2' ? 'selected' : ''}>de_dust2</option>
+              <option value="de_inferno" ${match.map === 'de_inferno' ? 'selected' : ''}>de_inferno</option>
+              <option value="de_nuke" ${match.map === 'de_nuke' ? 'selected' : ''}>de_nuke</option>
+              <option value="de_ancient" ${match.map === 'de_ancient' ? 'selected' : ''}>de_ancient</option>
+              <option value="de_anubis" ${match.map === 'de_anubis' ? 'selected' : ''}>de_anubis</option>
+              <option value="de_train" ${match.map === 'de_train' ? 'selected' : ''}>de_train</option>
+              <option value="de_cache" ${match.map === 'de_cache' ? 'selected' : ''}>de_cache</option>
+            </select>
           </div>
+        </div>
+
+        <div style="display:flex; gap:8px;">
+          <button class="btn" style="flex:1; padding:9px 12px; font-size:11px; margin-bottom:0; font-weight:800;" onclick="saveBracketMatchAdmin(${rIndex}, ${mIndex})">Зберегти матч</button>
         </div>
       `;
       mContainer.appendChild(matchCard);
@@ -3898,6 +3977,7 @@ window.saveBracketMatchAdmin = function(rIndex, mIndex) {
   const statusEl = document.getElementById(`m-status-${rIndex}-${mIndex}`);
   const timeEl = document.getElementById(`m-time-${rIndex}-${mIndex}`);
   const winnerSelectEl = document.getElementById(`m-winner-${rIndex}-${mIndex}`);
+  const mapEl = document.getElementById(`m-map-${rIndex}-${mIndex}`);
 
   const team1 = team1El ? team1El.value : "Очікується";
   const team2 = team2El ? team2El.value : "Очікується";
@@ -3952,6 +4032,9 @@ window.saveBracketMatchAdmin = function(rIndex, mIndex) {
   match.score2 = score2;
   match.status = status;
   match.time = time;
+  if (mapEl) {
+    match.map = mapEl.value;
+  }
 
   // Settle Winner if finished
   if (status === "finished") {
@@ -4001,6 +4084,9 @@ window.saveBracketMatchAdmin = function(rIndex, mIndex) {
 
   if (finalMatch && finalMatch.status === "finished" && finalMatch.winner) {
     tour.status = "completed";
+    if (!tour.completedAt) {
+      tour.completedAt = new Date().toISOString();
+    }
     
     // Distribute prizes to team owners automatically
     distributeTournamentPrizes(tour, db);
@@ -4013,7 +4099,7 @@ window.saveBracketMatchAdmin = function(rIndex, mIndex) {
           if (bet.selectedTeam.toLowerCase() === winningTeamName.toLowerCase()) {
             bet.status = "Виграш";
             bet.payout = Math.round(bet.amount * bet.odds);
-            u.balance = (u.balance || 0) + bet.payout;
+            u.unclaimedBalance = (u.unclaimedBalance || 0) + bet.payout;
           } else {
             bet.status = "Програш";
             bet.payout = 0;
@@ -4192,5 +4278,91 @@ window.clearDashboardStats = function() {
       showToast("Помилка синхронізації з хмарою при очищенні!", "error");
     });
 };
+
+
+// Update User Faceit account info
+window.updateUserFaceitAdmin = function() {
+  if (!searchedUserNick) return;
+  const db = getDB();
+  const user = db.users.find(u => u.username.toLowerCase() === searchedUserNick.toLowerCase());
+  if (!user) return;
+
+  const nick = document.getElementById('admin-faceit-nick').value.trim();
+  const lvl = parseInt(document.getElementById('admin-faceit-lvl').value);
+  const elo = parseInt(document.getElementById('admin-faceit-elo').value);
+
+  if (!nick) {
+    user.linkedFaceitName = null;
+    user.faceitLevel = null;
+    user.faceitElo = null;
+    user.faceitKD = null;
+    user.faceitWinrate = null;
+    user.faceitHS = null;
+    showToast(`FACEIT акаунт відв'язано для ${user.username}!`, "success");
+  } else {
+    user.linkedFaceitName = nick;
+    user.faceitLevel = isNaN(lvl) ? 1 : Math.max(1, Math.min(10, lvl));
+    user.faceitElo = isNaN(elo) ? 1000 : elo;
+    if (!user.faceitKD) user.faceitKD = "1.20";
+    if (!user.faceitWinrate) user.faceitWinrate = "52%";
+    if (!user.faceitHS) user.faceitHS = "45%";
+    showToast(`Дані FACEIT для ${user.username} оновлено!`, "success");
+  }
+
+  saveDB(db);
+  handleUserSearchAdmin();
+};
+
+// Render Admin Quests table progress
+function renderAdminQuests(db) {
+  const tbody = document.getElementById('admin-quests-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  const users = db.users || [];
+  users.forEach(user => {
+    if (user.username.toLowerCase() === 'admin') return;
+
+    const bets = (user.betHistory || []).filter(b => b.matchDisplay && !b.matchDisplay.startsWith("Дуель"));
+    const q1Progress = bets.length;
+    const q1Completed = q1Progress >= 3;
+    const q1Claimed = (user.claimedQuests || []).includes("quest_bets");
+
+    const duelsWon = (user.betHistory || []).filter(b => b.matchDisplay && b.matchDisplay.startsWith("Дуель") && b.status === "Виграш");
+    const q2Progress = duelsWon.length;
+    const q2Completed = q2Progress >= 1;
+    const q2Claimed = (user.claimedQuests || []).includes("quest_duel");
+
+    let q1Status = "";
+    if (q1Claimed) {
+      q1Status = `<span style="color:#26a17b; font-weight:bold;">🏆 Забрано (${q1Progress}/3)</span>`;
+    } else if (q1Completed) {
+      q1Status = `<span style="color:#FFA500; font-weight:bold;">✅ Виконано (${q1Progress}/3)</span>`;
+    } else {
+      q1Status = `<span style="color:var(--text-secondary);">${q1Progress}/3 (В процесі)</span>`;
+    }
+
+    let q2Status = "";
+    if (q2Claimed) {
+      q2Status = `<span style="color:#26a17b; font-weight:bold;">🏆 Забрано (${q2Progress}/1)</span>`;
+    } else if (q2Completed) {
+      q2Status = `<span style="color:#FFA500; font-weight:bold;">✅ Виконано (${q2Progress}/1)</span>`;
+    } else {
+      q2Status = `<span style="color:var(--text-secondary);">${q2Progress}/1 (В процесі)</span>`;
+    }
+
+    const claimedCount = (user.claimedQuests || []).length;
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><strong>${user.username.toUpperCase()}</strong></td>
+      <td>${q1Status}</td>
+      <td>${q2Status}</td>
+      <td><span class="badge-mini-${claimedCount > 0 ? 'win' : 'pending'}">${claimedCount} / 2 забрано</span></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
 
 
