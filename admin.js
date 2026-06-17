@@ -2,7 +2,7 @@
 const DB_KEY = 'volk_site_v4';
 const CLOUD_BUCKET = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
   ? 'http://localhost:10000/'
-  : 'https://volk-backend.onrender.com/';
+  : '/api/';
 
 window.isValidTournament = function(t) {
   if (!t || !t.id || !t.name) return false;
@@ -1021,6 +1021,7 @@ function renderAdminPanel() {
   renderAdminTournamentsList(db.tournaments || []);
   renderTournamentBettingTab();
   renderAdminQuests(db);
+  renderAdminQuestsList(db);
   
   if (typeof renderDatabaseTab === 'function') {
     renderDatabaseTab();
@@ -4315,54 +4316,152 @@ window.updateUserFaceitAdmin = function() {
 
 // Render Admin Quests table progress
 function renderAdminQuests(db) {
+  const theadTr = document.getElementById('admin-quests-thead-tr');
   const tbody = document.getElementById('admin-quests-tbody');
   if (!tbody) return;
+
+  const quests = db.quests || [];
+
+  // Update headers
+  if (theadTr) {
+    theadTr.innerHTML = `
+      <th>Нікнейм</th>
+      ${quests.map(q => `<th>${q.title}</th>`).join('')}
+      <th>Статус нагород</th>
+    `;
+  }
+
   tbody.innerHTML = "";
 
   const users = db.users || [];
   users.forEach(user => {
     if (user.username.toLowerCase() === 'admin') return;
 
-    const bets = (user.betHistory || []).filter(b => b.matchDisplay && !b.matchDisplay.startsWith("Дуель"));
-    const q1Progress = bets.length;
-    const q1Completed = q1Progress >= 3;
-    const q1Claimed = (user.claimedQuests || []).includes("quest_bets");
+    let questCellsHTML = "";
+    quests.forEach(quest => {
+      // calculate progress dynamically
+      const target = quest.targetCount || 1;
+      let progress = 0;
+      if (quest.type === "bets") {
+        progress = (user.betHistory || []).filter(b => b.matchDisplay && !b.matchDisplay.startsWith("Дуель")).length;
+      } else if (quest.type === "duels_win") {
+        progress = (user.betHistory || []).filter(b => b.matchDisplay && b.matchDisplay.startsWith("Дуель") && b.status === "Виграш").length;
+      }
 
-    const duelsWon = (user.betHistory || []).filter(b => b.matchDisplay && b.matchDisplay.startsWith("Дуель") && b.status === "Виграш");
-    const q2Progress = duelsWon.length;
-    const q2Completed = q2Progress >= 1;
-    const q2Claimed = (user.claimedQuests || []).includes("quest_duel");
+      const completed = progress >= target;
+      const claimed = (user.claimedQuests || []).includes(quest.id);
 
-    let q1Status = "";
-    if (q1Claimed) {
-      q1Status = `<span style="color:#26a17b; font-weight:bold;">🏆 Забрано (${q1Progress}/3)</span>`;
-    } else if (q1Completed) {
-      q1Status = `<span style="color:#FFA500; font-weight:bold;">✅ Виконано (${q1Progress}/3)</span>`;
-    } else {
-      q1Status = `<span style="color:var(--text-secondary);">${q1Progress}/3 (В процесі)</span>`;
-    }
+      let statusHTML = "";
+      if (claimed) {
+        statusHTML = `<span style="color:#26a17b; font-weight:bold;">🏆 Забрано (${progress}/${target})</span>`;
+      } else if (completed) {
+        statusHTML = `<span style="color:#FFA500; font-weight:bold;">✅ Виконано (${progress}/${target})</span>`;
+      } else {
+        statusHTML = `<span style="color:var(--text-secondary);">${progress}/${target}</span>`;
+      }
+      questCellsHTML += `<td>${statusHTML}</td>`;
+    });
 
-    let q2Status = "";
-    if (q2Claimed) {
-      q2Status = `<span style="color:#26a17b; font-weight:bold;">🏆 Забрано (${q2Progress}/1)</span>`;
-    } else if (q2Completed) {
-      q2Status = `<span style="color:#FFA500; font-weight:bold;">✅ Виконано (${q2Progress}/1)</span>`;
-    } else {
-      q2Status = `<span style="color:var(--text-secondary);">${q2Progress}/1 (В процесі)</span>`;
-    }
-
-    const claimedCount = (user.claimedQuests || []).length;
+    const claimedCount = (user.claimedQuests || []).filter(qid => quests.some(q => q.id === qid)).length;
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><strong>${user.username.toUpperCase()}</strong></td>
-      <td>${q1Status}</td>
-      <td>${q2Status}</td>
-      <td><span class="badge-mini-${claimedCount > 0 ? 'win' : 'pending'}">${claimedCount} / 2 забрано</span></td>
+      ${questCellsHTML}
+      <td><span class="badge-mini-${claimedCount > 0 ? 'win' : 'pending'}">${claimedCount} / ${quests.length} забрано</span></td>
     `;
     tbody.appendChild(tr);
   });
 }
+
+// Render dynamic list of active quests in admin
+function renderAdminQuestsList(db) {
+  const container = document.getElementById('admin-active-quests-list');
+  if (!container) return;
+  container.innerHTML = "";
+
+  const quests = db.quests || [];
+  quests.forEach(quest => {
+    const card = document.createElement('div');
+    card.className = "card";
+    card.style.background = "rgba(255,255,255,0.02)";
+    card.style.borderColor = "rgba(255,255,255,0.05)";
+    card.style.padding = "15px";
+    card.style.display = "flex";
+    card.style.flexDirection = "column";
+    card.style.justifyContent = "space-between";
+
+    card.innerHTML = `
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;">
+          <strong style="color: white; font-size: 13px;">${quest.title}</strong>
+          <span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; background: ${quest.type === 'bets' ? '#26a17b' : '#ff5500'}; color: white;">
+            ${quest.type === 'bets' ? 'Ставки' : 'Дуелі'}
+          </span>
+        </div>
+        <p style="font-size: 11px; color: var(--text-secondary); margin: 6px 0 10px 0; line-height: 1.4;">${quest.description}</p>
+        <div style="font-size: 11px; color: var(--cs-orange); font-weight: bold;">
+          Нагорода: +${quest.reward} 🪙 (Ціль: ${quest.targetCount})
+        </div>
+      </div>
+      <button class="btn btn-danger" onclick="adminDeleteQuest('${quest.id}')" style="margin-top: 15px; padding: 6px 12px; font-size: 11px; font-weight: 800; width: 100%;">
+        🗑️ ВИДАЛИТИ КВЕСТ
+      </button>
+    `;
+    container.appendChild(card);
+  });
+}
+
+window.adminCreateQuest = function() {
+  const db = getDB();
+  
+  const title = document.getElementById('quest-title-input').value.trim();
+  const desc = document.getElementById('quest-desc-input').value.trim();
+  const reward = parseInt(document.getElementById('quest-reward-input').value);
+  const target = parseInt(document.getElementById('quest-target-input').value);
+  const type = document.getElementById('quest-type-input').value;
+
+  if (!title || !desc || isNaN(reward) || isNaN(target)) {
+    showToast("Будь ласка, заповніть всі поля правильно!", "error");
+    return;
+  }
+
+  const newQuest = {
+    id: "quest_" + Date.now(),
+    title: title,
+    description: desc,
+    reward: reward,
+    targetCount: target,
+    type: type
+  };
+
+  if (!db.quests) db.quests = [];
+  db.quests.push(newQuest);
+
+  saveDB(db);
+  showToast("Квест успішно створено!", "success");
+  
+  // Reset form
+  document.getElementById('admin-create-quest-form').reset();
+  
+  // Re-render
+  renderAdminQuestsList(db);
+  renderAdminQuests(db);
+};
+
+window.adminDeleteQuest = function(questId) {
+  if (!confirm("Ви впевнені, що хочете видалити цей квест?")) return;
+  
+  const db = getDB();
+  db.quests = (db.quests || []).filter(q => q.id !== questId);
+  
+  saveDB(db);
+  showToast("Квест видалено!", "success");
+  
+  // Re-render
+  renderAdminQuestsList(db);
+  renderAdminQuests(db);
+};
 
 
 

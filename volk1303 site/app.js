@@ -2,7 +2,7 @@
 const DB_KEY = 'volk_site_v4';
 const CLOUD_BUCKET = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
   ? 'http://localhost:10000/'
-  : 'https://volk-backend.onrender.com/';
+  : '/api/';
 
 window.isValidTournament = function(t) {
   if (!t || !t.id || !t.name) return false;
@@ -321,6 +321,10 @@ function getDB() {
     if (!db.tournaments) db.tournaments = [];
     if (!db.twitchStatus) db.twitchStatus = "live";
     if (!db.activeTwitchChannel) db.activeTwitchChannel = "volk13o3";
+    
+    // Quests are managed exclusively by the admin panel - never auto-initialize them
+    if (!db.quests) db.quests = [];
+    
     if (!db.pendingWithdrawals) {
       db.pendingWithdrawals = [];
       dbUpdated = true;
@@ -3023,37 +3027,30 @@ window.claimLevelReward = function() {
   renderPageContent();
 };
 
-// 5. Daily Quests checklist
-const DAILY_QUESTS = [
-  {
-    id: "quest_bets",
-    title: "Зроби 3 ставки на CS2",
-    description: "Зроби будь-які 3 ставки на матчі CS2",
-    reward: 10,
-    checkCompleted: (user) => {
-      const bets = user.betHistory.filter(b => b.matchDisplay && !b.matchDisplay.startsWith("Дуель"));
-      return bets.length >= 3;
-    },
-    getProgressText: (user) => {
-      const bets = user.betHistory.filter(b => b.matchDisplay && !b.matchDisplay.startsWith("Дуель"));
-      return `${Math.min(bets.length, 3)} / 3`;
-    }
-  },
-  {
-    id: "quest_duel",
-    title: "Виграй 1 лобі (Aim)",
-    description: "Здобудь перемогу в дуелі або командному бою на aim-карті (1v1, 2v2, 3v3, 5v5)",
-    reward: 15,
-    checkCompleted: (user) => {
-      const duelsWon = user.betHistory.filter(b => b.matchDisplay && b.matchDisplay.startsWith("Дуель") && b.status === "Виграш");
-      return duelsWon.length >= 1;
-    },
-    getProgressText: (user) => {
-      const duelsWon = user.betHistory.filter(b => b.matchDisplay && b.matchDisplay.startsWith("Дуель") && b.status === "Виграш");
-      return `${Math.min(duelsWon.length, 1)} / 1`;
-    }
+// 5. Daily Quests checklist (Dynamic loading helpers)
+function checkQuestCompleted(quest, user) {
+  const target = quest.targetCount || 1;
+  if (quest.type === "bets") {
+    const bets = (user.betHistory || []).filter(b => b.matchDisplay && !b.matchDisplay.startsWith("Дуель"));
+    return bets.length >= target;
+  } else if (quest.type === "duels_win") {
+    const duelsWon = (user.betHistory || []).filter(b => b.matchDisplay && b.matchDisplay.startsWith("Дуель") && b.status === "Виграш");
+    return duelsWon.length >= target;
   }
-];
+  return false;
+}
+
+function getQuestProgressText(quest, user) {
+  const target = quest.targetCount || 1;
+  if (quest.type === "bets") {
+    const bets = (user.betHistory || []).filter(b => b.matchDisplay && !b.matchDisplay.startsWith("Дуель"));
+    return `${Math.min(bets.length, target)} / ${target}`;
+  } else if (quest.type === "duels_win") {
+    const duelsWon = (user.betHistory || []).filter(b => b.matchDisplay && b.matchDisplay.startsWith("Дуель") && b.status === "Виграш");
+    return `${Math.min(duelsWon.length, target)} / ${target}`;
+  }
+  return `0 / ${target}`;
+}
 
 function renderDailyQuests() {
   const container = document.getElementById('quests-list-container');
@@ -3066,10 +3063,17 @@ function renderDailyQuests() {
 
   if (!user.claimedQuests) user.claimedQuests = [];
 
-  DAILY_QUESTS.forEach(quest => {
-    const completed = quest.checkCompleted(user);
+  const quests = db.quests || [];
+
+  if (quests.length === 0) {
+    container.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-secondary); font-size:13px; font-family:'Tektur',sans-serif;">Квести ще не налаштовані адміністратором</div>`;
+    return;
+  }
+
+  quests.forEach(quest => {
+    const completed = checkQuestCompleted(quest, user);
     const claimed = user.claimedQuests.includes(quest.id);
-    const progressText = quest.getProgressText(user);
+    const progressText = getQuestProgressText(quest, user);
 
     const div = document.createElement('div');
     div.className = "quest-item";
@@ -3102,10 +3106,10 @@ window.claimQuestReward = function(questId) {
   if (!user.claimedQuests) user.claimedQuests = [];
   if (user.claimedQuests.includes(questId)) return;
 
-  const quest = DAILY_QUESTS.find(q => q.id === questId);
+  const quest = (db.quests || []).find(q => q.id === questId);
   if (!quest) return;
 
-  if (!quest.checkCompleted(user)) {
+  if (!checkQuestCompleted(quest, user)) {
     showToast("Квест ще не виконано!", "error");
     return;
   }

@@ -721,29 +721,53 @@
       <!-- TAB 6.5: Daily Quests Panel -->
       <section id="pane-quests" class="admin-content-pane">
         <div style="display: grid; grid-template-columns: 1fr; gap: 20px;">
+          
           <!-- Quests Definition -->
           <div class="card">
             <div class="section-title">📜 СПИСОК АКТИВНИХ ЩОДЕННИХ КВЕСТІВ</div>
-            <div style="display: flex; gap: 15px; margin-bottom: 20px;">
-              <div class="card" style="flex: 1; background: rgba(255,255,255,0.02); border-color: rgba(255,255,255,0.05); padding: 15px;">
-                <strong>Зроби 3 ставки на CS2</strong><br>
-                <span style="font-size: 11px; color: var(--text-secondary);">Зроби будь-які 3 ставки на матчі CS2 (окрім дуелей)</span><br>
-                <span style="font-size: 11px; color: var(--cs-orange); font-weight: bold; margin-top: 5px; display: inline-block;">Нагорода: 10 Vcoin</span>
-              </div>
-              <div class="card" style="flex: 1; background: rgba(255,255,255,0.02); border-color: rgba(255,255,255,0.05); padding: 15px;">
-                <strong>Виграй 1 лобі (Aim)</strong><br>
-                <span style="font-size: 11px; color: var(--text-secondary);">Здобудь перемогу в дуелі або командному бою на aim-карті (1v1, 2v2...)</span><br>
-                <span style="font-size: 11px; color: var(--cs-orange); font-weight: bold; margin-top: 5px; display: inline-block;">Нагорода: 15 Vcoin</span>
-              </div>
+            <div id="admin-active-quests-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; margin-bottom: 20px;">
+              <!-- Filled dynamically by JS -->
             </div>
           </div>
+
+          <!-- Add Quest Form -->
+          <div class="card">
+            <div class="section-title">➕ СТВОРИТИ НОВИЙ КВЕСТ</div>
+            <form id="admin-create-quest-form" onsubmit="event.preventDefault(); adminCreateQuest();" style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
+              <div class="form-group">
+                <label for="quest-title-input">Назва квесту</label>
+                <input type="text" id="quest-title-input" class="form-input" placeholder="Напр: Зроби 5 ставок" required>
+              </div>
+              <div class="form-group">
+                <label for="quest-desc-input">Опис</label>
+                <input type="text" id="quest-desc-input" class="form-input" placeholder="Напр: Зроби 5 будь-яких ставок на сайті" required>
+              </div>
+              <div class="form-group">
+                <label for="quest-reward-input">Нагорода (монет)</label>
+                <input type="number" id="quest-reward-input" class="form-input" placeholder="Напр: 50" min="1" required>
+              </div>
+              <div class="form-group">
+                <label for="quest-target-input">Цільова кількість (Target)</label>
+                <input type="number" id="quest-target-input" class="form-input" placeholder="Напр: 5" min="1" required>
+              </div>
+              <div class="form-group" style="grid-column: span 2;">
+                <label for="quest-type-input">Тип умови квесту</label>
+                <select id="quest-type-input" class="form-input" required style="background: var(--bg-input); color: white;">
+                  <option value="bets">Зробити N ставок (будь-яких)</option>
+                  <option value="duels_win">Виграти N дуелей (Aim лобі)</option>
+                </select>
+              </div>
+              <button type="submit" class="btn" style="grid-column: span 2; padding: 12px; font-weight: 800;">СТВОРИТИ КВЕСТ</button>
+            </form>
+          </div>
+
           <!-- Users Progress -->
           <div class="card">
             <div class="section-title">📊 ПРОГРЕС ВИКОНАННЯ КВЕСТІВ ГРАВЦЯМИ</div>
             <div class="admin-table-wrapper">
               <table class="admin-table">
                 <thead>
-                  <tr>
+                  <tr id="admin-quests-thead-tr">
                     <th>Нікнейм</th>
                     <th>Квест "3 ставки"</th>
                     <th>Квест "1 лобі"</th>
@@ -756,6 +780,7 @@
               </table>
             </div>
           </div>
+          
         </div>
       </section>
 
