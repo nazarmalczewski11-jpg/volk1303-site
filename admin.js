@@ -4346,6 +4346,12 @@ function renderAdminQuests(db) {
         progress = (user.betHistory || []).filter(b => b.matchDisplay && !b.matchDisplay.startsWith("Дуель")).length;
       } else if (quest.type === "duels_win") {
         progress = (user.betHistory || []).filter(b => b.matchDisplay && b.matchDisplay.startsWith("Дуель") && b.status === "Виграш").length;
+      } else if (quest.type === "wins") {
+        progress = (user.betHistory || []).filter(b => b.status === "Виграш").length;
+      } else if (quest.type === "tour_win") {
+        progress = (user.betHistory || []).filter(b => b.type === "tournament" && b.status === "Виграш").length;
+      } else if (quest.type === "balance") {
+        progress = Math.round(parseFloat(user.balance) || 0);
       }
 
       const completed = progress >= target;
@@ -4391,12 +4397,28 @@ function renderAdminQuestsList(db) {
     card.style.flexDirection = "column";
     card.style.justifyContent = "space-between";
 
+    const badgeColor = {
+      'bets': '#26a17b',
+      'duels_win': '#ff5500',
+      'wins': '#FFA500',
+      'tour_win': '#c79847',
+      'balance': '#e6005c'
+    }[quest.type] || '#8b949e';
+
+    const badgeLabel = {
+      'bets': 'Ставки',
+      'duels_win': 'Дуелі',
+      'wins': 'Виграші',
+      'tour_win': 'Турніри',
+      'balance': 'Баланс'
+    }[quest.type] || 'Квест';
+
     card.innerHTML = `
       <div>
         <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;">
           <strong style="color: white; font-size: 13px;">${quest.title}</strong>
-          <span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; background: ${quest.type === 'bets' ? '#26a17b' : '#ff5500'}; color: white;">
-            ${quest.type === 'bets' ? 'Ставки' : 'Дуелі'}
+          <span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; background: ${badgeColor}; color: white;">
+            ${badgeLabel}
           </span>
         </div>
         <p style="font-size: 11px; color: var(--text-secondary); margin: 6px 0 10px 0; line-height: 1.4;">${quest.description}</p>

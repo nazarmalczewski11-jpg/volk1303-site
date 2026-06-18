@@ -78,7 +78,8 @@ async function syncWithCloud() {
         fetch(CLOUD_BUCKET + 'promocodes', { cache: 'no-store' }),
         fetch(CLOUD_BUCKET + 'pendingDeposits', { cache: 'no-store' }),
         fetch(CLOUD_BUCKET + 'pendingWithdrawals', { cache: 'no-store' }),
-        fetch(CLOUD_BUCKET + 'usedTxids', { cache: 'no-store' })
+        fetch(CLOUD_BUCKET + 'usedTxids', { cache: 'no-store' }),
+        fetch(CLOUD_BUCKET + 'quests', { cache: 'no-store' })
       );
     }
 
@@ -95,6 +96,7 @@ async function syncWithCloud() {
     let pdRes = isFullSync ? results[7] : null;
     let pwdRes = isFullSync ? results[8] : null;
     let txRes = isFullSync ? results[9] : null;
+    let questsRes = isFullSync ? results[10] : null;
 
     if (bRes && bRes.ok) {
       const cloudBrackets = await bRes.json();
@@ -3036,6 +3038,15 @@ function checkQuestCompleted(quest, user) {
   } else if (quest.type === "duels_win") {
     const duelsWon = (user.betHistory || []).filter(b => b.matchDisplay && b.matchDisplay.startsWith("Дуель") && b.status === "Виграш");
     return duelsWon.length >= target;
+  } else if (quest.type === "wins") {
+    const wins = (user.betHistory || []).filter(b => b.status === "Виграш");
+    return wins.length >= target;
+  } else if (quest.type === "tour_win") {
+    const tourWins = (user.betHistory || []).filter(b => b.type === 'tournament' && b.status === "Виграш");
+    return tourWins.length >= target;
+  } else if (quest.type === "balance") {
+    const balance = parseFloat(user.balance) || 0;
+    return balance >= target;
   }
   return false;
 }
@@ -3048,6 +3059,15 @@ function getQuestProgressText(quest, user) {
   } else if (quest.type === "duels_win") {
     const duelsWon = (user.betHistory || []).filter(b => b.matchDisplay && b.matchDisplay.startsWith("Дуель") && b.status === "Виграш");
     return `${Math.min(duelsWon.length, target)} / ${target}`;
+  } else if (quest.type === "wins") {
+    const wins = (user.betHistory || []).filter(b => b.status === "Виграш");
+    return `${Math.min(wins.length, target)} / ${target}`;
+  } else if (quest.type === "tour_win") {
+    const tourWins = (user.betHistory || []).filter(b => b.type === 'tournament' && b.status === "Виграш");
+    return `${Math.min(tourWins.length, target)} / ${target}`;
+  } else if (quest.type === "balance") {
+    const balance = parseFloat(user.balance) || 0;
+    return `${Math.round(Math.min(balance, target))} / ${target}`;
   }
   return `0 / ${target}`;
 }
