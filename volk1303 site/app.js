@@ -322,8 +322,44 @@ function getDB() {
     if (!db.twitchStatus) db.twitchStatus = "live";
     if (!db.activeTwitchChannel) db.activeTwitchChannel = "volk13o3";
     
-    // Quests are managed exclusively by the admin panel - never auto-initialize them
-    if (!db.quests) db.quests = [];
+    // Quests initialization
+    if (!db.quests || db.quests.length === 0) {
+      db.quests = [
+        {
+          id: "first_bet",
+          title: "Перша кров",
+          description: "Зроби свою першу ставку на сайті",
+          reward: 100,
+          targetCount: 1,
+          type: "bets"
+        },
+        {
+          id: "five_wins",
+          title: "Капер-Початківець",
+          description: "Виграй 5 ставок на сайті",
+          reward: 250,
+          targetCount: 5,
+          type: "wins"
+        },
+        {
+          id: "tour_win",
+          title: "Аналітик Мейджору",
+          description: "Вгадай переможця турніру",
+          reward: 500,
+          targetCount: 1,
+          type: "tour_win"
+        },
+        {
+          id: "king_vcoin",
+          title: "Король Vcoin",
+          description: "Накопич 5000 монет на балансі",
+          reward: 1000,
+          targetCount: 5000,
+          type: "balance"
+        }
+      ];
+      dbUpdated = true;
+    }
     
     if (!db.pendingWithdrawals) {
       db.pendingWithdrawals = [];
@@ -4642,95 +4678,88 @@ function renderAchievements(user) {
   if (!container) return;
   container.innerHTML = "";
 
+  const db = getDB();
+  const quests = db.quests || [];
+  
+  if (quests.length === 0) {
+    container.innerHTML = `<div style="grid-column: span 2; text-align:center; padding:20px; color:var(--text-secondary); font-size:13px; font-family:'Tektur',sans-serif; width:100%;">Досягнення відсутні</div>`;
+    return;
+  }
+
   const history = user.betHistory || [];
   const balance = parseFloat(user.balance) || 0;
 
-  // Calculate stats for achievements
-  const totalBets = history.length;
-  const hasFirstBet = totalBets >= 1;
-
-  const totalWins = history.filter(b => b.status === "Виграш").length;
-  const hasFiveWins = totalWins >= 5;
-
-  const tourWins = history.filter(b => b.type === 'tournament' && b.status === "Виграш").length;
-  const hasTourWin = tourWins >= 1;
-
-  const hasFiveThousand = balance >= 5000;
-
-  const ACHIEVEMENTS_DATA = [
-    {
-      id: "first_bet",
-      title: "Перша кров",
-      desc: "Зроби свою першу ставку на сайті",
-      completed: hasFirstBet,
-      progress: `${Math.min(totalBets, 1)}/1`,
-      progressPct: hasFirstBet ? 100 : 0,
-      xp: 100,
-      coins: 100,
+  const typeStyles = {
+    'bets': {
       color: "#26a17b",
       badgeColor: "rgba(38, 161, 123, 0.05) rgba(38, 161, 123, 0.3)",
       icon: `<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2v20M2 12h20M12 12m-6 0a6 6 0 1 0 12 0 6 6 0 1 0-12 0"></path></svg>`
     },
-    {
-      id: "five_wins",
-      title: "Капер-Початківець",
-      desc: "Виграй 5 ставок на сайті",
-      completed: hasFiveWins,
-      progress: `${Math.min(totalWins, 5)}/5`,
-      progressPct: Math.min((totalWins / 5) * 100, 100),
-      xp: 250,
-      coins: 250,
+    'wins': {
       color: "#FFA500",
       badgeColor: "rgba(255, 165, 0, 0.05) rgba(255, 165, 0, 0.3)",
       icon: `<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>`
     },
-    {
-      id: "tour_win",
-      title: "Аналітик Мейджору",
-      desc: "Вгадай переможця турніру",
-      completed: hasTourWin,
-      progress: `${Math.min(tourWins, 1)}/1`,
-      progressPct: hasTourWin ? 100 : 0,
-      xp: 500,
-      coins: 500,
+    'tour_win': {
       color: "#c79847",
       badgeColor: "rgba(199, 152, 71, 0.05) rgba(199, 152, 71, 0.3)",
       icon: `<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v13m0-13V6a2 2 0 1 1 2 2h-2zm0 0V5a2 2 0 1 0-2 2h2zm0 13H9m3 0h3M7 8a4 4 0 0 1 4-4h2a4 4 0 0 1 4 4v2H7V8z"></path></svg>`
     },
-    {
-      id: "king_vcoin",
-      title: "Король Vcoin",
-      desc: "Накопич 5000 монет на балансі",
-      completed: hasFiveThousand,
-      progress: `${Math.round(balance)}/5000`,
-      progressPct: Math.min((balance / 5000) * 100, 100),
-      xp: 1000,
-      coins: 1000,
+    'balance': {
       color: "#ff5500",
       badgeColor: "rgba(255, 85, 0, 0.05) rgba(255, 85, 0, 0.3)",
       icon: `<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 0 0 1.946-.806 3.42 3.42 0 0 1 4.438 0 3.42 3.42 0 0 0 1.946.806 3.42 3.42 0 0 1 3.138 3.138 3.42 3.42 0 0 0 .806 1.946 3.42 3.42 0 0 1 0 4.438 3.42 3.42 0 0 0-.806 1.946 3.42 3.42 0 0 1-3.138 3.138 3.42 3.42 0 0 0-1.946.806 3.42 3.42 0 0 1-4.438 0 3.42 3.42 0 0 0-1.946-.806 3.42 3.42 0 0 1-3.138-3.138z"></path></svg>`
+    },
+    'duels_win': {
+      color: "#ff5500",
+      badgeColor: "rgba(255, 85, 0, 0.05) rgba(255, 85, 0, 0.3)",
+      icon: `<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>`
     }
-  ];
+  };
 
-  ACHIEVEMENTS_DATA.forEach(ach => {
+  quests.forEach(quest => {
+    const target = quest.targetCount || 1;
+    let progressVal = 0;
+    if (quest.type === "bets") {
+      progressVal = history.filter(b => b.matchDisplay && !b.matchDisplay.startsWith("Дуель")).length;
+    } else if (quest.type === "duels_win") {
+      progressVal = history.filter(b => b.matchDisplay && b.matchDisplay.startsWith("Дуель") && b.status === "Виграш").length;
+    } else if (quest.type === "wins") {
+      progressVal = history.filter(b => b.status === "Виграш").length;
+    } else if (quest.type === "tour_win") {
+      progressVal = history.filter(b => b.type === 'tournament' && b.status === "Виграш").length;
+    } else if (quest.type === "balance") {
+      progressVal = balance;
+    }
+
+    const completed = progressVal >= target;
+    const progressPct = Math.min((progressVal / target) * 100, 100);
+    const progressText = quest.type === "balance" ? `${Math.round(progressVal)}/${target}` : `${Math.min(progressVal, target)}/${target}`;
+
+    const style = typeStyles[quest.type] || {
+      color: "#FFA500",
+      badgeColor: "rgba(255, 165, 0, 0.05) rgba(255, 165, 0, 0.3)",
+      icon: `<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>`
+    };
+
+    const claimed = (user.claimedAchievements || []).includes(quest.id) || (user.claimedQuests || []).includes(quest.id);
+
     const card = document.createElement('div');
-    const claimed = (user.claimedAchievements || []).includes(ach.id);
-    
     card.className = "achievement-card";
-    
+
     let buttonHTML = "";
-    if (ach.completed && !claimed) {
+    if (completed && !claimed) {
       card.style.background = "rgba(255, 165, 0, 0.04)";
       card.style.borderColor = "rgba(255, 165, 0, 0.25)";
       buttonHTML = `
         <button class="btn btn-primary w-full py-2.5 text-xs font-black rounded-lg cursor-pointer" 
                 style="background: linear-gradient(135deg, var(--cs-orange) 0%, #ff5500 100%); border:none; margin-top: 14px; font-family: 'Tektur', sans-serif; letter-spacing: 0.5px;" 
-                onclick="claimAchievement('${ach.id}')">
-          Забрати досягнення (+${ach.coins} 🪙)
+                onclick="claimAchievement('${quest.id}')">
+          Забрати досягнення (+${quest.reward} 🪙)
         </button>
       `;
-    } else if (ach.completed && claimed) {
-      const colors = ach.badgeColor.split(' ');
+    } else if (completed && claimed) {
+      const colors = style.badgeColor.split(' ');
       card.style.background = colors[0];
       card.style.borderColor = colors[1];
       buttonHTML = `
@@ -4751,21 +4780,21 @@ function renderAchievements(user) {
     card.innerHTML = `
       <div class="flex flex-col flex-1">
         <div class="flex gap-3 items-start mb-3">
-          <div class="achievement-icon-wrapper" style="background: ${ach.color}15; border: 1px solid ${ach.color}30; color: ${ach.color};">
-            ${ach.icon}
+          <div class="achievement-icon-wrapper" style="background: ${style.color}15; border: 1px solid ${style.color}30; color: ${style.color};">
+            ${style.icon}
           </div>
           <div class="min-w-0 flex-1">
-            <h4 class="text-xs font-black text-[#FFF5E0] uppercase tracking-wider mb-0.5" style="font-family: 'Tektur', sans-serif;">${ach.title}</h4>
-            <p class="text-[10px] text-gray-400 leading-normal">${ach.desc}</p>
+            <h4 class="text-xs font-black text-[#FFF5E0] uppercase tracking-wider mb-0.5" style="font-family: 'Tektur', sans-serif;">${quest.title}</h4>
+            <p class="text-[10px] text-gray-400 leading-normal">${quest.description}</p>
           </div>
         </div>
         <div class="mt-auto">
           <div class="w-full bg-zinc-800/80 rounded-full h-1.5 mb-2">
-            <div class="h-1.5 rounded-full" style="width: ${ach.progressPct}%; background: ${ach.color};"></div>
+            <div class="h-1.5 rounded-full" style="width: ${progressPct}%; background: ${style.color};"></div>
           </div>
           <div class="flex justify-between items-center text-[9px] font-bold text-gray-400">
-            <span>Прогрес: ${ach.progress}</span>
-            <span class="text-white flex items-center gap-1"><span class="material-icons-outlined text-[10px]">emoji_events</span> ${ach.xp} XP</span>
+            <span>Прогрес: ${progressText}</span>
+            <span class="text-white flex items-center gap-1"><span class="material-icons-outlined text-[10px]">emoji_events</span> ${quest.reward} XP</span>
           </div>
         </div>
       </div>
@@ -4783,20 +4812,30 @@ window.claimAchievement = function(achId) {
   user.claimedAchievements = user.claimedAchievements || [];
   if (user.claimedAchievements.includes(achId)) return;
 
-  const ACHIEVEMENTS_REWARDS = {
-    first_bet: { coins: 100, name: "Перша кров" },
-    five_wins: { coins: 250, name: "Капер-Початківець" },
-    tour_win: { coins: 500, name: "Аналітик Мейджору" },
-    king_vcoin: { coins: 1000, name: "Король Vcoin" }
-  };
+  // Try to find the achievement/quest in db.quests first
+  const quest = (db.quests || []).find(q => q.id === achId);
+  let coins = 0;
+  let name = "";
+  if (quest) {
+    coins = quest.reward;
+    name = quest.title;
+  } else {
+    const ACHIEVEMENTS_REWARDS = {
+      first_bet: { coins: 100, name: "Перша кров" },
+      five_wins: { coins: 250, name: "Капер-Початківець" },
+      tour_win: { coins: 500, name: "Аналітик Мейджору" },
+      king_vcoin: { coins: 1000, name: "Король Vcoin" }
+    };
+    const reward = ACHIEVEMENTS_REWARDS[achId];
+    if (!reward) return;
+    coins = reward.coins;
+    name = reward.name;
+  }
 
-  const reward = ACHIEVEMENTS_REWARDS[achId];
-  if (!reward) return;
-
-  user.balance = (user.balance || 0) + reward.coins;
+  user.balance = (user.balance || 0) + coins;
   user.claimedAchievements.push(achId);
   saveDB(db);
-  showToast(`Досягнення "${reward.name}" забрано! +${reward.coins} 🪙`, "success");
+  showToast(`Досягнення "${name}" забрано! +${coins} 🪙`, "success");
   
   // Also push user update to server
   fetch(CLOUD_BUCKET + 'user_' + user.username.toLowerCase(), {
