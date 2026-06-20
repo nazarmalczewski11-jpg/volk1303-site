@@ -62,7 +62,7 @@ async function syncWithCloud() {
     if (!window.syncCycleCount) window.syncCycleCount = 0;
     window.syncCycleCount++;
 
-    const isFullSync = window.syncCycleCount % 3 === 0;
+    const isFullSync = (window.syncCycleCount === 1) || (window.syncCycleCount % 3 === 0);
 
     const fetches = [
       fetch(CLOUD_BUCKET + 'matches', { cache: 'no-store' }),
@@ -257,6 +257,13 @@ async function syncWithCloud() {
         dbChanged = true;
       }
     }
+    if (questsRes && questsRes.ok) {
+      const cloudQuests = await questsRes.json();
+      if (JSON.stringify(db.quests) !== JSON.stringify(cloudQuests)) {
+        db.quests = cloudQuests;
+        dbChanged = true;
+      }
+    }
 
     if (dbChanged) {
       localStorage.setItem(DB_KEY, JSON.stringify(db));
@@ -326,40 +333,7 @@ function getDB() {
     
     // Quests initialization
     if (db.quests === undefined || db.quests === null) {
-      db.quests = [
-        {
-          id: "first_bet",
-          title: "Перша кров",
-          description: "Зроби свою першу ставку на сайті",
-          reward: 100,
-          targetCount: 1,
-          type: "bets"
-        },
-        {
-          id: "five_wins",
-          title: "Капер-Початківець",
-          description: "Виграй 5 ставок на сайті",
-          reward: 250,
-          targetCount: 5,
-          type: "wins"
-        },
-        {
-          id: "tour_win",
-          title: "Аналітик Мейджору",
-          description: "Вгадай переможця турніру",
-          reward: 500,
-          targetCount: 1,
-          type: "tour_win"
-        },
-        {
-          id: "king_vcoin",
-          title: "Король Vcoin",
-          description: "Накопич 5000 монет на балансі",
-          reward: 1000,
-          targetCount: 5000,
-          type: "balance"
-        }
-      ];
+      db.quests = [];
       dbUpdated = true;
     }
     

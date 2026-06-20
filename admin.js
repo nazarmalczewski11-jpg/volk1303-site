@@ -111,7 +111,7 @@ async function syncWithCloud() {
     if (!window.syncCycleCount) window.syncCycleCount = 0;
     window.syncCycleCount++;
 
-    const isFullSync = window.syncCycleCount % 3 === 0;
+    const isFullSync = (window.syncCycleCount === 1) || (window.syncCycleCount % 3 === 0);
 
     const fetches = [
       fetch(CLOUD_BUCKET + 'matches', { cache: 'no-store' }),
