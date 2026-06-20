@@ -127,7 +127,8 @@ async function syncWithCloud() {
         fetch(CLOUD_BUCKET + 'promocodes', { cache: 'no-store' }),
         fetch(CLOUD_BUCKET + 'pendingDeposits', { cache: 'no-store' }),
         fetch(CLOUD_BUCKET + 'pendingWithdrawals', { cache: 'no-store' }),
-        fetch(CLOUD_BUCKET + 'usedTxids', { cache: 'no-store' })
+        fetch(CLOUD_BUCKET + 'usedTxids', { cache: 'no-store' }),
+        fetch(CLOUD_BUCKET + 'quests', { cache: 'no-store' })
       );
     }
 
@@ -144,6 +145,7 @@ async function syncWithCloud() {
     let pdRes = isFullSync ? results[7] : null;
     let pwdRes = isFullSync ? results[8] : null;
     let txRes = isFullSync ? results[9] : null;
+    let questsRes = isFullSync ? results[10] : null;
 
     if (bRes && bRes.ok) {
       const cloudBrackets = await bRes.json();
@@ -330,6 +332,15 @@ async function syncWithCloud() {
         dbChanged = true;
       }
     }
+    if (questsRes && questsRes.ok) {
+      const cloudQuests = await questsRes.json();
+      if (JSON.stringify(db.quests) !== JSON.stringify(cloudQuests)) {
+        db.quests = cloudQuests;
+        dbChanged = true;
+      }
+    } else if (questsRes && questsRes.status === 404) {
+      shouldPush = true;
+    }
     
     updateSyncStatus(true, "Синхронізовано: " + new Date().toLocaleTimeString());
 
@@ -375,7 +386,8 @@ async function pushToCloud(db) {
       fetch(CLOUD_BUCKET + 'settings', { method: 'POST', body: JSON.stringify({
         twitchStatus: db.twitchStatus,
         activeTwitchChannel: db.activeTwitchChannel
-      }) })
+      }) }),
+      fetch(CLOUD_BUCKET + 'quests', { method: 'POST', body: JSON.stringify(db.quests || []) })
     ];
 
     if (searchedUserNick) {
