@@ -325,7 +325,7 @@ function getDB() {
     if (!db.activeTwitchChannel) db.activeTwitchChannel = "volk13o3";
     
     // Quests initialization
-    if (!db.quests || db.quests.length === 0) {
+    if (db.quests === undefined || db.quests === null) {
       db.quests = [
         {
           id: "first_bet",

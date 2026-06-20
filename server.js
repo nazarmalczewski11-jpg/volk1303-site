@@ -63,8 +63,8 @@ function readJsonDb() {
     const raw = fs.readFileSync(JSON_DB_PATH, 'utf-8');
     const db = JSON.parse(raw);
     
-    // Auto-initialize quests if not present or empty
-    if (!db.quests || db.quests === "[]" || db.quests === "[]\n") {
+    // Auto-initialize quests if key is completely missing
+    if (db.quests === undefined || db.quests === null) {
       const defaultQuests = [
         {
           id: "first_bet",
