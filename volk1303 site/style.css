@@ -1629,9 +1629,9 @@ nav {
 
 /* Footer styling */
 footer {
-  background: linear-gradient(to top, rgba(10, 11, 15, 0.95) 0%, rgba(10, 11, 15, 0.4) 60%, transparent 100%) !important;
+  background: #000000 !important;
   border-top: 1px solid rgba(255, 255, 255, 0.05);
-  padding: 30px 4% 35px 4%;
+  padding: 20px 4% !important;
   font-size: 12px;
   color: var(--text-secondary);
   line-height: 1.5;
@@ -1639,6 +1639,29 @@ footer {
   width: 100%;
   box-sizing: border-box;
 }
+
+.footer-compact {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  font-size: 12px !important;
+  max-width: 1400px !important;
+  margin: 0 auto !important;
+  width: 100% !important;
+  gap: 15px !important;
+}
+
+.footer-compact a {
+  color: var(--text-secondary) !important;
+  text-decoration: none !important;
+  transition: var(--transition) !important;
+}
+
+.footer-compact a:hover {
+  color: #FFA500 !important;
+}
+
 
 .footer-inner {
   max-width: 1400px;
