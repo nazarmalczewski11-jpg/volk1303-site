@@ -13,6 +13,21 @@ window.isValidTournament = function(t) {
   return true;
 };
 
+window.formatsMatch = function(f1, f2) {
+  if (!f1 || !f2) return false;
+  const norm1 = String(f1).toLowerCase().replace(/\s+/g, '').replace(/х/g, 'x');
+  const norm2 = String(f2).toLowerCase().replace(/\s+/g, '').replace(/х/g, 'x');
+  const getBaseFormat = (str) => {
+    if (str.includes('1x1')) return '1x1';
+    if (str.includes('2x2')) return '2x2';
+    if (str.includes('3x3')) return '3x3';
+    if (str.includes('4x4')) return '4x4';
+    if (str.includes('5x5')) return '5x5';
+    return str;
+  };
+  return getBaseFormat(norm1) === getBaseFormat(norm2);
+};
+
 let isSyncing = false;
 let activePushes = 0;
 
@@ -1080,12 +1095,13 @@ function renderDashboardOpsLog(db) {
   db.users.forEach(u => {
     if (u && u.username && u.username !== 'admin') {
       const regEvent = u.loginHistory ? u.loginHistory.find(h => h.type === 'register') : null;
-      const regTime = regEvent ? regEvent.date : "2026-06-01 12:00";
-      events.push({
-        time: regTime,
-        tag: "reg",
-        text: `Новий гравець <strong>${u.username.toUpperCase()}</strong> зареєструвався в системі`
-      });
+      if (regEvent) {
+        events.push({
+          time: regEvent.date,
+          tag: "reg",
+          text: `Новий гравець <strong>${u.username.toUpperCase()}</strong> зареєструвався в системі`
+        });
+      }
     }
   });
 
@@ -1268,7 +1284,11 @@ function renderTournamentBettingTab() {
           </div>
           <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
             <span style="font-size:11px; background:rgba(255,255,255,0.05); padding:4px 10px; border-radius:20px; color:var(--text-secondary);">${teamCount} команд</span>
-            <button onclick="event.stopPropagation(); deleteTournamentAdmin('${tour.id}');" class="btn btn-danger" style="padding:4px 10px; font-size:11px; font-weight:800; background:var(--error); border:none; border-radius:6px; color:white; cursor:pointer;">Видалити ❌</button>
+            ${tour.isFrozen ? `
+              <button onclick="event.stopPropagation(); toggleFreezeTournamentBettingAdmin('${tour.id}', false);" class="btn btn-danger" style="padding:4px 10px; font-size:11px; font-weight:800; background:var(--error); border:none; border-radius:6px; color:white; cursor:pointer;">Розморозити 🔓</button>
+            ` : `
+              <button onclick="event.stopPropagation(); toggleFreezeTournamentBettingAdmin('${tour.id}', true);" class="btn btn-secondary" style="padding:4px 10px; font-size:11px; font-weight:800; background:#2d3748; border:1px solid #4a5568; border-radius:6px; color:white; cursor:pointer;">Заморозити ❄️</button>
+            `}
             <span id="betting-chevron-${tour.id}" style="color:var(--cs-orange); font-size:14px; transition:transform 0.2s;">▼</span>
           </div>
         </div>
@@ -1283,6 +1303,17 @@ function renderTournamentBettingTab() {
     container.innerHTML = `<div style="text-align:center; color:red; padding:40px; font-size:13px;">Помилка відображення: ${err.message}</div>`;
   }
 }
+
+window.toggleFreezeTournamentBettingAdmin = function(tourId, freeze) {
+  const db = getDB();
+  const tour = (db.tournaments || []).find(t => t.id === tourId);
+  if (!tour) return;
+  tour.isFrozen = freeze;
+  tour.lastModified = Date.now();
+  saveDB(db);
+  showToast(freeze ? "Ставки на турнір заморожено!" : "Ставки на турнір розморожено!", freeze ? "error" : "success");
+  renderAdminPanel();
+};
 
 window.toggleBettingTourCard = function(tourId) {
   const panel = document.getElementById(`betting-tour-teams-${tourId}`);
@@ -3377,7 +3408,7 @@ window.showSelectExistingTeamForm = function(slotIndex) {
 
   const format = tour.format;
   const registered = tour.registeredTeams || [];
-  const matchingTeams = db.teams.filter(t => t.format === format && !registered.includes(t.id));
+  const matchingTeams = db.teams.filter(t => formatsMatch(t.format, format) && !registered.includes(t.id));
 
   if (matchingTeams.length === 0) {
     container.innerHTML = `
@@ -3862,7 +3893,7 @@ window.openBracketEditorCard = function(tourId, skipScroll = false) {
       matchCard.style.borderRadius = "8px";
 
       const regTeamIds = tour.registeredTeams || [];
-      const tourTeams = (db.teams || []).filter(t => t && t.name && (!tour.format || t.format === tour.format));
+      const tourTeams = (db.teams || []).filter(t => t && t.name && (!tour.format || formatsMatch(t.format, tour.format)));
       const teamList1 = tourTeams.map(t => `<option value="${t.name}" ${match.team1 === t.name ? 'selected' : ''}>${t.name}</option>`).join('');
       const teamList2 = tourTeams.map(t => `<option value="${t.name}" ${match.team2 === t.name ? 'selected' : ''}>${t.name}</option>`).join('');
 
@@ -4292,7 +4323,7 @@ window.closeModal = function(modalId) {
 };
 
 // Clear statistics history (reset total deposits, bets, and logs) for all users
-window.clearDashboardStats = function() {
+window.clearDashboardStats = async function() {
   if (!confirm("Ви впевнені, що хочете очистити всю статистику дашборду (історію поповнень, історію ставок та консоль логів) для всіх користувачів? Це дійство є незворотнім.")) {
     return;
   }
@@ -4300,26 +4331,28 @@ window.clearDashboardStats = function() {
   db.users.forEach(u => {
     u.depositHistory = [];
     u.betHistory = [];
+    u.loginHistory = []; // Clear registration/login history too so logs don't persist
   });
   db.pendingDeposits = [];
   db.pendingWithdrawals = [];
   db.aimLobbies = [];
   
-  saveDB(db);
-  
-  // Save to cloud too
-  fetch(CLOUD_BUCKET + 'users', { method: 'POST', body: JSON.stringify(db.users) });
-  fetch(CLOUD_BUCKET + 'pendingDeposits', { method: 'POST', body: JSON.stringify([]) });
-  fetch(CLOUD_BUCKET + 'pendingWithdrawals', { method: 'POST', body: JSON.stringify([]) });
-  fetch(CLOUD_BUCKET + 'aimLobbies', { method: 'POST', body: JSON.stringify([]) })
-    .then(() => {
-      showToast("Статистику дашборду успішно очищено!", "success");
-      renderAdminPanel();
-    })
-    .catch(e => {
-      console.error(e);
-      showToast("Помилка синхронізації з хмарою при очищенні!", "error");
+  try {
+    await saveDB(db);
+    // Also clear all individual user keys on the server!
+    const userClearPromises = db.users.map(u => {
+      return fetch(CLOUD_BUCKET + 'user_' + u.username.toLowerCase(), {
+        method: 'POST',
+        body: JSON.stringify(u)
+      });
     });
+    await Promise.all(userClearPromises);
+    showToast("Статистику дашборду успішно очищено!", "success");
+  } catch (e) {
+    console.error(e);
+    showToast("Помилка при очищенні статистики!", "error");
+  }
+  renderAdminPanel();
 };
 
 
@@ -4483,7 +4516,8 @@ window.adminCreateQuest = function() {
   const desc = document.getElementById('quest-desc-input').value.trim();
   const reward = parseInt(document.getElementById('quest-reward-input').value);
   const target = parseInt(document.getElementById('quest-target-input').value);
-  const type = document.getElementById('quest-type-input').value;
+  const typeEl = document.getElementById('quest-type-input');
+  const type = typeEl ? typeEl.value : "bets";
 
   if (!title || !desc || isNaN(reward) || isNaN(target)) {
     showToast("Будь ласка, заповніть всі поля правильно!", "error");

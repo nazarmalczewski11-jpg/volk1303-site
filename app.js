@@ -3618,6 +3618,7 @@ window.switchTournamentDetailTab = function(tourId, tabKey) {
 
 // Check if a tournament's active match has a 6+ round score lead to freeze bets
 function isTournamentBettingFrozen(tour) {
+  if (tour && tour.isFrozen) return true;
   if (!tour || !tour.brackets || !tour.brackets.rounds) return false;
   for (const round of tour.brackets.rounds) {
     if (!round.matches) continue;
@@ -4374,36 +4375,12 @@ window.openWithdrawModal = function() {
           🪙 <span style="color: var(--text-primary); font-weight: 800;">КУРС ВАЛЮТИ:</span> 1 монета = 1 гривня (UAH)
         </div>
 
-        <div class="payment-tabs">
-          <button class="payment-tab-btn active" id="withdraw-tab-card" onclick="switchWithdrawTab('card')">
-            <span style="font-size: 14px;">💳</span> Карта Visa/MC
-          </button>
-          <button class="payment-tab-btn" id="withdraw-tab-usdt" onclick="switchWithdrawTab('usdt')">
-            <span style="font-size: 14px;">🟢</span> USDT TRC20
-          </button>
-        </div>
-
-        <!-- Visa/MC Form -->
-        <div id="withdraw-card-panel" class="payment-method-details active">
-          <form id="withdraw-card-form" onsubmit="submitWithdrawForm(event, 'Visa/Mastercard')">
-            <div class="form-group">
-              <label for="withdraw-card-number">Номер карти</label>
-              <input type="text" id="withdraw-card-number" class="form-input" placeholder="XXXX XXXX XXXX XXXX" required pattern="\\d{16}" title="Введіть 16 цифр карти без пробілів">
-            </div>
-            <div class="form-group" style="margin-top: 12px;">
-              <label for="withdraw-card-holder">ПІБ отримувача</label>
-              <input type="text" id="withdraw-card-holder" class="form-input" placeholder="Ім'я та Прізвище отримувача" required>
-            </div>
-            <div class="form-group" style="margin-top: 12px;">
-              <label for="withdraw-card-amount">Сума виведення (монет)</label>
-              <input type="number" id="withdraw-card-amount" class="form-input" placeholder="Мін. 2000 монет" min="2000" required style="color: var(--text-primary);">
-            </div>
-            <button type="submit" class="btn" style="width: 100%; margin-top: 15px; padding: 12px;">СТВОРІТИ ЗАПИТ НА ВИВЕДЕННЯ</button>
-          </form>
+        <div style="margin-bottom: 15px; font-weight: 800; font-size: 12px; text-transform: uppercase; color: var(--cs-orange); letter-spacing: 0.5px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+          🟢 USDT TRC20
         </div>
 
         <!-- USDT TRC20 Form -->
-        <div id="withdraw-usdt-panel" class="payment-method-details">
+        <div id="withdraw-usdt-panel" class="payment-method-details active">
           <form id="withdraw-usdt-form" onsubmit="submitWithdrawForm(event, 'USDT TRC20')">
             <div class="form-group">
               <label for="withdraw-usdt-address">USDT TRC20 Адреса</label>

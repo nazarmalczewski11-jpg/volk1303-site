@@ -4030,4 +4030,9 @@ footer {
   }
 }
 
+/* Hide Monobank payment/withdrawal options */
+.payment-tabs, #dep-tab-mono, #payment-mono {
+  display: none !important;
+}
+
 
