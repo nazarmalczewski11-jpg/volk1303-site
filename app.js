@@ -2144,56 +2144,7 @@ function renderProfileDashboard() {
     }
   }
 
-  // Render Faceit binding box
-  const faceitContainer = document.getElementById('faceit-binding-container');
-  if (faceitContainer) {
-    if (user.linkedFaceitName) {
-      faceitContainer.innerHTML = `
-        <div style="display:flex; flex-direction:column; gap:10px;">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <strong style="color:white; font-size:14px; font-family:'Tektur', sans-serif;">${user.linkedFaceitName}</strong>
-            <span style="background: linear-gradient(135deg, #ff5500 0%, #ff7300 100%); color: white; padding: 4px 10px; border-radius: 6px; font-weight: 800; font-size: 11px; letter-spacing: 0.5px; font-family: 'Tektur', sans-serif; box-shadow: 0 0 10px rgba(255, 85, 0, 0.2);">LVL ${user.faceitLevel || 6}</span>
-          </div>
-          
-          <div class="xp-container" style="padding:10px; border-radius:8px; background-color:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.05);">
-            <div class="xp-header" style="font-size:10px; margin-bottom:6px; display:flex; justify-content:space-between; font-family:'Tektur', sans-serif;">
-              <span>XP до наступного ELO рівня</span>
-              <span style="font-weight:700; color:white;">${user.faceitElo || 1550} / 1700 ELO</span>
-            </div>
-            <div class="xp-bar" style="height:6px; background-color:rgba(255,255,255,0.05); border-radius:4px; overflow:hidden;">
-              <div class="xp-fill" style="width: 75%; background:#ff5500; height:100%;"></div>
-            </div>
-          </div>
 
-          <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; text-align:center; font-size:11px; margin-top:5px;">
-            <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.05); padding:8px 6px; border-radius:8px;">
-              <div style="color:var(--text-secondary); font-size:10px; font-family:'Tektur', sans-serif; font-weight:700; letter-spacing:0.5px;">K/D RATIO</div>
-              <strong style="color:white; font-size:15px; font-family:'Russo One', sans-serif; display:block; margin-top:4px;">${user.faceitKD || '1.18'}</strong>
-            </div>
-            <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.05); padding:8px 6px; border-radius:8px;">
-              <div style="color:var(--text-secondary); font-size:10px; font-family:'Tektur', sans-serif; font-weight:700; letter-spacing:0.5px;">WINRATE</div>
-              <strong style="color:white; font-size:15px; font-family:'Russo One', sans-serif; display:block; margin-top:4px;">${user.faceitWinrate || '54%'}</strong>
-            </div>
-            <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.05); padding:8px 6px; border-radius:8px;">
-              <div style="color:var(--text-secondary); font-size:10px; font-family:'Tektur', sans-serif; font-weight:700; letter-spacing:0.5px;">HEADSHOT %</div>
-              <strong style="color:white; font-size:15px; font-family:'Russo One', sans-serif; display:block; margin-top:4px;">${user.faceitHS || '48%'}</strong>
-            </div>
-          </div>
-
-          <button class="btn btn-secondary" onclick="unlinkFaceit()" style="width:100%; padding:10px; font-size:11px; font-weight:800; border:1px solid rgba(255,74,74,0.2); color:#ff4a4a; background:rgba(255,74,74,0.02); margin-top:10px; letter-spacing:0.5px; font-family:'Tektur', sans-serif;">
-            ВІДВ'ЯЗАТИ АКАУНТ
-          </button>
-        </div>
-      `;
-    } else {
-      faceitContainer.innerHTML = `
-        <form id="faceit-bind-form" onsubmit="event.preventDefault(); bindFaceitAccount();" style="display:flex; flex-direction:column; gap:8px;">
-          <input type="text" id="faceit-name-input" class="form-input" placeholder="Введіть нікнейм FACEIT" required style="padding:8px; font-size:12px;">
-          <button type="submit" class="btn" style="width:100%; padding:8px; font-size:11px; background:#ff5500;">ЗВ'ЯЗАТИ АКАУНТ</button>
-        </form>
-      `;
-    }
-  }
 
   // Render Skins Inventory list
   const invContainer = document.getElementById('inventory-skins-list');
@@ -2960,51 +2911,7 @@ function simulateOpponentJoin(lobbyId) {
   }, 1200);
 }
 
-// 4. Faceit link binders
-window.bindFaceitAccount = function() {
-  const input = document.getElementById('faceit-name-input');
-  if (!input) return;
-  const nickname = input.value.trim();
-  if (!nickname) return;
 
-  const db = getDB();
-  const user = db.users.find(u => u.username === db.currentUser);
-  if (!user) return;
-
-  let hash = 0;
-  for (let i = 0; i < nickname.length; i++) {
-    hash += nickname.charCodeAt(i);
-  }
-  
-  user.linkedFaceitName = nickname;
-  user.faceitLevel = (hash % 10) + 1;
-  user.faceitElo = 800 + (user.faceitLevel - 1) * 150 + (hash % 100);
-  user.faceitKD = (1.0 + (hash % 50) / 100).toFixed(2);
-  user.faceitWinrate = `${45 + (hash % 25)}%`;
-  user.faceitHS = `${40 + (hash % 20)}%`;
-
-  saveDB(db);
-  showToast(`Акаунт Faceit ${nickname} успішно прив'язано!`, "success");
-  renderPageContent();
-};
-
-window.unlinkFaceit = function() {
-  if (!confirm("Ви впевнені, що хочете відв'язати акаунт FACEIT?")) return;
-  const db = getDB();
-  const user = db.users.find(u => u.username === db.currentUser);
-  if (!user) return;
-
-  user.linkedFaceitName = null;
-  user.faceitLevel = null;
-  user.faceitElo = null;
-  user.faceitKD = null;
-  user.faceitWinrate = null;
-  user.faceitHS = null;
-
-  saveDB(db);
-  showToast("Акаунт FACEIT відв'язано.", "success");
-  renderPageContent();
-};
 
 window.claimLevelReward = function() {
   const db = getDB();
