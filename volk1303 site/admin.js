@@ -1898,6 +1898,35 @@ window.renderDatabaseTab = function() {
   }
 };
 
+function parseLocaleDateAdmin(dateStr) {
+  if (!dateStr) return new Date(0);
+  let cleanStr = dateStr.trim();
+  if (cleanStr.includes('.')) {
+    const parts = cleanStr.split(',');
+    const datePart = parts[0].trim();
+    const timePart = parts[1] ? parts[1].trim() : '';
+    const dateSubparts = datePart.split('.');
+    if (dateSubparts.length === 3) {
+      const day = parseInt(dateSubparts[0], 10);
+      const month = parseInt(dateSubparts[1], 10) - 1;
+      const year = parseInt(dateSubparts[2], 10);
+      let hour = 0, min = 0, sec = 0;
+      if (timePart) {
+        const timeSubparts = timePart.split(':');
+        hour = parseInt(timeSubparts[0] || 0, 10);
+        min = parseInt(timeSubparts[1] || 0, 10);
+        sec = parseInt(timeSubparts[2] || 0, 10);
+      }
+      return new Date(year, month, day, hour, min, sec);
+    }
+  }
+  const d = new Date(cleanStr);
+  if (!isNaN(d.getTime())) {
+    return d;
+  }
+  return new Date(0);
+}
+
 function renderDatabaseUsersTable(users, searchQuery) {
   const tbody = document.getElementById('db-table-users-body');
   if (!tbody) return;
@@ -1957,7 +1986,7 @@ function renderDatabaseDepositsTable(users, searchQuery) {
     });
   });
 
-  allDeposits.sort((a, b) => new Date(b.date) - new Date(a.date));
+  allDeposits.sort((a, b) => parseLocaleDateAdmin(b.date) - parseLocaleDateAdmin(a.date));
 
   const filtered = allDeposits.filter(d => {
     return d.username.toLowerCase().includes(searchQuery) || d.method.toLowerCase().includes(searchQuery);
@@ -2006,7 +2035,7 @@ function renderDatabaseBetsTable(users, searchQuery) {
     });
   });
 
-  allBets.sort((a, b) => new Date(b.date) - new Date(a.date));
+  allBets.sort((a, b) => parseLocaleDateAdmin(b.date) - parseLocaleDateAdmin(a.date));
 
   const filtered = allBets.filter(b => {
     return b.username.toLowerCase().includes(searchQuery) || b.matchDisplay.toLowerCase().includes(searchQuery) || b.selectedTeam.toLowerCase().includes(searchQuery);
@@ -2060,7 +2089,7 @@ function renderDatabaseLoginsTable(users, searchQuery) {
     });
   });
 
-  allLogins.sort((a, b) => new Date(b.date) - new Date(a.date));
+  allLogins.sort((a, b) => parseLocaleDateAdmin(b.date) - parseLocaleDateAdmin(a.date));
 
   const filtered = allLogins.filter(l => {
     return l.username.toLowerCase().includes(searchQuery) || l.device.toLowerCase().includes(searchQuery);
@@ -2172,7 +2201,8 @@ function renderInspectorLoginsList(user) {
   if (!container) return;
   container.innerHTML = '';
 
-  const logins = user.loginHistory || [];
+  const logins = [...(user.loginHistory || [])];
+  logins.sort((a, b) => parseLocaleDateAdmin(b.date) - parseLocaleDateAdmin(a.date));
   if (logins.length === 0) {
     container.innerHTML = `<span style="font-size:11px; color:var(--text-secondary); text-align:center; display:block; padding:10px;">Історія входів відсутня</span>`;
     return;
