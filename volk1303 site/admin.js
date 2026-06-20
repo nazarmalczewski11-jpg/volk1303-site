@@ -606,7 +606,14 @@ function setupAdminListeners() {
     });
   }
 
-
+  // Faceit update form
+  const updateFaceitForm = document.getElementById('admin-update-faceit-form');
+  if (updateFaceitForm) {
+    updateFaceitForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      updateUserFaceitAdmin();
+    });
+  }
 
   // Stream Update
   const twitchForm = document.getElementById('admin-twitch-channel-form');
@@ -776,8 +783,17 @@ async function handleUserSearchAdmin() {
     <div><strong>Електронна пошта:</strong> ${user.email}</div>
     <div><strong>Поточний баланс:</strong> <strong style="color:var(--cs-orange);">${user.balance} 🪙</strong></div>
     <div><strong>Депозит Бонус:</strong> +${user.bonusPercent || 0}%</div>
+    <div><strong>FACEIT:</strong> ${user.linkedFaceitName ? `${user.linkedFaceitName} (LVL ${user.faceitLevel || 1}, ELO ${user.faceitElo || 0})` : 'не прив\'язано'}</div>
   `;
   controls.style.display = 'block';
+
+  // Prepopulate Faceit fields
+  const faceitNickInput = document.getElementById('admin-faceit-nick');
+  const faceitLvlInput = document.getElementById('admin-faceit-lvl');
+  const faceitEloInput = document.getElementById('admin-faceit-elo');
+  if (faceitNickInput) faceitNickInput.value = user.linkedFaceitName || "";
+  if (faceitLvlInput) faceitLvlInput.value = user.faceitLevel || "";
+  if (faceitEloInput) faceitEloInput.value = user.faceitElo || "";
 }
 
 // Adjust User Balance (Points dispensing)
@@ -4277,7 +4293,38 @@ window.clearDashboardStats = function() {
 };
 
 
+// Update User Faceit account info
+window.updateUserFaceitAdmin = function() {
+  if (!searchedUserNick) return;
+  const db = getDB();
+  const user = db.users.find(u => u.username.toLowerCase() === searchedUserNick.toLowerCase());
+  if (!user) return;
 
+  const nick = document.getElementById('admin-faceit-nick').value.trim();
+  const lvl = parseInt(document.getElementById('admin-faceit-lvl').value);
+  const elo = parseInt(document.getElementById('admin-faceit-elo').value);
+
+  if (!nick) {
+    user.linkedFaceitName = null;
+    user.faceitLevel = null;
+    user.faceitElo = null;
+    user.faceitKD = null;
+    user.faceitWinrate = null;
+    user.faceitHS = null;
+    showToast(`FACEIT акаунт відв'язано для ${user.username}!`, "success");
+  } else {
+    user.linkedFaceitName = nick;
+    user.faceitLevel = isNaN(lvl) ? 1 : Math.max(1, Math.min(10, lvl));
+    user.faceitElo = isNaN(elo) ? 1000 : elo;
+    if (!user.faceitKD) user.faceitKD = "1.20";
+    if (!user.faceitWinrate) user.faceitWinrate = "52%";
+    if (!user.faceitHS) user.faceitHS = "45%";
+    showToast(`Дані FACEIT для ${user.username} оновлено!`, "success");
+  }
+
+  saveDB(db);
+  handleUserSearchAdmin();
+};
 
 // Render Admin Quests table progress
 function renderAdminQuests(db) {
