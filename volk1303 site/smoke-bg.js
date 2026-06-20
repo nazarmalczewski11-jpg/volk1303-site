@@ -185,7 +185,7 @@
     // Check page paths
     const path = window.location.pathname.toLowerCase();
     const isTournament = path.includes("tournament.html");
-    const isBetsPage = path.includes("betting.html") || path.includes("my-bets.html") || path.endsWith("/");
+    const isBetsPage = path.includes("betting.html") || path.includes("my-bets.html") || path.includes("profile.html") || path.endsWith("/");
 
     if (isTournament) {
       canvas.style.backgroundColor = "transparent";
