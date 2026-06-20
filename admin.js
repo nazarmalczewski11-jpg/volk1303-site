@@ -1116,7 +1116,7 @@ function renderDashboardOpsLog(db) {
   });
 
   // Sort events reverse-chronologically (newest first)
-  events.sort((a, b) => new Date(b.time) - new Date(a.time));
+  events.sort((a, b) => parseLocaleDateAdmin(b.time) - parseLocaleDateAdmin(a.time));
 
   if (events.length === 0) {
     container.innerHTML = `<span style="color:#4a5568;">[SYSTEM] Очікування активності користувачів...</span>`;
