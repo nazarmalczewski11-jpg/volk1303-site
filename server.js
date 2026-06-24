@@ -65,40 +65,7 @@ function readJsonDb() {
     
     // Auto-initialize quests if key is completely missing
     if (db.quests === undefined || db.quests === null) {
-      const defaultQuests = [
-        {
-          id: "first_bet",
-          title: "Перша кров",
-          description: "Зроби свою першу ставку на сайті",
-          reward: 100,
-          targetCount: 1,
-          type: "bets"
-        },
-        {
-          id: "five_wins",
-          title: "Капер-Початківець",
-          description: "Виграй 5 ставок на сайті",
-          reward: 250,
-          targetCount: 5,
-          type: "wins"
-        },
-        {
-          id: "tour_win",
-          title: "Аналітик Мейджору",
-          description: "Вгадай переможця турніру",
-          reward: 500,
-          targetCount: 1,
-          type: "tour_win"
-        },
-        {
-          id: "king_vcoin",
-          title: "Король Vcoin",
-          description: "Накопич 5000 монет на балансі",
-          reward: 1000,
-          targetCount: 5000,
-          type: "balance"
-        }
-      ];
+      const defaultQuests = [];
       db.quests = JSON.stringify(defaultQuests);
       fs.writeFileSync(JSON_DB_PATH, JSON.stringify(db, null, 2), 'utf-8');
     }

@@ -750,6 +750,16 @@
                 <label for="quest-target-input">Цільова кількість (Target)</label>
                 <input type="number" id="quest-target-input" class="form-input" placeholder="Напр: 5" min="1" required>
               </div>
+              <div class="form-group">
+                <label for="quest-type-input">Тип активності (Тип)</label>
+                <select id="quest-type-input" class="form-input" required>
+                  <option value="bets">Ставки (Будь-які крім дуелей)</option>
+                  <option value="duels_win">Виграні дуелі</option>
+                  <option value="wins">Виграні ставки (Будь-які)</option>
+                  <option value="tour_win">Виграні ставки на турніри</option>
+                  <option value="balance">Баланс (Досягнута сума)</option>
+                </select>
+              </div>
 
               <button type="submit" class="btn" style="grid-column: span 2; padding: 12px; font-weight: 800;">СТВОРИТИ КВЕСТ</button>
             </form>
