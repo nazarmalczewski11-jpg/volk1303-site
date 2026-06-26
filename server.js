@@ -150,11 +150,37 @@ const handlePostKey = async (req, res) => {
   }
 };
 
+// 4. DELETE key
+const handleDeleteKey = async (req, res) => {
+  const { key } = req.params;
+  
+  if (usePostgres) {
+    try {
+      await pool.query('DELETE FROM kv_store WHERE key = $1', [key]);
+      res.send('OK');
+    } catch (err) {
+      console.error(`Error deleting key ${key} from Postgres:`, err);
+      res.status(500).send('Internal Server Error');
+    }
+  } else {
+    // JSON Mode
+    const db = readJsonDb();
+    if (db[key] !== undefined) {
+      delete db[key];
+      writeJsonDb(db);
+    }
+    res.send('OK');
+  }
+};
+
 app.get('/api/:key', handleGetKey);
 app.get('/:key', handleGetKey);
 
 app.post('/api/:key', handlePostKey);
 app.post('/:key', handlePostKey);
+
+app.delete('/api/:key', handleDeleteKey);
+app.delete('/:key', handleDeleteKey);
 
 // 3. Health check route
 app.get('/', (req, res) => {

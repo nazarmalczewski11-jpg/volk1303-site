@@ -1214,7 +1214,7 @@ function renderAdminUsersTable(users) {
   });
 }
 
-window.deleteUserAdmin = function(username) {
+window.deleteUserAdmin = async function(username) {
   if (username.toLowerCase() === 'admin') {
     showToast("Неможливо видалити акаунт адміністратора!", "error");
     return;
@@ -1224,7 +1224,13 @@ window.deleteUserAdmin = function(username) {
   const db = getDB();
   db.users = db.users.filter(u => u.username.toLowerCase() !== username.toLowerCase());
 
-  saveDB(db);
+  try {
+    await fetch(CLOUD_BUCKET + 'user_' + username.toLowerCase(), { method: 'DELETE' });
+  } catch (err) {
+    console.error("Failed to delete user profile from backend:", err);
+  }
+
+  await saveDB(db);
   showToast(`Користувача ${username.toUpperCase()} успішно видалено!`, "success");
   renderAdminPanel();
 };
@@ -2040,6 +2046,7 @@ function renderDatabaseDepositsTable(users, searchQuery) {
       <td><span class="ops-log-tag ${badgeClass}" style="font-size:10px; padding:3px 8px;">${dep.method}</span></td>
       <td style="color:#26A17B; font-weight:800;">+${dep.amount} 🪙</td>
       <td style="font-size:11px; opacity:0.8;">${dep.date}</td>
+      <td><button class="btn btn-danger" style="padding:4px 8px; font-size:10px;" onclick="deleteDepositLogAdmin('${dep.username}', '${dep.date}')">Видалити</button></td>
     `;
     tbody.appendChild(tr);
   });
@@ -2054,6 +2061,7 @@ function renderDatabaseBetsTable(users, searchQuery) {
   users.forEach(u => {
     (u.betHistory || []).forEach(bet => {
       allBets.push({
+        id: bet.id || '',
         username: u.username,
         matchDisplay: bet.matchDisplay || 'Дуель',
         selectedTeam: bet.selectedTeam,
@@ -2073,7 +2081,7 @@ function renderDatabaseBetsTable(users, searchQuery) {
   });
 
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-secondary); padding: 20px;">Ставок не знайдено</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:var(--text-secondary); padding: 20px;">Ставок не знайдено</td></tr>`;
     return;
   }
 
@@ -2098,6 +2106,7 @@ function renderDatabaseBetsTable(users, searchQuery) {
       <td style="color:${bet.status === 'Виграш' ? '#26A17B' : 'white'}; font-weight:800;">${payoutText}</td>
       <td style="font-size:11px; opacity:0.8;">${bet.date}</td>
       <td><span class="ops-log-tag ${statusClass}" style="font-size:9px; padding:2px 6px;">${bet.status}</span></td>
+      <td><button class="btn btn-danger" style="padding:4px 8px; font-size:10px;" onclick="deleteBetLogAdmin('${bet.username}', '${bet.id}')">Видалити</button></td>
     `;
     tbody.appendChild(tr);
   });
@@ -2127,7 +2136,7 @@ function renderDatabaseLoginsTable(users, searchQuery) {
   });
 
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-secondary); padding: 20px;">Логів входів не знайдено</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-secondary); padding: 20px;">Логів входів не знайдено</td></tr>`;
     return;
   }
 
@@ -2149,10 +2158,71 @@ function renderDatabaseLoginsTable(users, searchQuery) {
       <td style="font-size:11px; opacity:0.8;">${log.date}</td>
       <td style="font-size:12px;">${log.device}</td>
       <td><span class="ops-log-tag ${typeBadge}" style="font-size:9px; padding:2px 6px;">${typeText}</span></td>
+      <td><button class="btn btn-danger" style="padding:4px 8px; font-size:10px;" onclick="deleteLoginLogAdmin('${log.username}', '${log.date}')">Видалити</button></td>
     `;
     tbody.appendChild(tr);
   });
 }
+
+window.deleteDepositLogAdmin = async function(username, date) {
+  if (!confirm(`Ви впевнені, що хочете видалити цей запис депозиту?`)) return;
+  const db = getDB();
+  const user = db.users.find(u => u.username.toLowerCase() === username.toLowerCase());
+  if (user) {
+    user.depositHistory = (user.depositHistory || []).filter(dep => dep.date !== date);
+    try {
+      await fetch(CLOUD_BUCKET + 'user_' + username.toLowerCase(), {
+        method: 'POST',
+        body: JSON.stringify(user)
+      });
+    } catch (e) {
+      console.error(e);
+    }
+    await saveDB(db);
+    showToast("Запис депозиту успішно видалено!", "success");
+    renderDatabaseTab();
+  }
+};
+
+window.deleteBetLogAdmin = async function(username, betId) {
+  if (!confirm(`Ви впевнені, що хочете видалити цей запис ставки?`)) return;
+  const db = getDB();
+  const user = db.users.find(u => u.username.toLowerCase() === username.toLowerCase());
+  if (user) {
+    user.betHistory = (user.betHistory || []).filter(b => b.id !== betId);
+    try {
+      await fetch(CLOUD_BUCKET + 'user_' + username.toLowerCase(), {
+        method: 'POST',
+        body: JSON.stringify(user)
+      });
+    } catch (e) {
+      console.error(e);
+    }
+    await saveDB(db);
+    showToast("Запис ставки успішно видалено!", "success");
+    renderDatabaseTab();
+  }
+};
+
+window.deleteLoginLogAdmin = async function(username, date) {
+  if (!confirm(`Ви впевнені, що хочете видалити цей запис входу?`)) return;
+  const db = getDB();
+  const user = db.users.find(u => u.username.toLowerCase() === username.toLowerCase());
+  if (user) {
+    user.loginHistory = (user.loginHistory || []).filter(log => log.date !== date);
+    try {
+      await fetch(CLOUD_BUCKET + 'user_' + username.toLowerCase(), {
+        method: 'POST',
+        body: JSON.stringify(user)
+      });
+    } catch (e) {
+      console.error(e);
+    }
+    await saveDB(db);
+    showToast("Запис входу успішно видалено!", "success");
+    renderDatabaseTab();
+  }
+};
 
 window.openUserInspector = function(username) {
   const db = getDB();

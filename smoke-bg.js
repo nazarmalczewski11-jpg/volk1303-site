@@ -186,6 +186,7 @@
     const path = window.location.pathname.toLowerCase();
     const isTournament = path.includes("tournament.html");
     const isBetsPage = path.includes("betting.html") || path.includes("my-bets.html") || path.endsWith("/");
+    const isProfilePage = path.includes("profile.html");
 
     if (isTournament) {
       canvas.style.backgroundColor = "transparent";
@@ -205,6 +206,16 @@
       document.body.style.setProperty("background-image", "linear-gradient(to bottom, rgba(8, 9, 12, 0.8) 0%, rgba(8, 9, 12, 0.7) 40%, rgba(8, 9, 12, 0.85) 100%), url('assets/bets_bg.jpg')", "important");
       document.body.style.setProperty("background-size", "cover", "important");
       document.body.style.setProperty("background-position", "center top", "important");
+      document.body.style.setProperty("background-attachment", "fixed", "important");
+      document.body.style.setProperty("background-color", "#08090c", "important");
+    } else if (isProfilePage) {
+      canvas.style.backgroundColor = "transparent";
+      canvas.style.backgroundImage = "none";
+      canvas.style.opacity = "0.35"; // Make the smoke more transparent
+
+      document.body.style.setProperty("background-image", "linear-gradient(to bottom, rgba(8, 9, 12, 0.8) 0%, rgba(8, 9, 12, 0.7) 40%, rgba(8, 9, 12, 0.85) 100%), url('assets/profile_bg.png')", "important");
+      document.body.style.setProperty("background-size", "cover", "important");
+      document.body.style.setProperty("background-position", "center center", "important");
       document.body.style.setProperty("background-attachment", "fixed", "important");
       document.body.style.setProperty("background-color", "#08090c", "important");
     } else {
