@@ -3971,7 +3971,7 @@ window.openBracketEditorCard = function(tourId, skipScroll = false) {
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid rgba(255,255,255,0.03); padding-bottom:6px;">
           <strong style="color:white; font-size:12px;">Матч ID: ${match.id}</strong>
           <div>
-            <select id="m-status-${rIndex}-${mIndex}" style="background:var(--bg-input); color:white; border:1px solid var(--border-color); font-size:11px; padding:4px 8px; border-radius:4px;">
+            <select id="m-status-${rIndex}-${mIndex}" onchange="saveBracketMatchAdmin(${rIndex}, ${mIndex})" style="background:var(--bg-input); color:white; border:1px solid var(--border-color); font-size:11px; padding:4px 8px; border-radius:4px;">
               <option value="upcoming" ${match.status === 'upcoming' ? 'selected' : ''}>Очікується</option>
               <option value="live" ${match.status === 'live' ? 'selected' : ''}>Активний</option>
               <option value="finished" ${match.status === 'finished' ? 'selected' : ''}>Завершений</option>
