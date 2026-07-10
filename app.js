@@ -4409,11 +4409,11 @@ window.openWithdrawModal = function() {
     const usdtAmt = document.getElementById('withdraw-usdt-amount');
     if (cardAmt) {
       cardAmt.max = user.balance;
-      cardAmt.placeholder = `Мін. 2000, макс. ${user.balance}`;
+      cardAmt.placeholder = `Мін. 2000 (доступно: ${user.balance})`;
     }
     if (usdtAmt) {
       usdtAmt.max = user.balance;
-      usdtAmt.placeholder = `Мін. 2000, макс. ${user.balance}`;
+      usdtAmt.placeholder = `Мін. 2000 (доступно: ${user.balance})`;
     }
   }
 
