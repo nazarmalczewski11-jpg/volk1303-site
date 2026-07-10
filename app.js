@@ -2952,7 +2952,7 @@ window.claimLevelReward = function() {
 function checkQuestCompleted(quest, user) {
   const target = quest.targetCount || 1;
   if (quest.type === "bets") {
-    const bets = (user.betHistory || []).filter(b => b.matchDisplay && !b.matchDisplay.startsWith("Дуель"));
+    const bets = (user.betHistory || []).filter(b => b.type === "tournament" || (b.matchDisplay && !b.matchDisplay.startsWith("Дуель")));
     return bets.length >= target;
   } else if (quest.type === "duels_win") {
     const duelsWon = (user.betHistory || []).filter(b => b.matchDisplay && b.matchDisplay.startsWith("Дуель") && b.status === "Виграш");
@@ -2973,7 +2973,7 @@ function checkQuestCompleted(quest, user) {
 function getQuestProgressText(quest, user) {
   const target = quest.targetCount || 1;
   if (quest.type === "bets") {
-    const bets = (user.betHistory || []).filter(b => b.matchDisplay && !b.matchDisplay.startsWith("Дуель"));
+    const bets = (user.betHistory || []).filter(b => b.type === "tournament" || (b.matchDisplay && !b.matchDisplay.startsWith("Дуель")));
     return `${Math.min(bets.length, target)} / ${target}`;
   } else if (quest.type === "duels_win") {
     const duelsWon = (user.betHistory || []).filter(b => b.matchDisplay && b.matchDisplay.startsWith("Дуель") && b.status === "Виграш");
@@ -4583,7 +4583,7 @@ function renderAchievements(user) {
     const target = quest.targetCount || 1;
     let progressVal = 0;
     if (quest.type === "bets") {
-      progressVal = history.filter(b => b.matchDisplay && !b.matchDisplay.startsWith("Дуель")).length;
+      progressVal = history.filter(b => b.type === "tournament" || (b.matchDisplay && !b.matchDisplay.startsWith("Дуель"))).length;
     } else if (quest.type === "duels_win") {
       progressVal = history.filter(b => b.matchDisplay && b.matchDisplay.startsWith("Дуель") && b.status === "Виграш").length;
     } else if (quest.type === "wins") {
