@@ -321,26 +321,28 @@ function getDB() {
   try {
     const db = JSON.parse(data);
     let dbUpdated = false;
-    // Ensure all critical collections and rosters are initialized
-    if (!db.users) db.users = [];
-    if (!db.teams) db.teams = [];
-    if (!db.matches) db.matches = [];
-    if (!db.aimLobbies) db.aimLobbies = [];
-    if (!db.promocodes) db.promocodes = [];
-    if (!db.tournaments) db.tournaments = [];
+    
+    // Parse stringified collections from cloud
+    const parseField = (f) => {
+      if (typeof f === 'string') {
+        try {
+          return JSON.parse(f);
+        } catch (e) {
+          console.error("Error parsing field:", e);
+        }
+      }
+      return f;
+    };
+    db.users = parseField(db.users) || [];
+    db.teams = parseField(db.teams) || [];
+    db.matches = parseField(db.matches) || [];
+    db.aimLobbies = parseField(db.aimLobbies) || [];
+    db.promocodes = parseField(db.promocodes) || [];
+    db.tournaments = parseField(db.tournaments) || [];
+    db.quests = parseField(db.quests) || [];
+    db.pendingWithdrawals = parseField(db.pendingWithdrawals) || [];
     if (!db.twitchStatus) db.twitchStatus = "live";
     if (!db.activeTwitchChannel) db.activeTwitchChannel = "volk13o3";
-    
-    // Quests initialization
-    if (db.quests === undefined || db.quests === null) {
-      db.quests = [];
-      dbUpdated = true;
-    }
-    
-    if (!db.pendingWithdrawals) {
-      db.pendingWithdrawals = [];
-      dbUpdated = true;
-    }
     
     // Defensive check to ensure admin user is present and has the correct password
     let adminUser = db.users.find(u => u.username === 'admin');

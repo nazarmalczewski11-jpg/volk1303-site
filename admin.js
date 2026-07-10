@@ -432,16 +432,28 @@ function getDB() {
   if (!data) return null;
   try {
     const db = JSON.parse(data);
-    // Ensure all critical collections are defensively initialized
-    if (!db.users) db.users = [];
-    if (!db.teams) db.teams = [];
-    if (!db.matches) db.matches = [];
-    if (!db.aimLobbies) db.aimLobbies = [];
-    if (!db.promocodes) db.promocodes = [];
-    if (!db.pendingDeposits) db.pendingDeposits = [];
-    if (!db.pendingWithdrawals) db.pendingWithdrawals = [];
-    if (!db.usedTxids) db.usedTxids = [];
-    if (!db.tournaments) db.tournaments = [];
+    
+    // Parse stringified collections from cloud
+    const parseField = (f) => {
+      if (typeof f === 'string') {
+        try {
+          return JSON.parse(f);
+        } catch (e) {
+          console.error("Error parsing field:", e);
+        }
+      }
+      return f;
+    };
+    db.users = parseField(db.users) || [];
+    db.teams = parseField(db.teams) || [];
+    db.matches = parseField(db.matches) || [];
+    db.aimLobbies = parseField(db.aimLobbies) || [];
+    db.promocodes = parseField(db.promocodes) || [];
+    db.pendingDeposits = parseField(db.pendingDeposits) || [];
+    db.pendingWithdrawals = parseField(db.pendingWithdrawals) || [];
+    db.usedTxids = parseField(db.usedTxids) || [];
+    db.tournaments = parseField(db.tournaments) || [];
+    db.quests = parseField(db.quests) || [];
     
     // Defensive check to ensure admin user is present and has the correct password
     let adminUser = db.users.find(u => u.username === 'admin');
