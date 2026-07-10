@@ -193,31 +193,43 @@
       canvas.style.backgroundImage = "none";
       canvas.style.opacity = "0.35"; // Make the smoke more transparent
 
-      document.body.style.setProperty("background-image", "linear-gradient(to bottom, rgba(8, 9, 12, 0.8) 0%, rgba(8, 9, 12, 0.7) 40%, rgba(8, 9, 12, 0.85) 100%), url('assets/tour_bg.png')", "important");
-      document.body.style.setProperty("background-size", "cover", "important");
-      document.body.style.setProperty("background-position", "center top", "important");
-      document.body.style.setProperty("background-attachment", "fixed", "important");
-      document.body.style.setProperty("background-color", "#08090c", "important");
+      document.documentElement.style.setProperty("background-image", "linear-gradient(to bottom, rgba(8, 9, 12, 0.5) 0%, rgba(8, 9, 12, 0.35) 40%, rgba(8, 9, 12, 0.55) 100%), url('assets/tour_bg.png')", "important");
+      document.documentElement.style.setProperty("background-size", "cover", "important");
+      document.documentElement.style.setProperty("background-position", "center top", "important");
+      document.documentElement.style.setProperty("background-attachment", "fixed", "important");
+      document.documentElement.style.setProperty("background-color", "#08090c", "important");
+      
+      document.body.style.setProperty("background", "transparent", "important");
+      document.body.style.setProperty("background-image", "none", "important");
+      document.body.style.setProperty("background-color", "transparent", "important");
     } else if (isBetsPage) {
       canvas.style.backgroundColor = "transparent";
       canvas.style.backgroundImage = "none";
       canvas.style.opacity = "0.35"; // Make the smoke more transparent
 
-      document.body.style.setProperty("background-image", "linear-gradient(to bottom, rgba(8, 9, 12, 0.8) 0%, rgba(8, 9, 12, 0.7) 40%, rgba(8, 9, 12, 0.85) 100%), url('assets/bets_bg.jpg')", "important");
-      document.body.style.setProperty("background-size", "cover", "important");
-      document.body.style.setProperty("background-position", "center top", "important");
-      document.body.style.setProperty("background-attachment", "fixed", "important");
-      document.body.style.setProperty("background-color", "#08090c", "important");
+      document.documentElement.style.setProperty("background-image", "linear-gradient(to bottom, rgba(8, 9, 12, 0.5) 0%, rgba(8, 9, 12, 0.35) 40%, rgba(8, 9, 12, 0.55) 100%), url('assets/bets_bg.jpg')", "important");
+      document.documentElement.style.setProperty("background-size", "cover", "important");
+      document.documentElement.style.setProperty("background-position", "center top", "important");
+      document.documentElement.style.setProperty("background-attachment", "fixed", "important");
+      document.documentElement.style.setProperty("background-color", "#08090c", "important");
+
+      document.body.style.setProperty("background", "transparent", "important");
+      document.body.style.setProperty("background-image", "none", "important");
+      document.body.style.setProperty("background-color", "transparent", "important");
     } else if (isProfilePage) {
       canvas.style.backgroundColor = "transparent";
       canvas.style.backgroundImage = "none";
       canvas.style.opacity = "0.35"; // Make the smoke more transparent
 
-      document.body.style.setProperty("background-image", "linear-gradient(to bottom, rgba(8, 9, 12, 0.8) 0%, rgba(8, 9, 12, 0.7) 40%, rgba(8, 9, 12, 0.85) 100%), url('assets/profile_bg.png')", "important");
-      document.body.style.setProperty("background-size", "cover", "important");
-      document.body.style.setProperty("background-position", "center center", "important");
-      document.body.style.setProperty("background-attachment", "fixed", "important");
-      document.body.style.setProperty("background-color", "#08090c", "important");
+      document.documentElement.style.setProperty("background-image", "linear-gradient(to bottom, rgba(8, 9, 12, 0.5) 0%, rgba(8, 9, 12, 0.35) 40%, rgba(8, 9, 12, 0.55) 100%), url('assets/profile_bg.png')", "important");
+      document.documentElement.style.setProperty("background-size", "cover", "important");
+      document.documentElement.style.setProperty("background-position", "center center", "important");
+      document.documentElement.style.setProperty("background-attachment", "fixed", "important");
+      document.documentElement.style.setProperty("background-color", "#08090c", "important");
+
+      document.body.style.setProperty("background", "transparent", "important");
+      document.body.style.setProperty("background-image", "none", "important");
+      document.body.style.setProperty("background-color", "transparent", "important");
     } else {
       // Set uniform deep dark solid color background for the canvas (NO wallpaper, NO gradient)
       canvas.style.backgroundColor = "#08090c";
