@@ -4656,7 +4656,7 @@ function renderAchievements(user) {
           </div>
           <div class="flex justify-between items-center text-[9px] font-bold text-gray-400">
             <span>Прогрес: ${progressText}</span>
-            <span class="text-white flex items-center gap-1"><span class="material-icons-outlined text-[10px]">emoji_events</span> ${quest.reward} XP</span>
+            <span class="text-white flex items-center gap-1">🪙 ${quest.reward}</span>
           </div>
         </div>
       </div>
