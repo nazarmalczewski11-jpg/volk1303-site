@@ -2821,7 +2821,6 @@ window.openAddTournamentModal = function() {
     // Offset local timezone
     const tzOffset = now.getTimezoneOffset() * 60000;
     const localISOTime = (new Date(now - tzOffset)).toISOString().slice(0, 16);
-    dtInput.min = localISOTime;
     dtInput.value = localISOTime;
   }
 
@@ -2852,9 +2851,6 @@ window.openEditTournamentModal = function(tourId) {
   
   const dtInput = document.getElementById('tour-datetime');
   if (dtInput) {
-    const now = new Date();
-    const tzOffset = now.getTimezoneOffset() * 60000;
-    dtInput.min = (new Date(now - tzOffset)).toISOString().slice(0, 16);
     dtInput.value = tour.datetime || "";
   }
 
