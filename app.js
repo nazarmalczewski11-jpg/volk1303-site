@@ -3628,7 +3628,7 @@ function isTournamentBettingFrozen(tour) {
       if (match.status === 'live' || match.status === 'active' || match.status === 'upcoming') {
         const s1 = parseInt(match.score1) || 0;
         const s2 = parseInt(match.score2) || 0;
-        if (Math.abs(s1 - s2) >= 6) {
+        if (Math.abs(s1 - s2) >= 7) {
           return true;
         }
       }
@@ -3723,7 +3723,7 @@ function renderTournamentBettingPortal(tourId) {
     ${frozen ? `
       <div style="background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.25); border-radius:10px; padding:12px 16px; margin-bottom:16px; display:flex; align-items:center; gap:10px; color:#ef4444; font-size:12px; font-weight:800; box-shadow:0 4px 12px rgba(239,68,68,0.05);">
         <span style="font-size:16px; animation: pulse 1.5s infinite;">❄️</span>
-        <span>СТАВКИ ЗАМОРОЖЕНО (одна з команд перемагає на 6+ раундів)</span>
+        <span>СТАВКИ ЗАМОРОЖЕНО (одна з команд перемагає на 7+ раундів)</span>
       </div>
     ` : ''}
     <div style="margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;">
@@ -3940,7 +3940,7 @@ window.placeTournamentBet = function(tourId, teamId, teamName, odds, matchMapNam
   }
 
   if (isTournamentBettingFrozen(tour)) {
-    showToast('Ставки на цей турнір заморожено (різниця в рахунку матчу 6+ раундів)!', 'error');
+    showToast('Ставки на цей турнір заморожено (різниця в рахунку матчу 7+ раундів)!', 'error');
     return;
   }
 
@@ -4059,7 +4059,7 @@ window.submitBetModalForm = function(event) {
     }
 
     if (isTournamentBettingFrozen(tour)) {
-      showToast('Ставки на цей турнір заморожено (різниця в рахунку матчу 6+ раундів)!', 'error');
+      showToast('Ставки на цей турнір заморожено (різниця в рахунку матчу 7+ раундів)!', 'error');
       closeModal('bet-modal');
       return;
     }
